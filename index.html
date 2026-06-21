@@ -1,0 +1,2488 @@
+<!DOCTYPE html>
+<html lang="zh-TW" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>急診醫學評核系統 v5.2</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- Firestore accessed via REST API (no SDK needed - more reliable on mobile/file:// contexts) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0b1121;--bg2:#111827;--bg3:#1a2235;--card:#151d2e;
+  --border:#1e2d45;--acc:#00c9a7;--a2:#3b82f6;--a3:#f59e0b;
+  --danger:#ef4444;--purple:#a855f7;
+  --text:#e2e8f0;--t2:#94a3b8;--t3:#475569;
+  --r:12px;--rs:8px;--sw:252px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Noto Sans TC',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:var(--sw);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:200;transition:transform .3s}
+.sb-logo{padding:14px 16px 10px;border-bottom:1px solid var(--border)}
+.sb-tag{font-family:'DM Mono',monospace;font-size:9px;color:var(--acc);letter-spacing:3px;text-transform:uppercase;margin-bottom:3px}
+.sb-logo h1{font-size:12.5px;font-weight:700;line-height:1.4}
+.sb-nav{flex:1;padding:6px 0;overflow-y:auto}
+.ns{padding:6px 14px 2px;font-size:9px;font-weight:600;color:var(--t3);letter-spacing:2px;text-transform:uppercase}
+.ni{display:flex;align-items:center;gap:8px;padding:7px 16px;cursor:pointer;color:var(--t2);font-size:12px;border-left:3px solid transparent;transition:all .15s;user-select:none}
+.ni:hover{background:var(--bg3);color:var(--text)}
+.ni.active{background:rgba(0,201,167,.09);color:var(--acc);border-left-color:var(--acc);font-weight:500}
+.ni .ic{font-size:13px;width:17px;text-align:center}
+.nb{margin-left:auto;background:var(--danger);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px}
+.sb-foot{padding:9px 11px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:5px}
+.mdb{width:100%;padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--t2);font-size:11px;cursor:pointer;font-family:inherit;transition:all .15s;text-align:center}
+.mdb:hover{border-color:var(--acc);color:var(--acc)}
+.mdb.adm{border-color:var(--purple);color:var(--purple);background:rgba(168,85,247,.08)}
+.cst{text-align:center;font-size:10px;padding:3px 6px;border-radius:6px;background:var(--bg3);color:var(--t3)}
+.cst.ok{color:var(--acc);background:rgba(0,201,167,.08)}
+.cst.err{color:var(--danger);background:rgba(239,68,68,.08)}
+.cst.err{color:var(--danger);background:rgba(239,68,68,.08)}
+.att-badge{font-size:10px;padding:3px 8px;border-radius:10px;background:rgba(0,201,167,.12);color:var(--acc);border:1px solid rgba(0,201,167,.25);text-align:center;font-weight:600}
+.sbo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:199}
+.sbt{display:none;position:fixed;top:12px;left:12px;z-index:201;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;cursor:pointer;font-size:18px;color:var(--text)}
+.main{margin-left:var(--sw);min-height:100vh}
+.topbar{height:52px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:var(--bg);position:sticky;top:0;z-index:100}
+.tbt{font-size:14px;font-weight:600}
+.tbr{display:flex;align-items:center;gap:8px}
+.badge{padding:3px 9px;border-radius:20px;font-size:10px;font-weight:500;border:1px solid}
+.bdg{background:rgba(0,201,167,.12);color:var(--acc);border-color:rgba(0,201,167,.3)}
+.bdp{background:rgba(168,85,247,.12);color:var(--purple);border-color:rgba(168,85,247,.3)}
+.content{padding:18px 20px}
+.page{display:none}.page.active{display:block}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px}
+.ct{font-size:11px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px}
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--acc)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;position:relative;overflow:hidden}
+.stat::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.sg::before{background:var(--acc)}.sb::before{background:var(--a2)}.sy::before{background:var(--a3)}.sr::before{background:var(--danger)}.sp::before{background:var(--purple)}
+.sl{font-size:10px;color:var(--t3);margin-bottom:4px;font-weight:500}
+.sv{font-size:20px;font-weight:700;font-family:'DM Mono',monospace}
+.ss{font-size:10px;color:var(--t2);margin-top:1px}
+.fg{margin-bottom:11px}
+label{display:block;font-size:11px;font-weight:500;color:var(--t2);margin-bottom:4px}
+select,input,textarea{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--rs);color:var(--text);padding:7px 10px;font-size:13px;font-family:inherit;outline:none;transition:border-color .15s}
+select:focus,input:focus,textarea:focus{border-color:var(--acc)}
+input:disabled,select:disabled{opacity:.4;cursor:not-allowed}
+textarea{resize:vertical;min-height:68px}
+.req{color:var(--danger);margin-left:2px}
+.mf{border-color:rgba(239,68,68,.4)!important}
+.fil{border-color:rgba(0,201,167,.35)!important}
+/* MS TABLE */
+.ms-section{margin-bottom:20px}
+.ms-sec-hd{font-size:13px;font-weight:700;padding:7px 0 5px;border-bottom:2px solid var(--border);margin-bottom:2px;display:flex;align-items:center;gap:8px}
+.ms-sec-desc{font-size:11px;color:var(--t3);margin-bottom:9px;padding:5px 9px;background:rgba(59,130,246,.05);border-left:3px solid var(--a2);border-radius:0 5px 5px 0;line-height:1.5}
+.ms-tbl{width:100%;border-collapse:collapse}
+.ms-tbl th{font-size:10.5px;color:var(--t3);font-weight:500;padding:5px 8px;border-bottom:1px solid var(--border);white-space:nowrap}
+.ms-tbl th:first-child{text-align:left;width:52%}
+.ms-tbl th:not(:first-child){text-align:center;width:16%}
+.ms-tbl td{padding:6px 8px;border-bottom:1px solid rgba(30,45,69,.4);font-size:12px;vertical-align:middle}
+.ms-tbl td:not(:first-child){text-align:center}
+.ms-tbl tr:hover td{background:rgba(255,255,255,.015)}
+.ms-tbl tr.lvsep td{background:rgba(255,255,255,.02);padding:4px 8px 2px;font-size:10.5px}
+.ms-tbl tr.lkd-row td{opacity:.4}
+.lvtag{display:inline-block;font-family:'DM Mono',monospace;font-size:9px;font-weight:600;padding:1px 6px;border-radius:7px}
+.lv1{background:rgba(239,68,68,.15);color:#ef4444}.lv2{background:rgba(249,115,22,.15);color:#f97316}
+.lv3{background:rgba(234,179,8,.15);color:#eab308}.lv4{background:rgba(34,197,94,.15);color:#22c55e}
+.ropt{display:flex;align-items:center;justify-content:center;min-width:44px;min-height:44px}
+.ropt input[type=radio]{accent-color:var(--acc);width:22px;height:22px;cursor:pointer}
+/* EPA RATING */
+.rg{margin-bottom:14px;position:relative;border:1px solid var(--border);border-radius:var(--rs);padding:11px;background:rgba(255,255,255,.01)}
+.rg.lkd{opacity:.45;pointer-events:none}
+.rl{font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px}
+.rd{font-size:10px;color:var(--t3);margin-bottom:6px;line-height:1.4}
+.epa-lv-box{background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);border-radius:7px;padding:7px 9px;margin-bottom:7px;font-size:11px;color:var(--t2);line-height:1.65}
+.rscale{display:flex;gap:4px}
+.rb{flex:1;min-width:34px;padding:6px 2px;border:1px solid var(--border);border-radius:6px;background:var(--bg3);color:var(--t2);font-size:10.5px;cursor:pointer;text-align:center;transition:all .15s;font-family:'DM Mono',monospace;font-weight:500;line-height:1.3}
+.rb:hover:not(:disabled){border-color:var(--acc);color:var(--acc)}
+.rb.s.l1{background:#ef4444;border-color:#ef4444;color:#fff}
+.rb.s.l2{background:#f97316;border-color:#f97316;color:#fff}
+.rb.s.l3{background:#eab308;border-color:#eab308;color:#000}
+.rb.s.l4{background:#22c55e;border-color:#22c55e;color:#000}
+.rb.s.l5{background:#00c9a7;border-color:#00c9a7;color:#000}
+.sclbl{display:flex;justify-content:space-between;font-size:9px;color:var(--t3);margin-top:1px}
+/* FEEDBACK */
+.fb-box{margin-top:7px;background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:7px;padding:9px}
+.fb-title{font-size:10.5px;color:var(--t2);font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.fb-tools{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
+.pre-btn{padding:2px 8px;border:1px solid var(--border);border-radius:13px;background:var(--bg3);color:var(--t2);font-size:10.5px;cursor:pointer;transition:all .15s;font-family:inherit}
+.pre-btn:hover{border-color:var(--acc);color:var(--acc)}
+/* EPA SELECTION */
+.epa-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px}
+.epabtn{padding:9px 11px;border:1.5px solid var(--border);border-radius:var(--rs);background:var(--bg3);color:var(--t2);cursor:pointer;text-align:left;transition:all .2s;font-family:inherit}
+.epabtn:hover:not(:disabled){border-color:var(--a2);color:var(--text)}
+.epabtn.sel{border-color:var(--acc);background:rgba(0,201,167,.08);color:var(--acc)}
+.epabtn.lkd{opacity:.45;cursor:not-allowed}
+.ec{font-family:'DM Mono',monospace;font-size:10px;font-weight:600;margin-bottom:2px}
+.en{font-size:11.5px;font-weight:500}
+/* MS SELECTION */
+.ms-sel-wrap{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:12px}
+.ms-grp-title{font-size:10.5px;font-weight:600;color:var(--t2);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
+.ms-grp-cnt{font-size:10px;color:var(--acc);font-family:'DM Mono',monospace}
+.ms-chip-wrap{display:flex;flex-wrap:wrap;gap:7px}
+.mchip{padding:7px 12px;border:1.5px solid var(--border);border-radius:10px;background:var(--bg3);color:var(--t2);cursor:pointer;font-size:13px;transition:all .2s;font-family:inherit;min-width:80px;text-align:center}
+.mchip:active{transform:scale(.96)}
+.mchip.sel{border-color:var(--acc);background:rgba(0,201,167,.08);color:var(--acc)}
+.mchip.lkd{opacity:.4;cursor:not-allowed}
+/* WIZARD */
+.wiz-steps{display:flex;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto}
+.ws{flex:1;text-align:center;padding:8px 4px;font-size:10.5px;color:var(--t3);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;white-space:nowrap}
+.ws.active{color:var(--acc);border-bottom-color:var(--acc);font-weight:600}
+.ws.done{color:var(--a2);border-bottom-color:var(--a2)}
+.wpane{display:none}.wpane.active{display:block}
+/* IMAGING */
+.img-scroll{max-height:190px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--rs);background:var(--bg3)}
+.img-item{display:flex;align-items:center;gap:8px;padding:6px 11px;cursor:pointer;border-bottom:1px solid rgba(30,45,69,.4);transition:background .12s}
+.img-item:last-child{border-bottom:none}
+.img-item:hover{background:rgba(255,255,255,.02)}
+.img-item input[type=radio]{accent-color:var(--acc);width:13px;height:13px}
+.img-item label{font-size:12px;color:var(--text);cursor:pointer}
+.img-type-row{display:flex;gap:7px;flex-wrap:wrap}
+.itbtn{padding:5px 13px;border:1.5px solid var(--border);border-radius:18px;background:var(--bg3);color:var(--t2);cursor:pointer;font-size:11.5px;transition:all .2s;font-family:inherit}
+.itbtn.sel{border-color:var(--acc);background:rgba(0,201,167,.08);color:var(--acc)}
+.star-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(30,45,69,.5)}
+.star-row:last-child{border-bottom:none}
+.starbtn{width:27px;height:27px;border:1px solid var(--border);border-radius:5px;background:var(--bg3);color:var(--t2);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.starbtn.on{background:var(--a3);border-color:var(--a3);color:#000}
+/* BTNS */
+.btn{padding:7px 14px;border-radius:var(--rs);font-size:12px;font-weight:500;cursor:pointer;border:none;font-family:inherit;transition:all .15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.bp{background:var(--acc);color:#000}.bp:hover{background:#00b894}
+.bs{background:transparent;border:1px solid var(--border);color:var(--t2)}.bs:hover{border-color:var(--acc);color:var(--acc)}
+.bd{background:var(--danger);color:#fff}.bpu{background:var(--purple);color:#fff}
+.bsm{padding:5px 10px;font-size:11px}.bxs{padding:3px 7px;font-size:10.5px}
+.bln{background:#06C755;color:#fff}.bem{background:var(--a2);color:#fff}
+/* TABLE */
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:7px 9px;font-size:9.5px;color:var(--t3);font-weight:600;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border)}
+td{padding:7px 9px;font-size:12px;border-bottom:1px solid rgba(30,45,69,.5);vertical-align:middle}
+tr:hover td{background:rgba(255,255,255,.015)}
+.pill{display:inline-block;padding:2px 7px;border-radius:9px;font-size:10px;font-weight:600;font-family:'DM Mono',monospace}
+.p1{background:rgba(239,68,68,.15);color:#ef4444}.p2{background:rgba(249,115,22,.15);color:#f97316}
+.p3{background:rgba(234,179,8,.15);color:#eab308}.p4{background:rgba(34,197,94,.15);color:#22c55e}
+.p5{background:rgba(0,201,167,.15);color:#00c9a7}
+.tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:11px;overflow-x:auto}
+.tab{padding:6px 11px;font-size:11px;font-weight:500;cursor:pointer;color:var(--t3);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;white-space:nowrap}
+.tab.active{color:var(--acc);border-bottom-color:var(--acc)}
+.sh{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:13px;flex-wrap:wrap;gap:8px}
+.st{font-size:15px;font-weight:700}
+.ss2{font-size:11.5px;color:var(--t3);margin-top:2px}
+.mb4{margin-bottom:13px}.mt4{margin-top:13px}.mt3{margin-top:9px}
+.ifl{display:flex;gap:7px;align-items:center}
+.fe{justify-content:flex-end}
+.cw{position:relative;height:220px}
+/* MODAL */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:300;display:none;align-items:center;justify-content:center;padding:12px}
+.ov.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:var(--r);width:100%;max-width:720px;max-height:93vh;overflow-y:auto;padding:20px}
+.mh{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:13px}
+.mt2{font-size:14px;font-weight:700}
+.mc{background:none;border:none;color:var(--t2);font-size:18px;cursor:pointer;padding:2px 5px;border-radius:4px;line-height:1}
+.mc:hover{background:var(--border);color:var(--text)}
+/* ALERTS */
+.al{padding:8px 11px;border-radius:var(--rs);font-size:12px;margin-bottom:10px}
+.aok{background:rgba(0,201,167,.1);border:1px solid rgba(0,201,167,.3);color:var(--acc)}
+.aw{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:var(--a3)}
+.ai{background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.3);color:var(--a2)}
+.ae{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--danger)}
+.hidden{display:none!important}
+.prog-wrap{background:var(--bg3);border-radius:4px;height:5px;margin-top:3px}
+.prog-bar{height:100%;border-radius:4px;transition:width .4s}
+/* ADMIN */
+.ah{font-size:11px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.tw{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(30,45,69,.5)}
+.tw:last-child{border-bottom:none}
+.tl{font-size:11.5px;color:var(--text)}
+.tsb{font-size:10px;color:var(--t3);margin-top:1px}
+.tog{position:relative;width:34px;height:18px;flex-shrink:0}
+.tog input{opacity:0;width:0;height:0;position:absolute}
+.tsl{position:absolute;inset:0;background:var(--bg3);border:1px solid var(--border);border-radius:9px;cursor:pointer;transition:.2s}
+.tsl::before{content:'';position:absolute;height:12px;width:12px;left:2px;top:2px;background:var(--t3);border-radius:50%;transition:.2s}
+.tog input:checked+.tsl{background:rgba(0,201,167,.2);border-color:var(--acc)}
+.tog input:checked+.tsl::before{background:var(--acc);transform:translateX(16px)}
+/* SCHEDULE */
+.sc-cell{background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:5px 6px;min-height:44px;cursor:pointer;transition:border-color .15s}
+.sc-cell:hover{border-color:var(--a2)}.sc-cell.hd{border-color:rgba(0,201,167,.35);background:rgba(0,201,167,.03)}.sc-cell.td{border-color:var(--a2)}
+.dchip{display:inline-flex;align-items:center;gap:3px;background:rgba(59,130,246,.13);border:1px solid rgba(59,130,246,.22);color:var(--a2);font-size:9.5px;padding:1px 5px;border-radius:6px;margin:1px;cursor:pointer}
+.dchip:hover{background:rgba(239,68,68,.1);color:var(--danger)}
+.dav{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--a2),var(--purple));display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0}
+.stag{display:inline-block;font-family:'DM Mono',monospace;font-size:9px;padding:1px 5px;border-radius:6px;font-weight:600}
+.stA{background:rgba(0,201,167,.15);color:var(--acc)}.stB{background:rgba(59,130,246,.15);color:var(--a2)}.stN{background:rgba(168,85,247,.15);color:var(--purple)}
+.who-bar{background:linear-gradient(90deg,rgba(59,130,246,.07),rgba(0,201,167,.07));border:1px solid rgba(59,130,246,.18);border-radius:8px;padding:8px 13px;margin-bottom:13px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+/* SHHER */
+.shher-tbl{width:100%;border-collapse:collapse;font-size:11px}
+.shher-tbl th{background:var(--bg3);padding:5px 7px;border:1px solid var(--border);text-align:center;font-size:9.5px;color:var(--t3);font-weight:600}
+.shher-tbl td{padding:5px 7px;border:1px solid var(--border);text-align:center;font-size:11px}
+.shher-tbl td:first-child{text-align:left;font-size:11.5px;color:var(--text);white-space:nowrap}
+.cell-pass{background:rgba(34,197,94,.18);color:#22c55e;font-weight:600}
+.cell-fail{background:rgba(239,68,68,.12);color:#ef4444}
+.cell-exp{background:rgba(59,130,246,.08);color:var(--a2)}
+/* ATT CALENDAR */
+.acc-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.acd{border-radius:5px;padding:4px;text-align:center;font-size:10.5px;font-family:'DM Mono',monospace;cursor:pointer;transition:all .15s;min-height:40px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:1px}
+.acd.empty{background:transparent;cursor:default}
+.acd.hass{background:rgba(0,201,167,.15);border:1px solid rgba(0,201,167,.3);color:var(--acc)}
+.acd.noss{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:var(--danger)}
+.acd.nosc{background:var(--bg3);border:1px solid var(--border);color:var(--t3)}
+.acd.tod{outline:2px solid var(--a2);outline-offset:1px}
+/* ATT SELECTOR */
+.att-sel-card{background:var(--bg2);border:2px solid var(--acc);border-radius:var(--r);padding:18px;text-align:center;margin-bottom:18px}
+.att-sel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:7px}
+.att-sel-btn{padding:9px 7px;border:1.5px solid var(--border);border-radius:var(--rs);background:var(--bg3);color:var(--t2);cursor:pointer;font-family:inherit;font-size:11.5px;transition:all .2s;text-align:center}
+.att-sel-btn:hover{border-color:var(--a2);color:var(--text)}
+.att-sel-btn.active{border-color:var(--acc);background:rgba(0,201,167,.1);color:var(--acc);font-weight:600}
+/* THANK YOU PAGE */
+.ty-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;gap:16px}
+.ty-icon{font-size:64px;line-height:1}
+.ty-title{font-size:22px;font-weight:700;color:var(--acc)}
+.ty-sub{font-size:14px;color:var(--t2);max-width:400px;line-height:1.6}
+/* GRAD */
+.grad-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:9px;font-size:10px;background:rgba(168,85,247,.12);color:var(--purple);border:1px solid rgba(168,85,247,.25)}
+/* SCHED PASTE */
+.paste-area{width:100%;min-height:120px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--rs);color:var(--text);padding:10px;font-size:11.5px;font-family:'DM Mono',monospace;resize:vertical}
+.paste-area:focus{outline:none;border-color:var(--acc)}
+/* Theme button */
+.theme-btn{width:100%;padding:7px 10px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--t3);font-size:12px;cursor:pointer;font-family:inherit;transition:all .15s;text-align:center}
+.theme-btn:hover{border-color:var(--a3);color:var(--a3)}
+/* Light theme */
+[data-theme="light"]{--bg:#f0f4f8;--bg2:#ffffff;--bg3:#e8edf5;--card:#ffffff;--border:#ccd6e8;--text:#1a2235;--t2:#4a5568;--t3:#718096}
+[data-theme="light"] table th{background:var(--bg3)}
+[data-theme="light"] .topbar{background:var(--bg)}
+body{font-size:var(--base-font,17px)}
+
+/* ══════════════════════════════════════════
+   MOBILE: app-like touch interface
+   ══════════════════════════════════════════ */
+@media(max-width:768px){
+  :root{--sw:0px}
+  .sidebar{transform:translateX(-252px);width:252px}
+  .sidebar.open{transform:translateX(0)}
+  .sbo.open{display:block}
+  .sbt{display:flex;align-items:center;justify-content:center}
+  .main{margin-left:0}
+  .topbar{padding-left:52px}
+  .g2,.g3,.g4{grid-template-columns:1fr}
+  .epa-grid,.ms-sel-wrap{grid-template-columns:1fr}
+  .content{padding:12px 11px;padding-bottom:90px} /* leave room for sticky bottom bar */
+  .wiz-nav{display:none} /* replaced by sticky mob-bottom-bar */
+  body{padding:0}
+  .wiz-steps{gap:0}
+  .ws{font-size:11px;padding:8px 3px}
+
+  /* App-style selectable cards (EPA / Milestone chips) replace tiny buttons */
+  .epabtn{padding:16px 14px;border-radius:14px;display:flex;align-items:center;gap:12px;min-height:60px}
+  .epabtn::before{content:'';width:22px;height:22px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;transition:all .15s}
+  .epabtn.sel::before{background:var(--acc);border-color:var(--acc);box-shadow:inset 0 0 0 3px var(--bg3)}
+  .ec{margin-bottom:1px}
+  .en{font-size:15px}
+
+  .mchip{min-height:56px;padding:10px 12px;border-radius:14px;display:flex;flex-direction:column;justify-content:center;width:100%}
+  .ms-chip-wrap{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+  /* Rating scale: large tappable app-style segments */
+  .rscale{gap:6px}
+  .rb{font-size:13px;padding:14px 4px;border-radius:12px;min-height:54px}
+
+  /* Sticky bottom action bar for wizard navigation (native-app feel) */
+  .mob-bottom-bar{position:fixed;left:0;right:0;bottom:0;background:var(--bg2);border-top:1px solid var(--border);padding:10px 14px calc(10px + env(safe-area-inset-bottom));display:flex;gap:10px;z-index:150;box-shadow:0 -4px 16px rgba(0,0,0,.12)}
+  .mob-bottom-bar .btn{flex:1;justify-content:center;padding:13px;font-size:15px;border-radius:12px}
+  .mob-bottom-bar.hidden{display:none}
+
+  /* Larger tap targets across the board */
+  .btn{min-height:42px}
+  .tab{padding:10px 14px;font-size:14px}
+  select,input,textarea{font-size:16px;padding:11px 12px} /* 16px prevents iOS auto-zoom */
+  .att-sel-btn{padding:16px 10px;border-radius:14px;font-size:14px}
+  .att-sel-grid{grid-template-columns:repeat(2,1fr)}
+
+  /* Larger radio/checkbox tap zones */
+  .ropt{min-width:48px;min-height:48px}
+  .ropt input[type=radio]{width:24px;height:24px}
+
+  /* Cards: more breathing room, rounder corners (native feel) */
+  .card{border-radius:16px;padding:14px}
+  .stat{border-radius:14px}
+
+  /* Modal becomes bottom sheet on mobile */
+  .ov{align-items:flex-end;padding:0}
+  .modal{border-radius:18px 18px 0 0;max-width:100%;width:100%;max-height:88vh;padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+}
+@media(max-width:400px){
+  .ms-chip-wrap{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div id="origin-warn-banner" class="hidden" style="position:fixed;top:0;left:0;right:0;z-index:300;background:#f59e0b;color:#1a1a1a;padding:10px 16px;font-size:13px;text-align:center;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.2)">
+  ⚠️ 偵測到此頁面非透過正式網址開啟，雲端同步可能不穩定 — <a href="#" onclick="nav('firebase');document.getElementById('origin-warn-banner').classList.add('hidden');return false;" style="color:#1a1a1a;text-decoration:underline">點此查看徹底解決方式</a>
+  <span style="cursor:pointer;margin-left:10px;font-weight:700" onclick="document.getElementById('origin-warn-banner').classList.add('hidden');document.body.style.paddingTop=''">✕</span>
+</div>
+<button class="sbt" onclick="toggleSB()">☰</button>
+<div class="sbo" id="sbo" onclick="closeSB()"></div>
+<aside class="sidebar" id="sb">
+  <div class="sb-logo">
+    <div class="sb-tag">TSEM · CBME 2025 v5.2</div>
+    <h1>急診醫學<br>住院醫師評核系統</h1>
+  </div>
+  <nav class="sb-nav">
+    <div class="ns">主要功能</div>
+    <div class="ni active" onclick="nav('dashboard',this)"><span class="ic">📊</span>儀表板</div>
+    <div class="ni" onclick="nav('assess',this)"><span class="ic">✏️</span>新增評核（MS+EPA）</div>
+    
+    <div class="ns">紀錄與分析</div>
+    <div class="ni" onclick="nav('history',this)"><span class="ic">📋</span>評核紀錄</div>
+    <div class="ni" onclick="nav('analytics',this)"><span class="ic">📈</span>統計分析</div>
+    <div class="ni" onclick="nav('shher',this)"><span class="ic">🏥</span>SHHER 執業矩陣</div>
+    <div class="ns">人員與排班</div>
+    <div class="ni" onclick="nav('residents',this)"><span class="ic">👩‍⚕️</span>住院醫師</div>
+    <div class="ni" onclick="nav('attendings',this)"><span class="ic">🩺</span>主治醫師</div>
+    <div class="ni" onclick="nav('schedule',this)"><span class="ic">📅</span>班表</div>
+    <div class="ns">工具</div>
+    <div class="ni" onclick="nav('graduated',this)"><span class="ic">🎓</span>已畢業學員</div>
+    <div class="ni" onclick="nav('export',this)"><span class="ic">⬇️</span>匯出報告</div>
+    <div class="ni admin-only hidden" id="ni-remind" onclick="nav('remind',this)">
+      <span class="ic">🔔</span>提醒未填答<span class="nb hidden" id="rbadge">0</span>
+    </div>
+    <div class="ni admin-only hidden" onclick="nav('admin',this)"><span class="ic">⚙️</span>系統管理員</div>
+    <div class="ni" onclick="nav('firebase',this)"><span class="ic">☁️</span>雲端設定</div>
+  </nav>
+  <div class="sb-foot">
+    <div style="position:relative"><div class="cst" id="cst">☁️ 未連線</div><div id="sync-ind" style="position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:var(--acc);opacity:0;transition:opacity .3s"></div></div>
+    <div class="att-badge" id="att-badge">未選擇主治醫師</div>
+    <button class="mdb" id="mdb" onclick="toggleMode()">🔒 切換管理員模式</button>
+    <button class="theme-btn" onclick="toggleTheme()">🌗 切換黑底 / 白底</button>
+    <div style="display:flex;align-items:center;gap:5px;width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:4px 8px">
+      <span style="font-size:11px;color:var(--t3);flex-shrink:0">文字</span>
+      <button onclick="adjFont(-1)" style="width:26px;height:26px;border:1px solid var(--border);border-radius:5px;background:var(--bg2);color:var(--t2);cursor:pointer;font-size:14px;line-height:1;flex-shrink:0">−</button>
+      <span id="font-size-label" style="font-size:11px;color:var(--acc);font-family:'DM Mono',monospace;flex:1;text-align:center">17px</span>
+      <button onclick="adjFont(1)" style="width:26px;height:26px;border:1px solid var(--border);border-radius:5px;background:var(--bg2);color:var(--t2);cursor:pointer;font-size:14px;line-height:1;flex-shrink:0">＋</button>
+      <button onclick="adjFont(0)" style="width:26px;height:26px;border:1px solid var(--border);border-radius:5px;background:var(--bg2);color:var(--t3);cursor:pointer;font-size:11px;line-height:1;flex-shrink:0" title="還原預設">↺</button>
+    </div>
+    <button id="cst-reload" onclick="location.reload()" style="display:none;width:100%;padding:5px;border-radius:6px;border:1px solid var(--danger);background:rgba(239,68,68,.08);color:var(--danger);font-size:11px;cursor:pointer;font-family:inherit">🔄 Firebase未載入，點此重新整理</button>
+  </div>
+</aside>
+
+<main class="main">
+<div class="topbar">
+  <div class="tbt" id="tbt">儀表板</div>
+  <div style="display:flex;align-items:center;gap:8px"><button class="btn bs bxs" onclick="nav('dashboard')" title="回首頁">🏠 首頁</button><span class="badge bdg" id="mbdg">指導醫師模式</span></div>
+</div>
+<div class="content">
+
+<!-- ATT SELECTOR -->
+<div id="att-selector-wrap" class="hidden mb4">
+  <div class="att-sel-card">
+    <div style="font-size:20px;font-weight:700;margin-bottom:14px">📌 請先選擇您的主治醫師身份</div>
+    <div class="att-sel-grid" id="att-sel-grid"></div>
+  </div>
+</div>
+<!-- Selected attending banner -->
+<div id="att-selected-banner" class="hidden mb4" style="background:linear-gradient(90deg,rgba(0,201,167,.15),rgba(59,130,246,.1));border:2px solid var(--acc);border-radius:12px;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+  <div style="display:flex;align-items:center;gap:13px">
+    <div style="width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--a2));display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff" id="att-avatar-big">?</div>
+    <div>
+      <div style="font-size:12px;color:var(--t3);margin-bottom:3px">目前身份（指導醫師）</div>
+      <div style="font-size:24px;font-weight:700;color:var(--acc)" id="att-name-big">—</div>
+    </div>
+  </div>
+  <button class="btn bs" onclick="reselAtt()" style="font-size:15px;padding:10px 18px;border-color:var(--acc);color:var(--acc)">↩ 重新選擇身份</button>
+</div>
+
+<!-- ═══ DASHBOARD ═══ -->
+<div class="page active" id="page-dashboard">
+  <div class="sh mb4">
+    <div><div class="st">總覽儀表板</div><div class="ss2" id="dash-sub">今日評核進度與整體概況</div></div>
+    <div class="ifl">
+      <button class="btn bp bsm" onclick="nav('assess')">＋ 新增評核</button>
+    </div>
+  </div>
+  <!-- Admin: today's attending bar -->
+  <div id="dash-att-bar" class="card mb4 hidden">
+    <div class="ct"><span class="dot" style="background:var(--a2)"></span>今日值班主治醫師</div>
+    <div id="dash-att-list"></div>
+  </div>
+  <!-- Non-admin: pending dates -->
+  <div id="dash-pending-card" class="card mb4 hidden">
+    <div class="ct"><span class="dot" style="background:var(--danger)"></span>尚未填寫評核的日期</div>
+    <div id="dash-pending-list"></div>
+  </div>
+  <div class="g4 mb4">
+    <div class="stat sg"><div class="sl">總評核次數</div><div class="sv" id="st-cnt">0</div></div>
+    <div class="stat sb"><div class="sl">MS 可穩定</div><div class="sv" id="st-ms">0</div><div class="ss">細項</div></div>
+    <div class="stat sy"><div class="sl">EPA 均分</div><div class="sv" id="st-epa">—</div></div>
+    <div class="stat sr"><div class="sl">今日完成</div><div class="sv" id="st-td">0</div></div>
+  </div>
+  <!-- Admin charts -->
+  <div id="admin-dash-charts" class="g2 mb4 hidden">
+    <div class="card"><div class="ct"><span class="dot"></span>EPA 等級曲線</div><div class="cw"><canvas id="ch-epa-c"></canvas></div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--a2)"></span>MS 可呈現率</div><div class="cw"><canvas id="ch-ms-c"></canvas></div></div>
+  </div>
+  <div class="card">
+    <div class="ct"><span class="dot" style="background:var(--a3)"></span>最近評核紀錄</div>
+    <div style="overflow-x:auto">
+      <table><thead><tr><th>日期</th><th>主治</th><th>住院醫師</th><th>年級</th><th>MS%</th><th>EPA均</th><th>影像</th><th>操作</th></tr></thead>
+      <tbody id="dash-tbody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ASSESS WIZARD ═══ -->
+<div class="page" id="page-assess">
+  <div class="sh mb4"><div><div class="st">新增評核 — MS + EPA</div></div></div>
+  <!-- Mobile sticky bottom action bar (synced with wizard step via goStep) -->
+  <div class="mob-bottom-bar hidden" id="mob-bar">
+    <button class="btn bs" id="mob-bar-prev" onclick="">← 上一步</button>
+    <button class="btn bp" id="mob-bar-next" onclick="">下一步 →</button>
+  </div>
+  <div id="ass-ok" class="al aok hidden">✅ 評核已儲存！</div>
+  <div id="ass-err" class="al ae hidden"></div>
+  <div class="wiz-steps mb4">
+    <div class="ws active" id="ws0">1. 基本資料</div>
+    <div class="ws" id="ws1">2. 選擇項目</div>
+    <div class="ws" id="ws2">3. EPA 評分</div>
+    <div class="ws" id="ws3">4. Milestone</div>
+  </div>
+  <div class="wpane active" id="wp0">
+    <div class="who-bar">
+      <span style="font-size:11.5px;color:var(--t2);font-weight:600">📌 填答主治醫師：</span>
+      <select id="f-att" style="max-width:210px" onchange="onAttChange()"><option value="">— 請選擇 —</option></select>
+      <span id="tshift" style="font-size:10.5px;color:var(--t3)"></span>
+    </div>
+    <div class="card">
+      <div class="ct"><span class="dot"></span>基本資料</div>
+      <div class="fg"><label>住院醫師<span class="req">*</span></label><select id="f-res"><option value="">— 請選擇 —</option></select></div>
+      <div class="g2">
+        <div class="fg"><label>評核日期</label><input type="date" id="f-date"></div>
+        <div class="fg"><label>臨床情境 / 病例</label><input type="text" id="f-case" placeholder="例：OHCA、休克評估..."></div>
+      </div>
+    </div>
+    <div class="ifl fe mt4 wiz-nav"><button class="btn bp" onclick="goStep(1)">下一步 →</button></div>
+  </div>
+  <div class="wpane" id="wp1">
+    <div class="card mb4">
+      <div class="ct"><span class="dot" style="background:var(--a2)"></span>選擇 EPA（<span id="ec">0</span>/1）— 每次選 1 項</div>
+      <div class="epa-grid" id="epa-grid"></div>
+    </div>
+    <div class="card mb4">
+      <div class="ct"><span class="dot" style="background:var(--a3)"></span>選擇 Milestone</div>
+      <div class="ms-sel-wrap">
+        <div><div class="ms-grp-title">PC 病患照護 (PC1-14) <span class="ms-grp-cnt" id="pc-cnt">0/2</span></div><div class="ms-chip-wrap" id="ms-pc-chips"></div></div>
+        <div><div class="ms-grp-title">MK / PROF / ICS / PBLI / SBP <span class="ms-grp-cnt" id="npc-cnt">0/2</span></div><div class="ms-chip-wrap" id="ms-npc-chips"></div></div>
+      </div>
+    </div>
+    <div class="ifl mt3 wiz-nav" style="justify-content:space-between">
+      <button class="btn bs bsm" onclick="goStep(0)">← 上一步</button>
+      <button class="btn bp bsm" onclick="goStep(2)">下一步：EPA 評分 →</button>
+    </div>
+  </div>
+  <div class="wpane" id="wp2">
+    <div class="al ai mb4"><b>EPA 等級說明</b>（主治醫師評 1-5 分；2a/2b 及 3a/3b/3c 細分由 CCC 設定）</div>
+    <div class="card mb4"><div class="ct"><span class="dot" style="background:var(--a2)"></span>EPA 信任度評分</div><div id="epa-form"></div></div>
+    <div class="ifl mt3 wiz-nav" style="justify-content:space-between">
+      <button class="btn bs bsm" onclick="goStep(1)">← 上一步</button>
+      <button class="btn bp bsm" onclick="goStep(3)">下一步：Milestone →</button>
+    </div>
+  </div>
+  <div class="wpane" id="wp3">
+    <div class="al ai mb4">請針對選取的每個 Milestone 細項，選擇「未穩定呈現 / 未觀察 / 可穩定呈現」，並可填寫各項質性回饋。</div>
+    <div id="ms-form"></div>
+    <!-- 影像醫學評核 - 整合於此，選填 -->
+    <div class="card mt4">
+      <div class="ct"><span class="dot" style="background:var(--purple)"></span>🩻 影像醫學判讀評核（選填）</div>
+      <div class="ifl mb4" style="gap:10px">
+        <label class="tog" style="flex-shrink:0"><input type="checkbox" id="embed-img-enabled" onchange="toggleEmbedImg()"><span class="tsl"></span></label>
+        <span style="font-size:14px">啟用影像醫學評核</span>
+      </div>
+      <div id="embed-img-inner" style="display:none">
+        <div class="g2 mb4">
+          <div class="fg"><label>病歷號</label><input type="text" id="eipid" placeholder="選填"></div>
+          <div class="fg"><label>影像種類<span class="req">*</span></label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="itbtn" onclick="selEmbedIT('X-ray',this)">X-ray</button>
+              <button class="itbtn" onclick="selEmbedIT('CT',this)">CT</button>
+              <button class="itbtn" onclick="selEmbedIT('MRI',this)">MRI</button>
+            </div>
+          </div>
+        </div>
+        <div class="tabs" id="embed-img-tabs">
+          <div class="tab active" onclick="swEmbedImgTab('req',this)">必要案例</div>
+          <div class="tab" onclick="swEmbedImgTab('sel',this)">選擇案例</div>
+        </div>
+        <p style="font-size:12px;color:var(--t3);margin-bottom:7px">如當日無適合個案，請點選「其他」。</p>
+        <div class="img-scroll mb4" id="embed-img-case-list"></div>
+        <div id="embed-img-sub-wrap" class="hidden mb4">
+          <div style="font-size:13px;font-weight:600;color:var(--t2);margin-bottom:6px">選擇案例（進一步分類）</div>
+          <div class="img-scroll" id="embed-img-sub-list"></div>
+        </div>
+        <div style="font-size:13px;font-weight:600;color:var(--t2);margin-bottom:8px">評核項目（1=非常不滿意 5=非常滿意）</div>
+        <div id="embed-img-stars"></div>
+        <div class="fg mt4">
+          <label>影像評核意見（若啟用則必填）<span class="req">*</span></label>
+          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:10px;margin-top:4px">
+            <div style="font-size:12px;color:var(--t2);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px">💬 評核意見
+              
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px" id="eimg-pre-tools"></div>
+            <textarea id="eimg-comment" class="mf" oninput="checkFb(this)" placeholder="請具體描述評核意見..." style="width:100%;min-height:70px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;outline:none;resize:vertical"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="ifl mt4 wiz-nav" style="justify-content:space-between">
+      <button class="btn bs bsm" onclick="goStep(2)">← 上一步</button>
+      <button class="btn bp" onclick="saveAssess()">💾 儲存評核</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ IMAGING (獨立頁面，必填) ═══ -->
+<div class="page" id="page-imaging">
+  <div class="sh mb4"><div><div class="st">🩻 影像醫學判讀評核表</div><div class="ss2">急診影像醫學評核（必填）</div></div></div>
+  <div id="img-ok" class="al aok hidden">✅ 影像評核已儲存！</div>
+  <div id="img-err" class="al ae hidden"></div>
+  <div class="g2">
+    <div>
+      <div class="card mb4">
+        <div class="ct"><span class="dot"></span>基本資料</div>
+        <div class="who-bar" style="margin-bottom:11px">
+          <span style="font-size:11.5px;color:var(--t2);font-weight:600">📌 主治醫師：</span>
+          <select id="im-att" style="max-width:190px"><option value="">— 請選擇 —</option></select>
+        </div>
+        <div class="fg"><label>住院醫師<span class="req">*</span></label><select id="im-res"><option value="">— 請選擇 —</option></select></div>
+        <div class="g2">
+          <div class="fg"><label>評核日期</label><input type="date" id="im-date"></div>
+          <div class="fg"><label>病歷號</label><input type="text" id="im-pid" placeholder="選填"></div>
+        </div>
+        <div class="fg"><label>影像種類<span class="req">*</span></label>
+          <div class="img-type-row" id="im-type-row">
+            <button class="itbtn" onclick="selImgType('X-ray',this)">X-ray</button>
+            <button class="itbtn" onclick="selImgType('CT',this)">CT</button>
+            <button class="itbtn" onclick="selImgType('MRI',this)">MRI</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct"><span class="dot" style="background:var(--a2)"></span>案例選擇</div>
+        <div class="tabs" id="im-tabs">
+          <div class="tab active" onclick="swImgTab('req',this)">必要案例</div>
+          <div class="tab" onclick="swImgTab('sel',this)">選擇案例</div>
+        </div>
+        <p style="font-size:10.5px;color:var(--t3);margin-bottom:7px">如當日無適合個案，請點選「其他」。</p>
+        <div class="img-scroll mb4" id="im-case-list"></div>
+        <div id="im-sub-wrap" class="hidden">
+          <div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:6px">選擇案例（進一步分類）</div>
+          <div class="img-scroll" id="im-sub-list"></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="ct"><span class="dot" style="background:var(--a3)"></span>評核項目（1=非常不滿意 5=非常滿意）</div>
+        <div id="im-stars"></div>
+        <div class="fg mt4">
+          <label>哪裡做得很好或未來如何改善<span class="req">*</span></label>
+          <div class="fb-box">
+            <div class="fb-title">💬 影像評核意見
+              
+            </div>
+            <div class="fb-tools" id="im-pre-tools"></div>
+            <textarea id="im-comment" class="mf" oninput="checkFb(this)" placeholder="請具體描述評核意見..."></textarea>
+          </div>
+        </div>
+        <div class="ifl fe mt4">
+          <button class="btn bs bsm" onclick="clearImg()">清除</button>
+          <button class="btn bp" onclick="saveImg()">💾 儲存影像評核</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- THANK YOU PAGE -->
+<div class="page" id="page-thankyou">
+  <div class="ty-wrap">
+    <div class="ty-icon">🙏</div>
+    <div class="ty-title">感謝您完成評核！</div>
+    <div class="ty-sub">您的評核已成功儲存。感謝您對住院醫師訓練品質的貢獻！</div>
+    <div class="ifl" style="flex-wrap:wrap;justify-content:center;gap:10px">
+      <button class="btn bp" onclick="nav('assess')">＋ 再新增一筆評核</button>
+      <button class="btn bpu" onclick="navToPending()">🔔 前往該主治醫師未填答</button>
+      <button class="btn bs" onclick="nav('dashboard')">回儀表板</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ HISTORY ═══ -->
+<div class="page" id="page-history">
+  <div class="sh mb4"><div><div class="st">評核紀錄</div></div></div>
+  <div class="card mb4" style="padding:9px 13px">
+    <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+      <select id="hf-a" style="width:140px" onchange="renderHistory()"><option value="">所有主治</option></select>
+      <select id="hf-r" style="width:135px" onchange="renderHistory()"><option value="">所有住院醫師</option></select>
+      <input type="month" id="hf-m" style="width:130px" onchange="renderHistory()">
+      <button class="btn bs bsm" onclick="clearHF()">清除</button>
+    </div>
+  </div>
+  <div class="card" style="overflow-x:auto">
+    <table><thead><tr><th>日期</th><th>主治</th><th>住院醫師</th><th>MS%</th><th>EPA均</th><th>影像</th><th>操作</th></tr></thead>
+    <tbody id="hist-tbody"></tbody></table>
+  </div>
+</div>
+
+<!-- ═══ ANALYTICS ═══ -->
+<div class="page" id="page-analytics">
+  <div class="sh mb4">
+    <div><div class="st">統計分析</div></div>
+    <select id="ana-r" style="width:170px" onchange="renderAnalytics()"><option value="">所有住院醫師</option></select>
+  </div>
+  <div class="g2 mb4">
+    <div class="card"><div class="ct"><span class="dot"></span>EPA 等級曲線</div><div class="cw"><canvas id="ch-epa-l"></canvas></div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--a2)"></span>MS 各面向可呈現率</div><div class="cw"><canvas id="ch-ms-r"></canvas></div></div>
+  </div>
+  <div class="card mb4"><div class="ct"><span class="dot" style="background:var(--a3)"></span>EPA 各項平均</div><div id="epa-prog"></div></div>
+  <div class="card"><div class="ct"><span class="dot" style="background:var(--purple)"></span>Milestone 細項可呈現率</div><div id="ms-detail-stats"></div></div>
+</div>
+
+<!-- ═══ SHHER ═══ -->
+<div class="page" id="page-shher">
+  <div class="sh mb4">
+    <div><div class="st">🏥 SHHER EPA 執業矩陣</div><div class="ss2">未畢業住院醫師 EPA/MS 等級與執業門檻</div></div>
+    <div class="ifl" style="flex-wrap:wrap;gap:7px">
+      <div style="display:flex;align-items:center;gap:5px">
+        <span style="font-size:12px;color:var(--t2)">CCC：</span>
+        <select id="shher-ccc" style="width:95px" onchange="renderShher()">
+          <option value="0">最新一次</option>
+          <option value="1">前一次</option>
+          <option value="2">前兩次</option>
+        </select>
+      </div>
+      <select id="shher-yr" style="width:100px" onchange="renderShher()"><option value="">所有年級</option><option>R1</option><option>R2</option><option>R3</option><option>R4</option></select>
+    </div>
+  </div>
+  <div id="shher-table"></div>
+</div>
+
+<!-- ═══ RESIDENTS ═══ -->
+<div class="page" id="page-residents">
+  <div class="sh mb4"><div><div class="st">住院醫師管理</div></div>
+    <div class="ifl"><button class="btn bs bsm" onclick="nav('graduated')">🎓 已畢業</button><button class="btn bp bsm" onclick="openResM()">＋ 新增</button></div>
+  </div>
+  <div class="card" style="overflow-x:auto">
+    <table><thead><tr><th>代號</th><th>姓名</th><th>年級</th><th>評核次數</th><th>MS%</th><th>EPA均</th><th>操作</th></tr></thead>
+    <tbody id="res-tbody"></tbody></table>
+  </div>
+</div>
+
+<!-- ═══ ATTENDINGS ═══ -->
+<div class="page" id="page-attendings">
+  <div class="sh mb4"><div><div class="st">主治醫師管理</div></div><button class="btn bp bsm" onclick="openAttM()">＋ 新增</button></div>
+  <div class="card mb4" style="overflow-x:auto">
+    <table><thead><tr><th>編號</th><th>姓名</th><th>本月評核</th><th>備註</th><th>操作</th></tr></thead>
+    <tbody id="att-tbody"></tbody></table>
+  </div>
+  <div class="card" id="att-cal" style="display:none">
+    <div class="ct">
+      <span class="dot" style="background:var(--a2)"></span>
+      <span id="acc-title">評核日曆</span>
+      <div class="ifl" style="margin-left:auto">
+        <button class="btn bs bxs" onclick="accM(-1)">‹</button>
+        <span id="acc-mon" style="font-size:11.5px;min-width:80px;text-align:center"></span>
+        <button class="btn bs bxs" onclick="accM(1)">›</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
+      <div style="text-align:center;font-size:10px;color:var(--t3)">日</div><div style="text-align:center;font-size:10px;color:var(--t3)">一</div><div style="text-align:center;font-size:10px;color:var(--t3)">二</div><div style="text-align:center;font-size:10px;color:var(--t3)">三</div><div style="text-align:center;font-size:10px;color:var(--t3)">四</div><div style="text-align:center;font-size:10px;color:var(--t3)">五</div><div style="text-align:center;font-size:10px;color:var(--t3)">六</div>
+    </div>
+    <div class="acc-grid" id="acc-grid"></div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:9px">
+      <div style="display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--t2)"><div style="width:9px;height:9px;border-radius:2px;background:rgba(0,201,167,.3)"></div>有排班且有評核</div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--t2)"><div style="width:9px;height:9px;border-radius:2px;background:rgba(239,68,68,.2)"></div>有排班但未評核</div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--t2)"><div style="width:9px;height:9px;border-radius:2px;background:var(--bg3)"></div>未排班</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SCHEDULE ═══ -->
+<div class="page" id="page-schedule">
+  <div class="sh mb4">
+    <div><div class="st">班表管理</div></div>
+    <div class="ifl" style="flex-wrap:wrap;gap:6px">
+      <button class="btn bs bsm" onclick="schedMon(-1)">‹</button>
+      <span id="sched-t" style="font-size:13px;font-weight:600;min-width:86px;text-align:center"></span>
+      <button class="btn bs bsm" onclick="schedMon(1)">›</button>
+    </div>
+  </div>
+  <div class="card mb4">
+    <div class="ct"><span class="dot" style="background:var(--purple)"></span>貼上班表</div>
+    <p style="font-size:11px;color:var(--t3);margin-bottom:8px">請將班表資料（Tab分隔格式）貼至下方，格式如：日期欄位在第一欄，住院醫師代號在第一列，數字代表主治醫師編號，- 代表未上班。</p>
+    <textarea class="paste-area" id="sched-paste" placeholder="貼上班表資料...&#10;&#9;A&#9;B&#9;C&#9;...&#10;4/1&#9;4&#9;-&#9;-&#9;..."></textarea>
+    <div class="ifl mt3" style="flex-wrap:wrap;gap:6px">
+      <button class="btn bp bsm" onclick="parsePaste()">📊 解析班表</button>
+      <button class="btn bs bsm" onclick="document.getElementById('sched-paste').value=''">清除</button>
+    </div>
+    <div id="paste-result" class="al ai hidden mt3"></div>
+  </div>
+  <div class="card">
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
+      <div style="text-align:center;font-size:9.5px;color:var(--t3);padding:2px">日</div><div style="text-align:center;font-size:9.5px;color:var(--t3);padding:2px">一</div><div style="text-align:center;font-size:9.5px;color:var(--t3);padding:2px">二</div><div style="text-align:center;font-size:9.5px;color:var(--t3);padding:2px">三</div><div style="text-align:center;font-size:9.5px;color:var(--t3);padding:2px">四</div><div style="text-align:center;font-size:9.5px;color:var(--t3);padding:2px">五</div><div style="text-align:center;font-size:9.5px;color:var(--t3);padding:2px">六</div>
+    </div>
+    <div id="sc-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px"></div>
+  </div>
+</div>
+
+<!-- ═══ GRADUATED ═══ -->
+<div class="page" id="page-graduated">
+  <div class="sh mb4"><div><div class="st">🎓 已畢業學員專區</div></div></div>
+  <div class="card mb4"><div class="ct"><span class="dot" style="background:var(--purple)"></span>已畢業住院醫師</div><div id="grad-list"></div></div>
+  <div id="grad-detail" class="hidden">
+    <div class="sh mb4">
+      <div><div class="st" id="grad-name"></div></div>
+      <button class="btn bs bsm" onclick="closeGrad()">← 返回</button>
+    </div>
+    <div class="g2 mb4">
+      <div class="card"><div class="ct"><span class="dot"></span>EPA 等級曲線</div><div class="cw"><canvas id="grad-epa"></canvas></div></div>
+      <div class="card"><div class="ct"><span class="dot" style="background:var(--a2)"></span>MS 可呈現率曲線</div><div class="cw"><canvas id="grad-ms"></canvas></div></div>
+    </div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--a3)"></span>完整評核紀錄</div>
+      <div style="overflow-x:auto">
+        <table><thead><tr><th>日期</th><th>主治</th><th>MS%</th><th>EPA均</th><th>操作</th></tr></thead>
+        <tbody id="grad-tbody"></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ EXPORT ═══ -->
+<div class="page" id="page-export">
+  <div class="sh mb4"><div><div class="st">匯出 / 匯入資料</div></div></div>
+  <div class="g2 mb4">
+    <div class="card">
+      <div class="ct"><span class="dot"></span>CSV 匯出</div>
+      <div class="fg"><label>住院醫師</label><select id="exp-r"><option value="">所有住院醫師</option></select></div>
+      <div class="g2"><div class="fg"><label>起始</label><input type="date" id="exp-s"></div><div class="fg"><label>結束</label><input type="date" id="exp-e"></div></div>
+      <button class="btn bp bsm" onclick="exportCSV()">⬇ 匯出 CSV（含質性回饋）</button>
+    </div>
+    <div class="card">
+      <div class="ct"><span class="dot" style="background:var(--a2)"></span>列印</div>
+      <div class="fg"><label>住院醫師</label><select id="prt-r"><option value="">所有住院醫師</option></select></div>
+      <button class="btn bs bsm" onclick="printReport()">🖨 列印報告</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ct"><span class="dot" style="background:var(--a3)"></span>📥 資料匯入 / 備份還原</div>
+    <div class="al ai mb4">
+      <b>使用說明：</b><br>
+      • <b>匯出 JSON 備份</b>：將所有資料打包下載，可用於備份或轉移至其他裝置<br>
+      • <b>匯入資料</b>：貼上從其他裝置匯出的 JSON，系統會<b>合併</b>新資料（相同 ID 不重複匯入）
+    </div>
+    <div class="fg">
+      <label>貼上 JSON 備份資料</label>
+      <textarea id="import-json" style="min-height:120px;font-family:'DM Mono',monospace;font-size:13px" placeholder='貼上從其他裝置匯出的 JSON 備份...'></textarea>
+    </div>
+    <div class="ifl" style="flex-wrap:wrap;gap:8px">
+      <button class="btn bp bsm" onclick="importJSON()">📥 匯入資料</button>
+      <button class="btn bs bsm" onclick="exportJSON()">📤 匯出 JSON 備份</button>
+    </div>
+    <div id="import-result" class="hidden mt3"></div>
+  </div>
+</div>
+
+<!-- ═══ REMIND ═══ -->
+<div class="page" id="page-remind">
+  <div class="sh mb4">
+    <div><div class="st">🔔 提醒未填答</div></div>
+    <div class="ifl"><input type="date" id="rmd-date" style="width:140px" onchange="renderRemind()"><button class="btn bpu bsm" onclick="renderRemind()">查詢</button></div>
+  </div>
+  <div class="g3 mb4">
+    <div class="stat sb"><div class="sl">今日值班</div><div class="sv" id="rs-t">0</div></div>
+    <div class="stat sr"><div class="sl">尚未評核</div><div class="sv" id="rs-m">0</div></div>
+    <div class="stat sg"><div class="sl">已有評核</div><div class="sv" id="rs-o">0</div></div>
+  </div>
+  <div class="card mb4">
+    <div class="ifl" style="flex-wrap:wrap;gap:6px;margin-bottom:10px">
+      <button class="btn bem bsm" onclick="batchEmail()">📧 Email 提醒</button>
+      <button class="btn bln bsm" onclick="batchLine()">💬 LINE 提醒</button>
+    </div>
+    <div id="batch-area" class="hidden"><div class="ca" id="batch-txt" style="background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:10px;font-size:11px;color:var(--t2);white-space:pre-wrap;max-height:160px;overflow-y:auto;font-family:'DM Mono',monospace"></div>
+    <div class="ifl mt3"><button class="btn bs bsm" onclick="copyBatch()">複製</button><button class="btn bs bsm" onclick="document.getElementById('batch-area').classList.add('hidden')">關閉</button></div></div>
+  </div>
+  <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>個別狀態</div><div id="rmd-list"></div></div>
+</div>
+
+<!-- ═══ ADMIN ═══ -->
+<div class="page" id="page-admin">
+  <div class="sh mb4"><div><div class="st">⚙️ 系統管理員</div></div><span class="badge bdp">管理員</span></div>
+  <div class="g2 mb4">
+    <div class="card">
+      <div class="ah">🎯 評核上限</div>
+      <div class="fg"><label>每月每項 EPA 上限（0=不限）</label><div class="ifl"><input type="number" id="q-em" style="width:60px;text-align:center" min="0" max="50"></div></div>
+      <div class="fg"><label>每月每項 MS 上限（0=不限）</label><div class="ifl"><input type="number" id="q-mm" style="width:60px;text-align:center" min="0" max="50"></div></div>
+      <button class="btn bpu bsm" onclick="saveAdmin()">💾 儲存上限設定</button>
+      <div id="admin-limit-ok" class="al aok hidden mt3" style="font-size:12px">✅ 上限已儲存</div>
+      <div class="ah mt4">🔐 密碼</div>
+      <div class="g2"><div class="fg"><label>新密碼</label><input type="password" id="pw-n"></div><div class="fg"><label>確認</label><input type="password" id="pw-c"></div></div>
+      <button class="btn bs bsm" onclick="changePw()">更新密碼</button>
+    </div>
+    <div class="card">
+      <div class="ah">🏥 SHHER 矩陣設定</div>
+      <p style="font-size:11px;color:var(--t2);margin-bottom:10px">設定各住院醫師的獨立診 / 留觀 / 九診執業狀態（手動設定）</p>
+      <div class="fg"><label>選擇住院醫師</label><select id="ward-res" onchange="renderWardPanel()" style="max-width:200px"><option value="">— 選擇 —</option></select></div>
+      <div id="ward-panel"></div>
+    </div>
+  </div>
+  <!-- CCC Settings -->
+  <div class="card mb4">
+    <div class="ah">🎓 CCC 執業等級設定（每年2次）</div>
+    <p style="font-size:11px;color:var(--t2);margin-bottom:10px">設定各住院醫師 EPA 細分等級（2a/2b、3a/3b/3c）及 Milestone 子項目鎖定。CCC後更新。</p>
+    <div class="fg"><label>選擇住院醫師</label><select id="ccc-res" onchange="renderCCCPanel()" style="max-width:200px"><option value="">— 選擇 —</option></select></div>
+    <div id="ccc-panel"></div>
+  </div>
+  <div class="card mb4">
+    <div class="ah">📋 評核範圍啟用</div>
+    <div class="g2">
+      <div><div style="font-size:11px;color:var(--t2);font-weight:600;margin-bottom:5px">EPA</div><div id="adm-ep"></div></div>
+      <div><div style="font-size:11px;color:var(--t2);font-weight:600;margin-bottom:5px">Milestone</div><div id="adm-ms"></div></div>
+    </div>
+    <div class="ifl fe mt4"><button class="btn bpu bsm" onclick="saveAdmin()">💾 儲存</button></div>
+    <div id="admin-ok" class="al aok hidden mt3">✅ 設定已儲存</div>
+  </div>
+
+  <!-- ═══ CUSTOM ITEM EDITOR (適用其他科別自訂) ═══ -->
+  <div class="card">
+    <div class="ah">📝 自訂評核項目（EPA / Milestone）</div>
+    <p style="font-size:12px;color:var(--t2);margin-bottom:10px">可自由新增、編輯、刪除 EPA 與 Milestone 項目內容，方便其他科別調整為自己的評核架構。修改後請記得「💾 儲存全部變更」並同步雲端。</p>
+    <div class="tabs" id="item-editor-tabs">
+      <div class="tab active" onclick="swItemTab('epa',this)">EPA 項目</div>
+      <div class="tab" onclick="swItemTab('ms',this)">Milestone 項目</div>
+    </div>
+    <div id="item-editor-epa"></div>
+    <div id="item-editor-ms" class="hidden"></div>
+    <div class="ifl fe mt4" style="gap:8px">
+      <button class="btn bs bsm" onclick="if(confirm('確定還原成系統預設的 EPA / Milestone 內容？此操作會覆蓋目前的自訂內容。')){restoreDefaultItems();}">↺ 還原預設值</button>
+      <button class="btn bpu bsm" onclick="commitItemEdits()">💾 儲存全部變更</button>
+    </div>
+    <div id="item-editor-ok" class="al aok hidden mt3">✅ 項目已儲存，並已同步至雲端</div>
+  </div>
+</div>
+
+<!-- FIREBASE -->
+<div class="page" id="page-firebase">
+  <div class="sh mb4"><div><div class="st">☁️ 雲端設定</div><div class="ss2">若手機持續連線失敗，請見下方「真正徹底的解法」</div></div></div>
+  <div style="background:rgba(0,201,167,.12);border:2px solid var(--acc);border-radius:10px;padding:14px 18px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <span style="font-size:24px">☁️</span>
+      <div>
+        <div style="font-size:15px;font-weight:700;color:var(--acc)">Firebase 設定已內建 — 傳給別人直接可用</div>
+        <div style="font-size:13px;color:var(--t2);margin-top:2px">Project：<b>shher-d2331</b>　連線狀態：<span id="fb-conn-live">檢查中...</span></div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn bp bsm" onclick="loadFBCfg().then(()=>{const e=document.getElementById('fb-conn-live');if(e)e.textContent=db?'✅ 已連線':'❌ 失敗';})">🔄 重新連線</button>
+      <button class="btn bp bsm" onclick="syncUp()">⬆ 上傳資料</button>
+      <button class="btn bs bsm" onclick="syncDown()">⬇ 下載資料</button>
+      <button class="btn bs bsm" style="border-color:var(--purple);color:var(--purple)" onclick="runFBDiagnostics()">🔍 連線診斷（手機請點此）</button>
+    </div>
+    <div id="fb-diag-result" class="hidden mt3" style="background:var(--bg3);border-radius:8px;padding:8px 12px"></div>
+  </div>
+
+  <div class="card mb4" style="border-left:4px solid var(--a2)">
+    <div style="font-size:16px;font-weight:700;color:var(--a2);margin-bottom:14px">📋 設定步驟（管理員一次性操作）</div>
+    <div style="font-size:14px;line-height:2;color:var(--text)">
+      <div style="background:var(--bg3);border-radius:8px;padding:12px 16px;margin-bottom:10px">
+        <b>步驟一：建立 Firebase 專案</b><br>
+        前往 <a href="https://console.firebase.google.com" target="_blank" style="color:var(--a2);font-weight:600">console.firebase.google.com</a> → 點「<b>新增專案</b>」→ 輸入名稱（如 em-cbme）→ 停用 Analytics → 點「建立專案」
+      </div>
+      <div style="background:var(--bg3);border-radius:8px;padding:12px 16px;margin-bottom:10px">
+        <b>步驟二：建立 Firestore 資料庫</b><br>
+        左側選「<b>建構 → Firestore Database</b>」→「建立資料庫」→ 選「<b>正式版模式</b>」→ 位置選「<b>asia-east1（台灣）</b>」→「啟用」
+      </div>
+      <div style="background:var(--bg3);border-radius:8px;padding:12px 16px;margin-bottom:10px">
+        <b>步驟三：開放讀寫權限</b><br>
+        進入 Firestore →「<b>規則</b>」頁籤 → 將規則改為下方內容 → 點「<b>發布</b>」：<br>
+        <code style="display:block;background:var(--bg2);border:1px solid var(--border);padding:10px 14px;border-radius:6px;font-size:13px;margin:8px 0;line-height:1.7">rules_version = '2';<br>service cloud.firestore {<br>&nbsp;&nbsp;match /databases/{database}/documents {<br>&nbsp;&nbsp;&nbsp;&nbsp;match /{document=**} {<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;allow read, write: if true;<br>&nbsp;&nbsp;&nbsp;&nbsp;}<br>&nbsp;&nbsp;}<br>}</code>
+      </div>
+      <div style="background:var(--bg3);border-radius:8px;padding:12px 16px;margin-bottom:10px">
+        <b>步驟四：取得設定碼</b><br>
+        點左上角「<b>齒輪 → 專案設定</b>」→ 往下找「您的應用程式」→ 點網頁圖示「<b>&lt;/&gt;</b>」→ 輸入名稱（如 em-web）→「<b>註冊應用程式</b>」→ 複製 apiKey、authDomain、projectId、appId 四個值
+      </div>
+      <div style="background:rgba(0,201,167,.08);border:1px solid rgba(0,201,167,.25);border-radius:8px;padding:12px 16px">
+        <b>步驟五：填入下方欄位並連接</b><br>
+        填入四個值 → 點「🔗 連接並寫入設定」→ 看到「✅ 連線成功」→ 點「⬆ 同步到雲端」上傳所有現有資料<br>
+        <b style="color:var(--acc)">其他主治醫師</b>：打開同一個 HTML 檔案，填入相同的四個值 → 點「⬇ 從雲端同步」即可
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb4">
+    <div class="ct"><span class="dot" style="background:var(--purple)"></span>Firebase 設定碼</div>
+    <div class="g2">
+      <div class="fg"><label>API Key</label><input type="text" id="fb-k" placeholder="AIzaSy..."></div>
+      <div class="fg"><label>Auth Domain</label><input type="text" id="fb-d" placeholder="xxx.firebaseapp.com"></div>
+    </div>
+    <div class="g2">
+      <div class="fg"><label>Project ID <span class="req">*</span></label><input type="text" id="fb-p" placeholder="my-em-project"></div>
+      <div class="fg"><label>App ID</label><input type="text" id="fb-a" placeholder="1:xxx:web:xxx"></div>
+    </div>
+    <div class="ifl mt4" style="flex-wrap:wrap;gap:8px">
+      <button class="btn bpu" onclick="connectFB()" style="font-size:14px">🔗 連接並寫入設定</button>
+      <button class="btn bp bsm" onclick="syncUp()">⬆ 同步到雲端</button>
+      <button class="btn bs bsm" onclick="syncDown()">⬇ 從雲端同步</button>
+    </div>
+    <div id="fb-status" class="al ai hidden mt3"></div>
+  </div>
+
+  <div class="card mb4" style="border-left:4px solid var(--danger)">
+    <div style="font-size:15px;font-weight:700;color:var(--danger);margin-bottom:12px">📱 手機持續連線失敗？— 真正徹底的解法</div>
+    <div style="font-size:14px;line-height:1.9;color:var(--text)">
+      <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:12px 16px;margin-bottom:12px">
+        <b>為什麼「本機開啟」和「Google Drive 開啟」都不可靠？</b><br>
+        本機 HTML 檔案（file://）和 Google Drive 的「預覽」功能都<b>不是真正的網頁伺服器</b>。Drive 預覽常以唯讀/安全模式顯示內容，內嵌的 JavaScript 經常不會被執行 —— 也就是說頁面看起來正常，但同步功能可能根本沒有啟動過。<br>
+        唯一徹底的解法：把檔案放到<b>真正會執行程式碼的網頁主機</b>上，取得一個 https:// 開頭的正式網址。
+      </div>
+
+      <div style="background:rgba(0,201,167,.1);border:2px solid var(--acc);border-radius:8px;padding:12px 16px;margin-bottom:10px">
+        <b style="color:var(--acc)">✅ 方案一：GitHub Pages（推薦，永久免費、最穩定）</b><br>
+        1. 前往 <a href="https://github.com" target="_blank" style="color:var(--a2)">github.com</a> 註冊免費帳號（已有的話略過）<br>
+        2. 點右上角「+」→「New repository」→ 命名（如 em-cbme）→ 設為 Public → Create<br>
+        3. 進入該 repository → 「Add file」→「Upload files」→ 把這個 HTML 檔案拖進去，<b>檔名改為 index.html</b> → Commit<br>
+        4. 左側「Settings」→「Pages」→ Source 選「main」分支 → Save<br>
+        5. 等 1-2 分鐘，會得到一個網址，格式如：<code style="background:var(--bg3);padding:1px 6px;border-radius:4px">https://你的帳號.github.io/em-cbme/</code><br>
+        6. 把這個網址傳給所有人，<b>用瀏覽器打開（不是下載檔案）</b>，手機/電腦都能穩定同步
+      </div>
+
+      <div style="background:var(--bg3);border-radius:8px;padding:12px 16px;margin-bottom:10px">
+        <b>✅ 方案二：GitHub Gist + githack（不需建立 repository，更快速）</b><br>
+        1. 前往 <a href="https://gist.github.com" target="_blank" style="color:var(--a2)">gist.github.com</a>（需登入 GitHub 帳號）<br>
+        2. 檔名填 <code style="background:var(--bg2);padding:1px 6px;border-radius:4px">index.html</code>，把整個 HTML 內容貼上 → 「Create public gist」<br>
+        3. 點右上「Raw」按鈕，複製網址列的網址（類似 https://gist.githubusercontent.com/.../raw/.../index.html）<br>
+        4. 在該網址前面加上 <code style="background:var(--bg2);padding:1px 6px;border-radius:4px">https://raw.githack.com/</code>（去掉原本的 https://），組成新網址<br>
+        5. 用這個新網址打開即可，會是正式執行 JS 的網頁，非常穩定
+      </div>
+
+      <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:12px 16px">
+        <b style="color:var(--a3)">過渡方案（仍有風險，僅供緊急測試）</b><br>
+        若暫時無法設定上述方式：用 <b>Safari（iOS）</b> 或 <b>Chrome（Android）</b> 直接開啟本機檔案，並點下方「🔍 連線診斷」確認狀態。但此方式仍可能因瀏覽器安全限制而間歇性失敗，不建議長期使用。
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="border-left:4px solid var(--a3)">
+    <div style="font-size:15px;font-weight:700;color:var(--a3);margin-bottom:10px">⚠️ 常見問題</div>
+    <div style="font-size:14px;line-height:2">
+      <b>手機持續連線失敗（最常見原因）</b> → 此 Firebase 專案的 API Key 若設定了「HTTP 來源限制」，本機 HTML（file://）開啟時瀏覽器不會送出網址來源，會被 Google 拒絕。<br>
+      　→ 解法：管理員登入 <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--a2)">Google Cloud Console → API 和服務 → 憑證</a>，找到對應的 API Key，將「應用程式限制」設為「<b>無</b>」，或改用「Google Drive 開啟」方式（見上方）完全避開此問題<br>
+      <b>安全性規則錯誤</b> → 回 Firebase Console 確認 Firestore 規則已點「發布」<br>
+      <b>同步後資料不見</b> → 「⬇ 從雲端同步」會以雲端資料覆蓋本地，建議先用「匯出/匯入」頁面做 JSON 備份<br>
+      <b>其他人看不到資料</b> → 確認大家用的是同一份內建設定（Project ID: shher-d2331）<br>
+      <b>免費額度</b> → Firestore 免費方案每日可讀取 5 萬次、寫入 2 萬次，一般科內使用完全足夠
+    </div>
+  </div>
+</div>
+
+</div></main>
+
+<!-- MODALS -->
+<div class="ov" id="m-detail"><div class="modal" style="max-width:800px"><div class="mh"><div class="mt2" id="m-det-t"></div><button class="mc" onclick="closeM('m-detail')">✕</button></div><div id="m-det-b" style="overflow-x:auto"></div></div></div>
+<div class="ov" id="m-res"><div class="modal" style="max-width:460px">
+  <div class="mh"><div class="mt2" id="m-res-t">住院醫師</div><button class="mc" onclick="closeM('m-res')">✕</button></div>
+  <input type="hidden" id="r-id">
+  <div class="g2"><div class="fg"><label>代號</label><input type="text" id="r-no" placeholder="如 A, B..."></div><div class="fg"><label>姓名<span class="req">*</span></label><input type="text" id="r-n"></div></div>
+  <div class="g2"><div class="fg"><label>年級</label><select id="r-y"><option>R1</option><option>R2</option><option>R3</option><option>R4</option></select></div><div class="fg"><label>已畢業</label><label class="tog" style="margin-top:5px"><input type="checkbox" id="r-grad"><span class="tsl"></span></label></div></div>
+  <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:11px;margin:10px 0">
+    <div style="font-size:13px;font-weight:600;color:var(--t2);margin-bottom:8px">📊 評核月上限（個人設定）</div>
+    <div class="g2">
+      <div class="fg"><label>PC Milestone<br><span style="font-size:11px;color:var(--t3)">空白=套用全域，0=不限</span></label><input type="number" id="r-qpc" min="0" max="99" placeholder="空白"></div>
+      <div class="fg"><label>非PC Milestone<br><span style="font-size:11px;color:var(--t3)">空白=套用全域，0=不限</span></label><input type="number" id="r-qnpc" min="0" max="99" placeholder="空白"></div>
+    </div>
+  </div>
+  <div class="ifl fe mt3"><button class="btn bs bsm" onclick="closeM('m-res')">取消</button><button class="btn bp bsm" onclick="saveRes()">儲存</button></div>
+</div></div>
+<div class="ov" id="m-att"><div class="modal" style="max-width:480px">
+  <div class="mh"><div class="mt2" id="m-att-t">主治醫師</div><button class="mc" onclick="closeM('m-att')">✕</button></div>
+  <input type="hidden" id="a-id">
+  <div class="g2"><div class="fg"><label>編號</label><input type="text" id="a-no"></div><div class="fg"><label>姓名<span class="req">*</span></label><input type="text" id="a-n"></div></div>
+  <div class="fg"><label>Email</label><input type="email" id="a-e"></div>
+  <div class="fg"><label>LINE ID</label><input type="text" id="a-l"></div>
+  <div class="ah mt3">💬 個人質性回饋套餐</div>
+  <div id="att-pre-wrap"></div>
+  <div class="g2 mt3"><div class="fg"><label>套餐名稱</label><input type="text" id="atp-n"></div><div class="fg"><label>內容</label><input type="text" id="atp-c"></div></div>
+  <button class="btn bp bxs" onclick="addAttPre()">＋ 新增</button>
+  <div class="ifl fe mt3"><button class="btn bs bsm" onclick="closeM('m-att')">取消</button><button class="btn bp bsm" onclick="saveAtt()">儲存</button></div>
+</div></div>
+<div class="ov" id="m-pw"><div class="modal" style="max-width:320px">
+  <div class="mh"><div class="mt2">🔐 管理員登入</div><button class="mc" onclick="closeM('m-pw')">✕</button></div>
+  <div class="fg"><label>密碼</label><input type="password" id="pw-in" onkeydown="if(event.key==='Enter')checkPw()"></div>
+  <p style="font-size:10.5px;color:var(--t3);margin-bottom:8px">預設密碼：admin123</p>
+  <div id="pw-err" class="al ae hidden">密碼錯誤</div>
+  <div class="ifl fe"><button class="btn bs bsm" onclick="closeM('m-pw')">取消</button><button class="btn bpu bsm" onclick="checkPw()">登入</button></div>
+</div></div>
+<div class="ov" id="m-line"><div class="modal" style="max-width:440px">
+  <div class="mh"><div class="mt2">💬 LINE 訊息</div><button class="mc" onclick="closeM('m-line')">✕</button></div>
+  <div id="line-txt" style="background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:10px;font-size:11px;color:var(--t2);white-space:pre-wrap;max-height:180px;overflow-y:auto;font-family:'DM Mono',monospace"></div>
+  <div class="ifl mt3 fe"><button class="btn bs bsm" onclick="copyEl('line-txt')">複製</button><button class="btn bln bsm" onclick="window.open('https://line.me/R/nv/chat','_blank')">開啟 LINE</button></div>
+</div></div>
+
+<script>
+// ═══════════════════════════════════════════
+// STATIC DATA
+// ═══════════════════════════════════════════
+const DEF_ATT=[
+  {id:'A99',no:'99',n:'馬漢平',email:'',line:'',presets:[]},
+  {id:'A88',no:'88',n:'翁健瑞',email:'',line:'',presets:[]},
+  {id:'A77',no:'77',n:'蔡同堯',email:'',line:'',presets:[]},
+  {id:'A1',no:'1',n:'陳國智',email:'',line:'',presets:[]},
+  {id:'A2',no:'2',n:'王忠信',email:'',line:'',presets:[]},
+  {id:'A3',no:'3',n:'葉俊廷',email:'',line:'',presets:[]},
+  {id:'A4',no:'4',n:'柯世祐',email:'',line:'',presets:[]},
+  {id:'A5',no:'5',n:'黃婷韵',email:'',line:'',presets:[]},
+  {id:'A6',no:'6',n:'許瓅文',email:'',line:'',presets:[]},
+  {id:'A7',no:'7',n:'陳柏伸',email:'',line:'',presets:[]},
+  {id:'A8',no:'8',n:'李尚',email:'',line:'',presets:[]},
+  {id:'A9',no:'9',n:'許力云',email:'',line:'',presets:[]},
+  {id:'A10',no:'10',n:'邱奕璁',email:'',line:'',presets:[]},
+  {id:'A11',no:'11',n:'徐嘉鴻',email:'',line:'',presets:[]},
+  {id:'A12',no:'12',n:'紀則宇',email:'',line:'',presets:[]},
+  {id:'A13',no:'13',n:'謝沛興',email:'',line:'',presets:[]},
+  {id:'A14',no:'14',n:'江采蓮',email:'',line:'',presets:[]},
+  {id:'A15',no:'15',n:'莫心怡',email:'',line:'',presets:[]},
+  {id:'A16',no:'16',n:'劉宇鈞',email:'',line:'',presets:[]},
+  {id:'A17',no:'17',n:'王妍方',email:'',line:'',presets:[]},
+  {id:'A18',no:'18',n:'紀君儒',email:'',line:'',presets:[]},
+  {id:'A19',no:'19',n:'范閎皓',email:'',line:'',presets:[]},
+  {id:'A20',no:'20',n:'王鎮珄',email:'',line:'',presets:[]},
+  {id:'A21',no:'21',n:'曾孟元',email:'',line:'',presets:[]},
+  {id:'A22',no:'22',n:'陳天恩',email:'',line:'',presets:[]},
+  {id:'A23',no:'23',n:'林譁誠',email:'',line:'',presets:[]},
+  {id:'A24',no:'24',n:'謝豪(宏仁)',email:'',line:'',presets:[]},
+  {id:'A25',no:'25',n:'關曉雯(宏仁)',email:'',line:'',presets:[]},
+  {id:'A26',no:'26',n:'李瑋恩(宏仁)',email:'',line:'',presets:[]},
+  {id:'AC1',no:'兒1',n:'江舒欣',email:'',line:'',presets:[]},
+];
+const DEF_RES=[
+  {id:'RA',no:'A',n:'林奕彤',y:'R1',grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}},
+  {id:'RB',no:'B',n:'許鈞傑',y:'R1',grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}},
+  {id:'RC',no:'C',n:'李宜蒼',y:'R2',grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}},
+  {id:'RD',no:'D',n:'林胤彤',y:'R2',grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}},
+  {id:'RE',no:'E',n:'黃建緯',y:'R2',grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}},
+  {id:'RF',no:'F',n:'楊宏立',y:'R3',grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}},
+  {id:'RG',no:'G',n:'呂豐羽',y:'R3',grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}},
+  {id:'RH',no:'H',n:'鄭高林',y:'R3',grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}},
+  {id:'RJ',no:'J',n:'崔煊茂',y:'R4',grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}},
+  {id:'RK',no:'K',n:'林鼎翔',y:'R4',grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}},
+  {id:'RL',no:'L',n:'李玲',y:'R4',grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}},
+  {id:'RM',no:'M',n:'何宥陞',y:'R1',grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}},
+  {id:'RN',no:'N',n:'Hendy',y:'R1',grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}},
+];
+let EPA=[
+  {id:'EPA1',n:'到院前心跳停止病人處置',d:'OHCA接收、CPR管理、ROSC後照護'},
+  {id:'EPA2',n:'休克病人處置',d:'辨識休克類型、液體復甦、升壓藥使用'},
+  {id:'EPA3',n:'重大外傷病人處置',d:'依ATLS原則執行初步評估、傷害控制復甦'},
+  {id:'EPA4',n:'中毒病人處置',d:'辨識常見毒物、解毒劑使用、支持性治療'},
+  {id:'EPA5',n:'急性胸痛病人處置',d:'ACS、主動脈剝離、PE等危急病因鑑別與處置'},
+  {id:'EPA6',n:'急性意識改變病人處置',d:'AEIOU TIPS快速評估、腦中風識別、代謝性原因'},
+  {id:'EPA7',n:'急性呼吸困難病人處置',d:'哮喘、COPD急性惡化、肺炎、氣胸辨識處置'},
+];
+const EPA_LVL=[
+  'Level 1：觀察者，觀察且不主動操作。',
+  'Level 2：直接、主動監督下執行（2a教師在旁逐步共同操作 / 2b教師在旁必要時協助）。',
+  'Level 3：間接、反應性監督下執行（3a教師事後逐項確認 / 3b重點確認 / 3c必要時聯繫確認）。',
+  'Level 4：可獨立操作執行、事後確認即可。',
+  'Level 5：可對其他資淺學員進行監督與教學。',
+];
+// SHHER matrix: [id, name, R1h1,R1h2,R2h1,R2h2,R3h1,R3h2,R4h1,R4h2, thr_ind,thr_obs,thr_er]
+const SHHER_EPA=[
+  ['EPA1','到院前心跳停止',2,2,3,3,4,4,5,5,4,3,2],
+  ['EPA2','休克',2,2,3,3,4,4,5,5,4,3,2],
+  ['EPA3','重大外傷',1,2,2,3,3,4,4,5,3,2,2],
+  ['EPA4','中毒',1,2,2,3,3,4,4,5,3,2,2],
+  ['EPA5','急性胸痛',2,3,3,4,4,5,5,5,4,3,2],
+  ['EPA6','急性意識改變',2,2,3,4,4,5,5,5,4,3,2],
+  ['EPA7','急性呼吸困難',2,2,3,4,4,5,5,5,4,3,2],
+];
+const SHHER_MS=[
+  ['PC1','緊急穩定處置',1,1.5,2,2.5,3,3.5,4,4,3,2.5,2],
+  ['PC6','觀察與再次評估',1,1.5,2,2,3,3,4,4,3,2,1.5],
+  ['PC7','動向安排',1,1.5,2,2,3,3,4,4,3,2,1.5],
+  ['PC10','呼吸道處置',1,1.5,2,2.5,3,3.5,4,4,3,2.5,2],
+  ['PC12','急診超音波',1,2,2,2.5,3,3.5,4,4,3,2.5,2],
+  ['PC14','血管通路',1,1.5,2,2.5,3,3.5,4,4,3,2.5,2],
+  ['ICS2','跨專業溝通',1,1.5,2,2,3,3.5,4,4,3,2,1.5],
+];
+const IMG_REQ=['Stroke / brain infarction','Intracranial hemorrhage (traumatic & non-traumatic)','Increased intracranial pressure / herniation signs','Intracranial space occupying lesions','Cervical spine injury','Pneumothorax','Pneumomediastinum','Pleural effusion','Pulmonary infection','Pulmonary edema','Pulmonary embolism','Aortic dissection','Aortic rupture','Pericardial effusion / cardiac tamponade','Diaphragmatic rupture','Pneumoperitoneum','Small bowel obstruction','Cecal and sigmoid volvulus','Large bowel obstruction','Cholecystitis / biliary tract obstruction','Appendicitis','Urolithiasis','Fracture with extension into joint','Elbow joint effusion','Shoulder dislocation','Misplaced lines and tubes','Child abuse','其他'];
+const IMG_SEL=['Skull fractures','Stroke / brain infarction','Central Nervous system infections','Dural sinus thrombosis','Pituitary apoplexy','Spinal trauma and spinal cord injury','Facial fractures','Trauma to the aerodigestive tract','Infection of the paranasal sinuses','Infection of the neck','Ear Infections','Orbital infection','Rib fractures','Pulmonary contusion','Tracheobronchial injury','Airway foreign bodies','ARDS','Obstructive airway disease','Myocardial infarction','Aortic aneurysm','Active arterial extravasation on CT','Liver / Splenic injuries','Bowel injuries','Abdominal abscess','Pancreatitis','Diverticulitis','Ovarian cystic disease','Ovarian torsion','Pelvic inflammatory disease','Fracture','Dislocation','Arthritis / Avascular necrosis','其他'];
+const IMG_CR=['說明檢查之適應症','鑑別診斷之能力','判讀之正確性','溝通技巧'];
+let MS=[
+  {id:'PC1',cat:'PC',n:'緊急穩定處置',d:'急救危急病人時，按優先次序進行初步穩定措施，並且整合運用醫院之支援服務，且在執行急救後再度評估。',items:[{id:'PC1-L1-1',lv:1,t:'察覺病人的生命徵象出現異常，並適時求助。'},{id:'PC1-L1-2',lv:1,t:'評估病人的ABCs，並執行基本醫療措施。'},{id:'PC1-L2-3',lv:2,t:'評估並處理病人不穩定的生命徵象，啟動高級復甦處置流程。'},{id:'PC1-L2-4',lv:2,t:'辨別相關數據資料以形成初步診斷(diagnostic impression)和治療計畫。'},{id:'PC1-L2-5',lv:2,t:'評估是否有預立不施行心肺復甦術(DNR)醫囑並且有效適用於該次急救情境。'},{id:'PC1-L3-6',lv:3,t:'處理及辨別危急病人的輕重緩急優先順序。'},{id:'PC1-L3-7',lv:3,t:'急救危急病人時，優先進行關鍵的初步穩定措施。'},{id:'PC1-L3-8',lv:3,t:'實施穩定治療措施後，重新評估病人的狀況。'},{id:'PC1-L4-9',lv:4,t:'當進一步的臨床處置沒有效益時能夠即時察覺。'},{id:'PC1-L4-10',lv:4,t:'辨認出不易察覺且可能導致不穩定或病情惡化的病徵。'},{id:'PC1-L4-11',lv:4,t:'整合運用院內外相關支援及服務於處理重症病人與困難的急救情境。'}]},
+  {id:'PC2',cat:'PC',n:'焦點式病史詢問及身體診察',d:'歸納整理多重慢性疾病病人的本次就醫焦點，且適切地與其過去醫療紀錄比較，找出現在與過去表現的重要差異。',items:[{id:'PC2-L1-1',lv:1,t:'執行及溝通取得可靠且周詳的病史與身體診察。'},{id:'PC2-L2-2',lv:2,t:'針對病人主訴及急迫問題，有效執行及溝通以取得焦點病史與身體診察。'},{id:'PC2-L3-3',lv:3,t:'在急診受限或快速變動的情境下，優先獲取病史或身體診察中必要之部分。'},{id:'PC2-L4-4',lv:4,t:'利用所有可能的訊息來源，收集並整合出正確處理病人所需的必要資訊。'}]},
+  {id:'PC3',cat:'PC',n:'診斷性檢查及檢驗',d:'安排適切的檢查及檢驗並應用其結果。',items:[{id:'PC3-L1-1',lv:1,t:'了解診斷性檢查及檢驗的原則。'},{id:'PC3-L1-2',lv:1,t:'判斷病人需要接受診斷性檢查及檢驗。'},{id:'PC3-L2-3',lv:2,t:'安排適當的診斷性檢查及檢驗，並能評估利弊及禁忌。'},{id:'PC3-L2-4',lv:2,t:'執行適當的床邊診斷性檢查和操作型技能(procedures)。'},{id:'PC3-L2-5',lv:2,t:'判讀快速診斷性檢查及檢驗之結果，例如心電圖、放射性檢查、超音波。'},{id:'PC3-L3-6',lv:3,t:'按優先順序執行必要的檢查及檢驗，並考量成本效益。'},{id:'PC3-L3-7',lv:3,t:'判讀診斷性檢查及檢驗之結果，並認知檢查的風險與限制，適當尋求判讀上的協助。'},{id:'PC3-L3-8',lv:3,t:'因應各診斷檢查和操作型技能的風險、效益、禁忌症，執行替代方式或處置。'},{id:'PC3-L4-9',lv:4,t:'同時考慮疾病的發生機率，與檢查及檢驗結果影響醫療處置的可能性，來安排檢查(pre-test probability)。'},{id:'PC3-L4-10',lv:4,t:'了解偽陰性和偽陽性對檢查結果的影響(post-test probability)。'}]},
+  {id:'PC4',cat:'PC',n:'診斷',d:'基於現有資訊，縮小範圍並依可能性將鑑別診斷排序，以決定適當的處置。',items:[{id:'PC4-L1-1',lv:1,t:'依據主訴及初步評估，列出可能的數個診斷。'},{id:'PC4-L2-2',lv:2,t:'依據疾病發生的可能性，列出最可能的鑑別診斷。'},{id:'PC4-L2-3',lv:2,t:'列出最可能造成死亡、傷殘(mortality & morbidity)的鑑別診斷。'},{id:'PC4-L2-4',lv:2,t:'正確辨識病人是否「要緊」(sick or not sick)。'},{id:'PC4-L3-5',lv:3,t:'綜合現有的醫療資訊，將鑑別診斷依據罹病可能性排序，包含那些極有可能造成死亡、傷殘的疾病。'},{id:'PC4-L3-6',lv:3,t:'隨病情發展變化修正鑑別診斷。'},{id:'PC4-L4-7',lv:4,t:'善用現有資訊，縮小範圍、並衡量機率及後果嚴重度，來排序可能的鑑別診斷，並決定適當處置。'},{id:'PC4-L4-8',lv:4,t:'出現多個診斷或罕見診斷時，能辨識臨床推理的常見錯誤，進行正確診斷。'}]},
+  {id:'PC5',cat:'PC',n:'藥物治療',d:'依據作用機轉、預期效果、財務考量、可能副作用、病人偏好、過敏等選擇並開立處方。',items:[{id:'PC5-L1-1',lv:1,t:'明瞭急診常用藥物的分類及其作用機轉。'},{id:'PC5-L1-2',lv:1,t:'看診時常規詢問病人有無藥物過敏或藥物不良反應。'},{id:'PC5-L2-3',lv:2,t:'善用醫學知識，選擇適當藥物來治療病人。'},{id:'PC5-L2-4',lv:2,t:'考慮藥物治療可能產生的副作用及病人過敏史。'},{id:'PC5-L3-5',lv:3,t:'考量各種適合藥物，列出藥物治療計劃。基於作用機轉、預期效果及潛在副作用來選擇藥物。'},{id:'PC5-L3-6',lv:3,t:'辨識常見的藥物交互作用與副作用，並採取對應治療方式。'},{id:'PC5-L4-7',lv:4,t:'依據病人的偏好、飲食及個人狀況、財務考量、醫院政策與臨床指引來選擇適當藥物，包括不開立藥物也是可能的選擇。'},{id:'PC5-L4-8',lv:4,t:'辨識不常見或預期外的藥物副作用和交互作用，並採取對應治療方式。'}]},
+  {id:'PC6',cat:'PC',n:'觀察與再次評估',d:'病人在急診觀察時，依據病人資料及急診資源，適當地監測並再次評估病人狀況。',items:[{id:'PC6-L1-1',lv:1,t:'辨識出病人需要再次評估。'},{id:'PC6-L2-2',lv:2,t:'追蹤病人在急診期間是否已經接受必要的診斷和治療。'},{id:'PC6-L2-3',lv:2,t:'辨識那些病人需要在急診留觀。'},{id:'PC6-L3-4',lv:3,t:'病人急診留觀期間，適時監測其臨床狀態，並評估診斷與治療的有效性。'},{id:'PC6-L4-5',lv:4,t:'考量到留觀病人是否可能有其他的診斷與治療方式，並適時調整治療計畫，包括病人的心理及社會需求。'}]},
+  {id:'PC7',cat:'PC',n:'動向安排與照護轉移',d:'運用可用資源，為病人擬定針對疾病的衛教、會診及藥物等治療計畫，並安排後續診療。',items:[{id:'PC7-L1-1',lv:1,t:'描述基本的可用資源（例如，後續照護、復健、轉介機構）。'},{id:'PC7-L1-2',lv:1,t:'描述疾病的基本衛教內容。'},{id:'PC7-L2-3',lv:2,t:'為需最少資源的一般常見症狀病人做出處置決策。'},{id:'PC7-L2-4',lv:2,t:'衛教病人簡易的出院注意事項和相關入院計畫。'},{id:'PC7-L2-5',lv:2,t:'及時尋求適當的資源(如原主治醫師、會診醫師、個管師、社工等)。'},{id:'PC7-L3-6',lv:3,t:'對於需要醫療資源整合的常見急診病人做出處置決策，正確決定病人需要留院、轉院或可離院。'},{id:'PC7-L3-7',lv:3,t:'向病人診斷衛教、說明治療計畫、藥物統整以及安排家庭醫學科醫師或相關專科醫師的門診預約。'},{id:'PC7-L3-8',lv:3,t:'正確安排留院病人到適當層級的照護單位(加護病房、一般病房、觀察區)。'},{id:'PC7-L3-9',lv:3,t:'讓病人/照顧者(家屬)一同參與急診出院準備計畫，使其發揮效果。'},{id:'PC7-L4-10',lv:4,t:'對於需要醫療資源整合的複雜急診病人做出處置決策。'},{id:'PC7-L4-11',lv:4,t:'向病人說明複雜的出院和入院計畫，包括轉院程序。'}]},
+  {id:'PC8',cat:'PC',n:'任務轉換',d:'有效率及適時地轉換任務，使急診部門順利運作。',items:[{id:'PC8-L1-1',lv:1,t:'能在忙亂中處置單一病人。'},{id:'PC8-L2-2',lv:2,t:'能在不同病人間轉換任務。'},{id:'PC8-L3-3',lv:3,t:'有效運用任務轉換來處理不同嚴重程度、不同處置階段的多位病人。'},{id:'PC8-L4-4',lv:4,t:'有效運用任務轉換策略以掌控當下急診整體的運作。'}]},
+  {id:'PC9',cat:'PC',n:'操作型技能一般原則',d:'對符合適應症的病人執行必要的操作型技能，採取必要措施以避免併發症。',items:[{id:'PC9-L1-1',lv:1,t:'熟悉該技術操作須了解的解剖、生理學知識。'},{id:'PC9-L1-2',lv:1,t:'運用適當的標準防護措施(Universal precautions)。'},{id:'PC9-L2-3',lv:2,t:'了解急診常用技能的適應/禁忌症、解剖相關位置、器械裝備、麻醉及技術操作步驟以及可能的併發症。'},{id:'PC9-L2-4',lv:2,t:'評估病人、取得知情同意並確認依病安規範備妥所需監視儀器。'},{id:'PC9-L2-5',lv:2,t:'對中度危急，解剖位置清楚且併發症風險不高之病人執行操作型技能。'},{id:'PC9-L3-6',lv:3,t:'處置後評估有無任何可能之併發症，並處理常見的併發症。'},{id:'PC9-L3-7',lv:3,t:'初步嘗試未成功時有備援計劃。'},{id:'PC9-L3-8',lv:3,t:'在高風險的情境評估適應症、效益、風險以及替代方案。'},{id:'PC9-L4-9',lv:4,t:'針對符合適應症且具挑戰性的病人(如難以辨識解剖位置、年紀太小或太老或是伴有多重疾病的病人)，解釋並執行操作型技能。'},{id:'PC9-L4-10',lv:4,t:'於執行過程中採取必要措施，避免可能發生之併發症，並能明確辨識出本技能可能產生之結果及併發症。'}]},
+  {id:'PC10',cat:'PC',n:'呼吸道處置',d:'對符合適應症的病人執行呼吸道處置，採取必要措施以避免併發症。',items:[{id:'PC10-L1-1',lv:1,t:'描述上呼吸道解剖構造。'},{id:'PC10-L1-2',lv:1,t:'執行基本呼吸道處置，使用輔助呼吸道及袋瓣罩(BVM)給氧與通氣。'},{id:'PC10-L2-3',lv:2,t:'執行呼吸道評估項目以及描述氣管內插管的適應症。'},{id:'PC10-L2-4',lv:2,t:'描述快速插管(Drug Assisted Intubation, DAI)所使用藥物之適應症及禁忌症。'},{id:'PC10-L2-5',lv:2,t:'使用喉頭鏡執行快速插管(DAI)。'},{id:'PC10-L2-6',lv:2,t:'應用多種方式，確認插管後氣管內管位置。'},{id:'PC10-L3-7',lv:3,t:'對複雜病人，參考呼吸道處理流程，決定適當的插管工具。'},{id:'PC10-L3-8',lv:3,t:'執行插管後照護，含EtCO2監測，與依照病人生理狀況，調整適當的呼吸器模式。'},{id:'PC10-L3-9',lv:3,t:'辨識困難插管病人，並適時求援。'},{id:'PC10-L4-10',lv:4,t:'有能力執行環甲膜切開術(cricothyrotomy)。'},{id:'PC10-L4-11',lv:4,t:'對病情複雜病人執行進階呼吸道(advanced airway modalities)處置技術。'}]},
+  {id:'PC11',cat:'PC',n:'麻醉與急性疼痛處置',d:'不論病情、年齡，只要有需要，均能提供安全的疼痛處置、麻醉、鎮靜。',items:[
+{id:'PC11-L1-1',lv:1,t:'與病人討論局部麻醉的適應/禁忌症及可能的併發症。'},
+{id:'PC11-L1-2',lv:1,t:'使用適當劑量的局部麻醉藥物與合宜的技術，執行皮膚及皮下之局部麻醉。'},
+{id:'PC11-L2-3',lv:2,t:'了解麻醉、鎮靜藥品之適應症/禁忌症、併發症以及適當的劑量。'},
+{id:'PC11-L2-4',lv:2,t:'了解解剖位置、適應/禁忌症、可能併發症、適當的局部麻醉藥物劑量，以執行區域麻醉(regional anesthesia)。'},
+{id:'PC11-L3-5',lv:3,t:'了解操作型技能(procedure)所需鎮靜劑之適應/禁忌症、併發症及劑量。'},
+{id:'PC11-L3-6',lv:3,t:'評估病人，與之討論最適合止痛/鎮靜方式，並選用適當的藥品/劑量/途徑。'},
+{id:'PC11-L3-7',lv:3,t:'執行鎮靜前評估、取得病人同意，並選用適當的藥品/劑量。'},
+{id:'PC11-L3-8',lv:3,t:'鎮靜過程中，確保持續適當地監測病人。'},
+{id:'PC11-L4-9',lv:4,t:'以有效、最少併發症及最快恢復的原則，來選擇適當藥物、劑量和途徑，以執行操作型技能所需的鎮靜(procedural sedation)。'}
+]},
+  {id:'PC12',cat:'PC',n:'急診超音波',d:'利用目標導向重點式超音波在床邊進行緊急醫療狀況的評估和診斷。',items:[
+{id:'PC12-L1-1',lv:1,t:'描述急診超音波之適應症與應用。'},
+{id:'PC12-L1-2',lv:1,t:'說明如何取得最佳化的超音波影像，能針對各類重點式超音波的應用，選擇最適當的探頭。'},
+{id:'PC12-L2-3',lv:2,t:'具備基本超音波掃描能力（辨識各種器官組織）。'},
+{id:'PC12-L2-4',lv:2,t:'執行創傷超音波(eFAST)檢查。'},
+{id:'PC12-L3-5',lv:3,t:'執行目標導向重點式超音波檢查。'},
+{id:'PC12-L3-6',lv:3,t:'正確判讀所得影像。'},
+{id:'PC12-L4-7',lv:4,t:'熟練執行目標導向重點式超音波，在床邊進行緊急醫療狀況的評估和診斷、輔助急重症或外傷病人的急救以及協助臨床技術之執行。'}
+]},
+  {id:'PC13',cat:'PC',n:'傷口處置',d:'不論病情、年齡，均能適當的評估並處置傷口。',items:[
+{id:'PC13-L1-1',lv:1,t:'準備簡單傷口縫合，如傷口沖洗、麻醉、選擇適當針線等。'},
+{id:'PC13-L1-2',lv:1,t:'執行無菌操作。'},
+{id:'PC13-L1-3',lv:1,t:'執行單純縫合(simple interrupted suture)。'},
+{id:'PC13-L1-4',lv:1,t:'使用專業術語清楚描述傷口。如擦傷、裂傷、剝離傷、深淺等。'},
+{id:'PC13-L2-5',lv:2,t:'能夠將燒傷分級及計算體表面積(BSA)。'},
+{id:'PC13-L2-6',lv:2,t:'比較各種傷口處置的優缺點。如縫合、組織凝膠、膠帶、訂書針縫合器、頭髮固定等。'},
+{id:'PC13-L2-7',lv:2,t:'能辨識需要抗生素或破傷風預防的傷口。'},
+{id:'PC13-L2-8',lv:2,t:'對離院的病人做適當的傷口衛教，讓患者知道如何照護傷口。'},
+{id:'PC13-L3-9',lv:3,t:'執行複雜傷口處置。如深層、分層或角落縫合。'},
+{id:'PC13-L3-10',lv:3,t:'處理嚴重燒傷。'},
+{id:'PC13-L3-11',lv:3,t:'確認不應初期縫合(primary suture)的傷口。'},
+{id:'PC13-L3-12',lv:3,t:'適切會診其他專科。'},
+{id:'PC13-L3-13',lv:3,t:'辨識高風險及需進一步評估的傷口。(如X光、超音波、傷口探查等)'},
+{id:'PC13-L4-14',lv:4,t:'對無法以簡單方式止血的傷口進行進階止血。(如燒灼、結紮、深層縫合、注射、局部止血劑及止血帶止血)'},
+{id:'PC13-L4-15',lv:4,t:'修補可能影響美觀的傷口。(如嘴唇邊緣、眼瞼緣、鼻、耳)'},
+{id:'PC13-L4-16',lv:4,t:'描述焦痂切開術(escharotomy)的適應症和步驟。'}
+]},
+  {id:'PC14',cat:'PC',n:'血管通路',d:'不論病情、年齡，均能適當建立血管通路。',items:[
+{id:'PC14-L1-1',lv:1,t:'放置週邊靜脈導管。'},
+{id:'PC14-L1-2',lv:1,t:'執行動脈穿刺。'},
+{id:'PC14-L1-3',lv:1,t:'描述建立各種血管通路的適應/禁忌症及可能的併發症與後果。'},
+{id:'PC14-L2-4',lv:2,t:'具備執行骨針穿刺之能力。'},
+{id:'PC14-L2-5',lv:2,t:'放置動脈導管。'},
+{id:'PC14-L2-6',lv:2,t:'評估患者需求，並結合解剖/病理生理學考量，選擇最佳放置中心靜脈導管的位置。'},
+{id:'PC14-L3-7',lv:3,t:'使用超音波和標準防護措施，放置中心靜脈導管或血管通路，並確認位置適當。'},
+{id:'PC14-L4-8',lv:4,t:'狀況許可時，即使沒有超音波，也能放置中心靜脈導管。'},
+{id:'PC14-L4-9',lv:4,t:'為血管通路置放困難的病人，都能設法建立靜脈通路。'}
+]},
+  {id:'MK1',cat:'MK',n:'科學知識',d:'整合科學知識來理解常見乃至非典型或帶有複雜合併症的病人表現。',items:[{id:'MK1-L1-1',lv:1,t:'展現對常見的表現或疾病的科學知識。'},{id:'MK1-L2-2',lv:2,t:'展現對複雜的表現或疾病的科學知識。'},{id:'MK1-L3-3',lv:3,t:'能整合並闡述複雜或產生合併症之的科學知識。'},{id:'MK1-L4-4',lv:4,t:'整合複雜表現中不常見、非典型、或具有罕見合併症疾病的科學知識。'},{id:'MK1-L4-5',lv:4,t:'進行個案研究發表。'}]},
+  {id:'MK2',cat:'MK',n:'治療與臨床推理',d:'臨床推理，並能避免認知錯誤，管理醫療不確定性。',items:[{id:'MK2-L1-1',lv:1,t:'展現基礎的臨床推理。展現治療常見病症的知識。'},{id:'MK2-L2-2',lv:2,t:'展現急診的焦點式臨床推理。了解常見影響臨床思路之認知錯誤。'},{id:'MK2-L3-3',lv:3,t:'展現精熟病人因素對治療影響的知識。應用臨床推理原則來回顧性地辨識認知錯誤。'},{id:'MK2-L4-4',lv:4,t:'持續地重新評估個人的臨床推理，預防性地將認知錯誤降至最低，並管理不確定性。'}]},
+  {id:'PROF1',cat:'PROF',n:'專業行為及倫理原則',d:'遵守行醫倫理，對他人展現同理心、正直與尊重。',items:[{id:'PROF1-L1-1',lv:1,t:'在常規的情況下展現專業行為，並知道如何匯報臨床非預期的結果。在病人的照護中展現倫理原則知識。'},{id:'PROF1-L2-2',lv:2,t:'與各類病人、家屬及同仁互動時展現同理心、正直、尊重、敏感度與積極回應。'},{id:'PROF1-L3-3',lv:3,t:'瞭解自己的信念與價值觀會影響醫療服務，持續地內省以維持適當人際關係並提供優質醫療照護。'},{id:'PROF1-L4-4',lv:4,t:'在複雜、具挑戰性的臨床情況下，有效地分析、處理倫理議題，並運用適當的資源來處理與解決倫理道德困境。'}]},
+  {id:'PROF2',cat:'PROF',n:'當責',d:'對病人、社會、專業及自我展現當責的態度。',items:[{id:'PROF2-L1-1',lv:1,t:'展現基本專業責任感，如準時上班、穿著儀容合宜，以發揮醫師功能來照護病人。維護病人隱私。'},{id:'PROF2-L2-2',lv:2,t:'具備維持醫師身心健之認知，包含健康的睡眠。對於常見臨床狀況，常知所不足，並尋求協助。'},{id:'PROF2-L3-3',lv:3,t:'識別可能會影響自己或他人按時完成任務和職責的情況，並描述確保未來按時完成任務的策略。'},{id:'PROF2-L4-4',lv:4,t:'以專業與隱私保護的原則，處理因應自己與同事的失能(impairment)狀況，並適時向上呈報或尋求協助。'}]},
+  {id:'PROF3',cat:'PROF',n:'自我覺察與健康福祉',d:'覺察自我狀態，精熟運用執業生涯中促進健康福祉的策略。',items:[{id:'PROF3-L1-1',lv:1,t:'經由他人協助，可辨識個人與專業的身心狀態。'},{id:'PROF3-L2-2',lv:2,t:'可自行辨識個人與專業的身心狀態，並且尋求支授。'},{id:'PROF3-L3-3',lv:3,t:'尋求可用資源，來協助制定方案完善個人與專業的身心健康幸福狀態。'},{id:'PROF3-L4-4',lv:4,t:'可自行制定方案，完善個人與專業的身心健康幸福狀態。'}]},
+  {id:'ICS1',cat:'ICS',n:'以病人為中心的溝通',d:'展現足以與病人及家屬有效交換資訊、並取得合作的人際溝通技巧。',items:[{id:'ICS1-L1-1',lv:1,t:'使用語言和非語言行為，來表達尊重並建立良好關係。能識別阻擋有效溝通的常見障礙。'},{id:'ICS1-L2-2',lv:2,t:'透過積極傾聽和清晰的表達，在與病人直接接觸時，建立治療關係。'},{id:'ICS1-L3-3',lv:3,t:'處理病人及家屬的期待，並運用溝通技巧來減少潛在壓力、衝突及誤解。'},{id:'ICS1-L4-4',lv:4,t:'面對有挑戰或困難的病患都能順利地與其建立治療關係。對於特定挑戰（如告知壞消息），依照當時狀況靈活折衝溝通。'}]},
+  {id:'ICS2',cat:'ICS',n:'跨專業與團隊溝通',d:'領導以病人為中心的團隊，並確保團員間能有效溝通且互相尊重。',items:[{id:'ICS2-L1-1',lv:1,t:'能以尊重的態度進行會診。使用能反映醫療團隊所有成員價值觀的語言。'},{id:'ICS2-L2-2',lv:2,t:'能簡潔扼要地進行會診或尋求其他醫療資源。交班時能確保正確且有效率地溝通。'},{id:'ICS2-L3-3',lv:3,t:'確保與團隊成員有清楚的溝通與相互的尊重，並積極聆聽以適應不同的團隊溝通風格。'},{id:'ICS2-L4-4',lv:4,t:'使用彈性的溝通策略來解決急診常見之挑戰，如與會診醫師或是其他醫療人員間溝通的困難。'}]},
+  {id:'ICS3',cat:'ICS',n:'健康照護系統內的溝通',d:'清晰扼要地以有組織的方式進行溝通，並能與各利益相關者進行困難對話以改進系統。',items:[{id:'ICS3-L1-1',lv:1,t:'於病人的病歷中精確地記錄並保護病人的個人資訊。'},{id:'ICS3-L2-2',lv:2,t:'及時透過病人的病歷記錄展現有組織的診斷和治療推理思維。'},{id:'ICS3-L3-3',lv:3,t:'在病人的病歷中精簡扼要地報告診斷和治療推理思維。'},{id:'ICS3-L4-4',lv:4,t:'以清楚、簡明扼要、有組織的書面形式進行溝通。'}]},
+  {id:'PBLI1',cat:'PBLI',n:'循證實踐',d:'基於實證醫學持續改善工作表現以提升急診功能、自我學習及病人照護。',items:[{id:'PBLI1-L1-1',lv:1,t:'描述實證醫學(EBM)的基本原則。知道如何取得並且使用可得的證據。'},{id:'PBLI1-L2-2',lv:2,t:'追蹤病人之後續病程，以促進自我學習。清楚臨床問題，並使用實證醫學的臨床照護。'},{id:'PBLI1-L3-3',lv:3,t:'藉由嚴謹查證科學文獻及應用實證醫學的原則，改善個人工作表現。'},{id:'PBLI1-L4-4',lv:4,t:'展現實證醫學照護能力與精通資料查詢。參與流程改善計劃，提升急診實證照護。'}]},
+  {id:'PBLI2',cat:'PBLI',n:'執業中的反思與個人成長',d:'透過持續的反思，加深對自身行為和決策的理解，從而有效地促進個人成長和自我提升。',items:[{id:'PBLI2-L1-1',lv:1,t:'對於個人表現的數據或資料，秉持開放性的態度（包含回饋內容與其他資訊）。'},{id:'PBLI2-L2-2',lv:2,t:'對個人表現的數據或資料秉持開放性的態度，並藉此發展個人或職涯的目標。'},{id:'PBLI2-L3-3',lv:3,t:'尋求並接受發展個人及職涯目標所需的個人表現的數據或資料。'},{id:'PBLI2-L4-4',lv:4,t:'利用自身表現的數據資料與回饋，持續性地自我改善並評估是否有效地朝向職涯目標前進。'}]},
+  {id:'SBP1',cat:'SBP',n:'病人安全與品質改善',d:'參與醫療品質改善，促進病人安全。',items:[{id:'SBP1-L1-1',lv:1,t:'遵循標準規範以維護工作環境安全。描述醫療錯誤與不良事件及病人安全概念。'},{id:'SBP1-L2-2',lv:2,t:'常規執行基本病人安全作業，如暫停(time-outs)、呼叫求助(call for help)。'},{id:'SBP1-L3-3',lv:3,t:'使用流程（如檢核清單、SBAR）、人員與科技，來促進病人安全。'},{id:'SBP1-L4-4',lv:4,t:'參與機構流程改善計劃，促進急診照護及病人安全。引導團隊反思，如急救後檢討(code debriefings)。'}]},
+  {id:'SBP2',cat:'SBP',n:'醫療制度下的管理',d:'參與策略的制定及執行來改善醫療照護與病人照護流暢度。',items:[{id:'SBP2-L1-1',lv:1,t:'描述急診照護團隊的成員及角色。'},{id:'SBP2-L2-2',lv:2,t:'動用機構資源來協助病人照護。提供顧及成本效益之醫療照護。'},{id:'SBP2-L3-3',lv:3,t:'參與流程改善及資源調度，改善病人處理過程、減少急診滯留時間。'},{id:'SBP2-L4-4',lv:4,t:'針對處理複雜的醫療狀況，協調系統資源，提供病人最佳醫療照護。'}]},
+  {id:'SBP3',cat:'SBP',n:'科技運用',d:'使用資訊或科技產品來輔助及達成安全的醫療照護。',items:[{id:'SBP3-L1-1',lv:1,t:'能使用醫療資訊系統(EHR)開立醫囑、記錄病程及回應警訊。'},{id:'SBP3-L2-2',lv:2,t:'確核電子病歷記錄之正確性及完整性，以避免疏漏及錯誤。'},{id:'SBP3-L3-3',lv:3,t:'使用臨床決策輔助工具(clinical decision aids)以促進臨床處置。'},{id:'SBP3-L4-4',lv:4,t:'使用多種或進階科技輔助工具，如實證醫學資料庫、生成式人工智慧等。'}]},
+];
+const MS_CATS=['PC','MK','PROF','ICS','PBLI','SBP'];
+const MS_CAT_LBL={PC:'病患照護',MK:'醫學知識',PROF:'專業素養',ICS:'溝通協調',PBLI:'實踐學習',SBP:'系統實務'};
+// Save the original defaults so users can "restore to default" later
+const DEFAULT_EPA=JSON.parse(JSON.stringify(EPA));
+const DEFAULT_MS=JSON.parse(JSON.stringify(MS));
+function loadCustomItems(){
+  try{
+    const ce=localStorage.getItem('em_custom_epa');
+    if(ce){const parsed=JSON.parse(ce);if(Array.isArray(parsed)&&parsed.length)EPA=parsed;}
+    const cm=localStorage.getItem('em_custom_ms');
+    if(cm){const parsed=JSON.parse(cm);if(Array.isArray(parsed)&&parsed.length)MS=parsed;}
+  }catch(e){console.warn('loadCustomItems failed:',e);}
+  // Ensure CFG.enEpa / enMs have entries for all current items (default true)
+  EPA.forEach(e=>{if(!(e.id in CFG.enEpa))CFG.enEpa[e.id]=true;});
+  MS.forEach(m=>{if(!(m.id in CFG.enMs))CFG.enMs[m.id]=true;});
+}
+function saveCustomItems(){
+  localStorage.setItem('em_custom_epa',JSON.stringify(EPA));
+  localStorage.setItem('em_custom_ms',JSON.stringify(MS));
+  save();
+  fsSetDoc('config','customItems',{epa:EPA,ms:MS}).catch(()=>{});
+}
+
+// ═══════════════════
+// STATE
+// ═══════════════════
+let RES=JSON.parse(localStorage.getItem('em52_res')||'null');
+let ATT=JSON.parse(localStorage.getItem('em52_att')||'null');
+let ASSESS=JSON.parse(localStorage.getItem('em52_assess')||'[]');
+let SCHED=JSON.parse(localStorage.getItem('em52_sched')||'{}'); // {dateStr:[{attId,resId},...]}
+let CFG=JSON.parse(localStorage.getItem('em52_cfg')||'null')||{pw:'admin123',qEpaM:10,qMsM:8,enEpa:Object.fromEntries(EPA.map(e=>[e.id,true])),enMs:Object.fromEntries(MS.map(m=>[m.id,true]))};
+if(!RES)RES=DEF_RES.map(r=>({...r}));
+if(!ATT)ATT=DEF_ATT.map(a=>({...a}));
+let isAdmin=false,currentAttId=null;
+let charts={};
+let schedY=new Date().getFullYear(),schedMo=new Date().getMonth();
+let accId=null,accY=new Date().getFullYear(),accMo=new Date().getMonth();
+// assess state
+let selEpa=[],selPcMs=[],selNpcMs=[],epaScores={},epaFb={},msScores={},lastSavedAttId=null;
+// imaging state
+let imgType='',imgTab='req',imgStars={},imgSubCase='';
+let editAttId=null;
+
+function save(){localStorage.setItem('em52_res',JSON.stringify(RES));localStorage.setItem('em52_att',JSON.stringify(ATT));localStorage.setItem('em52_assess',JSON.stringify(ASSESS));localStorage.setItem('em52_sched',JSON.stringify(SCHED));localStorage.setItem('em52_cfg',JSON.stringify(CFG));}
+
+// FIREBASE
+// ── 內建 Firebase 設定（傳給別人不需重新設定）──
+// ── HARDCODED Firebase config (always connects, no localStorage needed) ──
+const FB_CONFIG={apiKey:"AIzaSyB8CkM_oTNuLQyG4deCoVKCk3BXYr8Q5-E",authDomain:"shher-d2331.firebaseapp.com",projectId:"shher-d2331",appId:"1:567713549009:web:b6e366883e513cf26493f0"};
+// ══════════════════════════════════════════════════════════════
+// FIRESTORE REST API CLIENT (no SDK needed)
+// Root cause fix: the Firebase JS SDK's WebChannel + IndexedDB
+// persistence are unreliable when the HTML is opened as a local
+// file (file://) on mobile browsers (especially iOS Safari, which
+// partitions/blocks storage for local file contexts). Plain fetch()
+// based REST calls work identically everywhere, so we bypass the
+// SDK entirely and talk to Firestore's REST API directly.
+// ══════════════════════════════════════════════════════════════
+const FS_BASE=`https://firestore.googleapis.com/v1/projects/${FB_CONFIG.projectId}/databases/(default)/documents`;
+const FS_KEY=FB_CONFIG.apiKey;
+let db=null; // kept as a "connected" flag (true/false) for compatibility with rest of app
+
+// Convert a JS value to a Firestore REST "Value" object
+function fsEncodeValue(v){
+  if(v===null||v===undefined)return{nullValue:null};
+  if(typeof v==='boolean')return{booleanValue:v};
+  if(typeof v==='number')return Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v};
+  if(typeof v==='string')return{stringValue:v};
+  if(Array.isArray(v))return{arrayValue:{values:v.map(fsEncodeValue)}};
+  if(typeof v==='object')return{mapValue:{fields:fsEncodeFields(v)}};
+  return{stringValue:String(v)};
+}
+function fsEncodeFields(obj){
+  const fields={};
+  Object.entries(obj||{}).forEach(([k,v])=>{fields[k]=fsEncodeValue(v);});
+  return fields;
+}
+// Convert a Firestore REST "Value" object back to a JS value
+function fsDecodeValue(val){
+  if(!val)return null;
+  if('nullValue'in val)return null;
+  if('booleanValue'in val)return val.booleanValue;
+  if('integerValue'in val)return parseInt(val.integerValue);
+  if('doubleValue'in val)return val.doubleValue;
+  if('stringValue'in val)return val.stringValue;
+  if('arrayValue'in val)return(val.arrayValue.values||[]).map(fsDecodeValue);
+  if('mapValue'in val)return fsDecodeFields(val.mapValue.fields||{});
+  if('timestampValue'in val)return val.timestampValue;
+  return null;
+}
+function fsDecodeFields(fields){
+  const obj={};
+  Object.entries(fields||{}).forEach(([k,v])=>{obj[k]=fsDecodeValue(v);});
+  return obj;
+}
+// Sanitize a string to be a safe Firestore document ID
+function fsSafeId(id){return String(id).replace(/[\/\s]/g,'_');}
+
+async function fsSetDoc(collection,docId,data){
+  const url=`${FS_BASE}/${collection}/${fsSafeId(docId)}?key=${FS_KEY}`;
+  const body=JSON.stringify({fields:fsEncodeFields(data)});
+  const res=await fsFetch(url,{method:'PATCH',headers:{'Content-Type':'application/json'},body});
+  if(!res.ok){const t=await res.text().catch(()=>'');throw new Error(fsHumanError(res.status,t));}
+  return res.json();
+}
+// fetch() with a hard timeout so mobile networks never hang forever
+async function fsFetch(url,opts={},timeoutMs=12000){
+  const ctrl=new AbortController();
+  const t=setTimeout(()=>ctrl.abort(),timeoutMs);
+  try{
+    const res=await fetch(url,{...opts,signal:ctrl.signal});
+    return res;
+  }catch(e){
+    if(e.name==='AbortError')throw new Error('連線逾時（已等待'+(timeoutMs/1000)+'秒），請檢查網路訊號');
+    throw new Error('網路錯誤：'+(e.message||'無法連線'));
+  }finally{clearTimeout(t);}
+}
+async function fsGetDoc(collection,docId){
+  const url=`${FS_BASE}/${collection}/${fsSafeId(docId)}?key=${FS_KEY}`;
+  const res=await fsFetch(url);
+  if(res.status===404)return null;
+  if(!res.ok){
+    const t=await res.text().catch(()=>'');
+    throw new Error(fsHumanError(res.status,t));
+  }
+  const data=await res.json();
+  return fsDecodeFields(data.fields||{});
+}
+// Translate raw HTTP errors into actionable Chinese messages
+function fsHumanError(status,bodyText){
+  if(status===403)return `403 權限被拒 — 請檢查 Firebase API Key 是否設定了「HTTP 來源限制」(Google Cloud Console → API 和服務 → 憑證)，本機 HTML 開啟時無法提供網址來源，需設為「不限制」或改用 Google Drive 開啟`;
+  if(status===401)return '401 未授權 — 請確認 Firestore 安全性規則允許讀寫';
+  if(status===429)return '429 請求過於頻繁，請稍後再試';
+  if(status>=500)return `${status} Google 伺服器暫時異常，請稍後再試`;
+  return `${status} ${bodyText.slice(0,100)}`;
+}
+async function fsListDocs(collection){
+  let docs=[];let pageToken='';
+  do{
+    const url=`${FS_BASE}/${collection}?pageSize=300&key=${FS_KEY}${pageToken?'&pageToken='+pageToken:''}`;
+    const res=await fsFetch(url);
+    if(!res.ok){const t=await res.text().catch(()=>'');throw new Error(fsHumanError(res.status,t));}
+    const data=await res.json();
+    (data.documents||[]).forEach(d=>docs.push(fsDecodeFields(d.fields||{})));
+    pageToken=data.nextPageToken||'';
+  }while(pageToken);
+  return docs;
+}
+// Write many docs with limited concurrency (gentle on mobile networks)
+async function fsWriteMany(collection,items,getId,concurrency=6){
+  let i=0;
+  async function worker(){
+    while(i<items.length){
+      const idx=i++;
+      const item=items[idx];
+      try{await fsSetDoc(collection,getId(item),item);}catch(e){console.warn('write failed',collection,getId(item),e.message);}
+    }
+  }
+  const workers=Array.from({length:Math.min(concurrency,items.length||1)},()=>worker());
+  await Promise.all(workers);
+}
+
+function setCst(t,msg){
+  const el=document.getElementById('cst');
+  if(el){el.textContent=msg;el.className='cst'+(t==='ok'?' ok':t==='err'?' err':'');}
+  const cl=document.getElementById('fb-conn-live');
+  if(cl){cl.textContent=t==='ok'?'✅ 已連線':t==='err'?'❌ 連線失敗':'⏳ 連線中...';cl.style.color=t==='ok'?'var(--acc)':t==='err'?'var(--danger)':'var(--a3)';}
+}
+
+let lastFBError=''; // store last error detail for diagnostics
+async function loadFBCfg(retrying=false){
+  setCst('','⏳ 連線中...');
+  try{
+    await fsGetDoc('config','cfg'); // test call; 404→null is fine, not an error
+    db=true;lastFBError='';
+    setCst('ok','☁️ 已連線');
+    if(!isAdmin)await syncDown(true);
+  }catch(e){
+    lastFBError=e.message||String(e);
+    if(!retrying){
+      // Mobile networks often have transient blips — auto-retry once after a short pause
+      await new Promise(r=>setTimeout(r,1500));
+      return loadFBCfg(true);
+    }
+    db=false;
+    setCst('err','❌ 連線失敗');
+    console.error('Firestore REST error:',e);
+  }
+}
+function connectFB(){
+  loadFBCfg().then(()=>{
+    const el=document.getElementById('fb-status');
+    if(el){
+      el.textContent=db?'✅ 連線成功！使用內建設定 (shher-d2331)':('❌ 連線失敗：'+lastFBError);
+      el.className=db?'al aok':'al ae';el.classList.remove('hidden');
+    }
+  });
+}
+// ── Connection diagnostics tool ──
+async function runFBDiagnostics(){
+  const out=document.getElementById('fb-diag-result');
+  if(!out)return;
+  out.classList.remove('hidden');
+  out.innerHTML='⏳ 診斷中，請稍候...';
+  const lines=[];
+  // Test 1: basic internet
+  try{
+    const t0=performance.now();
+    await fsFetch('https://www.gstatic.com/generate_204',{},6000);
+    lines.push(`✅ 基本網路連線正常（${Math.round(performance.now()-t0)}ms）`);
+  }catch(e){
+    lines.push(`❌ 基本網路連線失敗：${e.message}<br><span style="color:var(--t3)">→ 請檢查 WiFi / 行動數據是否開啟</span>`);
+  }
+  // Test 2: Firestore REST endpoint reachability + auth
+  try{
+    const t0=performance.now();
+    const res=await fsFetch(`${FS_BASE}/config/cfg?key=${FS_KEY}`,{},8000);
+    const ms=Math.round(performance.now()-t0);
+    if(res.status===404){
+      lines.push(`✅ Firestore 連線正常（${ms}ms，雲端設定文件尚未建立屬正常現象）`);
+    }else if(res.ok){
+      lines.push(`✅ Firestore 連線正常並可讀取資料（${ms}ms）`);
+    }else{
+      const t=await res.text().catch(()=>'');
+      lines.push(`❌ Firestore 回應錯誤：${fsHumanError(res.status,t)}`);
+    }
+  }catch(e){
+    lines.push(`❌ Firestore 連線失敗：${e.message}`);
+  }
+  // Test 3: origin / context info (helps diagnose file:// issues)
+  const origin=location.protocol+'//'+(location.host||'(本機檔案，無網域)');
+  lines.push(`ℹ️ 目前開啟方式：<code style="background:var(--bg3);padding:1px 6px;border-radius:4px">${location.protocol}</code> ${location.protocol==='file:'?'<span style="color:var(--a3)">（本機檔案 — 若持續連線失敗，強烈建議改用「Google Drive 開啟」，見下方說明）</span>':''}`);
+  out.innerHTML=lines.map(l=>`<div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:13px">${l}</div>`).join('');
+}
+async function batchWrite(items,colName,getId){
+  await fsWriteMany(colName,items,getId);
+}
+async function syncUp(){
+  const el=document.getElementById('fb-status');
+  if(el){el.textContent='⬆ 同步中...';el.className='al ai';el.classList.remove('hidden');}
+  try{
+    await fsWriteMany('assessments',ASSESS,a=>a.id);
+    await fsWriteMany('residents',RES,r=>r.id);
+    await fsWriteMany('attendings',ATT,a=>a.id);
+    await fsSetDoc('config','schedule',{data:SCHED});
+    await fsSetDoc('config','cfg',CFG);
+    await fsSetDoc('config','customItems',{epa:EPA,ms:MS});
+    if(el){el.textContent='✅ 同步成功！評核 '+ASSESS.length+' 筆、住院醫師 '+RES.length+' 位';el.className='al aok';}
+    db=true;setCst('ok','☁️ 已連線');
+  }catch(e){
+    if(el){el.textContent='❌ 同步失敗：'+e.message;el.className='al ae';}
+    console.error('syncUp error:',e);
+  }
+}
+async function syncDown(silent=false){
+  const el=document.getElementById('fb-status');
+  if(!silent&&el){el.textContent='⬇ 從雲端下載中...';el.className='al ai';el.classList.remove('hidden');}
+  try{
+    const[assessList,resList,attList,schedDoc,cfgDoc,itemsDoc]=await Promise.all([
+      fsListDocs('assessments'),
+      fsListDocs('residents'),
+      fsListDocs('attendings'),
+      fsGetDoc('config','schedule'),
+      fsGetDoc('config','cfg'),
+      fsGetDoc('config','customItems'),
+    ]);
+    if(assessList.length)ASSESS=assessList;
+    if(resList.length)RES=resList;
+    if(attList.length)ATT=attList;
+    if(schedDoc&&schedDoc.data)SCHED=schedDoc.data;
+    if(cfgDoc)Object.assign(CFG,cfgDoc);
+    if(itemsDoc&&Array.isArray(itemsDoc.epa)&&itemsDoc.epa.length){EPA=itemsDoc.epa;localStorage.setItem('em_custom_epa',JSON.stringify(EPA));}
+    if(itemsDoc&&Array.isArray(itemsDoc.ms)&&itemsDoc.ms.length){MS=itemsDoc.ms;localStorage.setItem('em_custom_ms',JSON.stringify(MS));}
+    save();
+    db=true;setCst('ok','☁️ 已連線');
+    if(!silent&&el){el.textContent='✅ 同步成功！評核 '+ASSESS.length+' 筆';el.className='al aok';}
+    renderDash();
+  }catch(e){
+    if(!silent&&el){el.textContent='❌ 同步失敗：'+e.message;el.className='al ae';}
+    else{db=false;setCst('err','⚠️ 同步失敗');}
+    console.error('syncDown error:',e);
+  }
+}
+async function saveCloud(rec){
+  try{await fsSetDoc('assessments',rec.id,rec);}catch(e){console.warn('saveCloud failed:',e.message);}
+}
+async function autoSync(){
+  try{
+    await fsWriteMany('assessments',ASSESS,a=>a.id);
+    await fsWriteMany('residents',RES,r=>r.id);
+    await fsWriteMany('attendings',ATT,a=>a.id);
+    await fsSetDoc('config','schedule',{data:SCHED});
+    await fsSetDoc('config','cfg',CFG);
+    setCst('ok','☁️ 已同步');
+    const ind=document.getElementById('sync-ind');
+    if(ind){ind.style.opacity='1';setTimeout(()=>ind.style.opacity='0',1500);}
+  }catch(e){setCst('err','⚠️ 同步失敗');console.warn('autoSync error:',e.message);}
+}
+
+// AUTH
+function toggleMode(){if(isAdmin){isAdmin=false;applyMode();}else{document.getElementById('pw-in').value='';document.getElementById('pw-err').classList.add('hidden');openM('m-pw');}}
+function checkPw(){if(document.getElementById('pw-in').value===CFG.pw){isAdmin=true;closeM('m-pw');applyMode();nav('admin');}else document.getElementById('pw-err').classList.remove('hidden');}
+function applyMode(){
+  document.querySelectorAll('.admin-only').forEach(el=>el.classList.toggle('hidden',!isAdmin));
+  const btn=document.getElementById('mdb'),bdg=document.getElementById('mbdg');
+  if(isAdmin){btn.textContent='🔓 切換回指導醫師模式';btn.classList.add('adm');bdg.textContent='管理員模式';bdg.className='badge bdp';document.getElementById('att-selector-wrap').classList.add('hidden');const _b=document.getElementById('att-selected-banner');if(_b){_b.classList.remove('hidden');const nb=document.getElementById('att-name-big');const ab=document.getElementById('att-avatar-big');if(nb&&att)nb.textContent=att.n;if(ab&&att)ab.textContent=att.n[0];}}
+  else{btn.textContent='🔒 切換管理員模式';btn.classList.remove('adm');bdg.textContent='指導醫師模式';bdg.className='badge bdg';if(!currentAttId)showAttSel();}
+  updateRmBadge();
+}
+function showAttSel(){const w=document.getElementById('att-selector-wrap');w.classList.remove('hidden');const grid=document.getElementById('att-sel-grid');grid.innerHTML=[...ATT].sort((a,b)=>(parseInt(a.no)||999)-(parseInt(b.no)||999)).map(a=>`<button class="att-sel-btn ${currentAttId===a.id?'active':''}" onclick="selAtt('${a.id}')">${a.no?`<span style="font-size:9.5px;color:var(--t3)">${a.no}</span><br>`:''}${a.n}</button>`).join('');}
+function selAtt(id){
+  currentAttId=id;
+  const att=ATT.find(a=>a.id===id);
+  if(att){
+    document.getElementById('att-badge').textContent=att.n;
+    document.getElementById('att-selector-wrap').classList.add('hidden');
+    // Show big banner
+    const banner=document.getElementById('att-selected-banner');
+    if(banner){
+      banner.classList.remove('hidden');
+      document.getElementById('att-name-big').textContent=att.n;
+      document.getElementById('att-avatar-big').textContent=att.n[0];
+    }
+  }
+  renderDash();
+}
+function reselAtt(){
+  const banner=document.getElementById('att-selected-banner');
+  if(banner)banner.classList.add('hidden');
+  currentAttId=null;
+  document.getElementById('att-badge').textContent='未選擇主治醫師';
+  showAttSel();
+}
+function changePw(){const n=document.getElementById('pw-n').value,c=document.getElementById('pw-c').value;if(!n)return alert('請輸入新密碼');if(n!==c)return alert('密碼不一致');CFG.pw=n;save();alert('密碼已更新');}
+
+// DATA HELPERS
+function visA(){return isAdmin||!currentAttId?ASSESS:ASSESS.filter(a=>a.attId===currentAttId);}
+function tod(){return new Date().toISOString().split('T')[0];}
+function mkStr(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+function getRes(id){return RES.find(r=>r.id===id);}
+function getAtt(id){return ATT.find(a=>a.id===id);}
+function getAttByNo(no){return ATT.find(a=>String(a.no)===String(no));}
+function getResByNo(no){return RES.find(r=>r.no===no);}
+
+// NAV
+const PT={dashboard:'儀表板',assess:'新增評核',thankyou:'謝謝填寫',history:'評核紀錄',analytics:'統計分析',shher:'SHHER 執業矩陣',residents:'住院醫師管理',attendings:'主治醫師管理',schedule:'班表管理',graduated:'已畢業學員',export:'匯出 / 匯入資料',remind:'提醒未填答',admin:'系統管理員',firebase:'雲端設定'};
+function nav(page,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+page)?.classList.add('active');
+  if(el)el.classList.add('active');else document.querySelectorAll('.ni').forEach(n=>{if(n.getAttribute('onclick')?.includes("'"+page+"'"))n.classList.add('active');});
+  document.getElementById('tbt').textContent=PT[page]||page;
+  closeSB();
+  if(page==='dashboard')renderDash();
+  if(page==='assess')initAssess();
+  if(page==='imaging')initImg();
+  if(page==='history')renderHistory();
+  if(page==='analytics')renderAnalytics();
+  if(page==='shher')renderShher();
+  if(page==='residents')renderRes();
+  if(page==='attendings')renderAtt();
+  if(page==='schedule')renderSched();
+  if(page==='graduated')renderGrad();
+  if(page==='export'){populateSel('exp-r');populateSel('prt-r');}
+  if(page==='remind'){document.getElementById('rmd-date').value=tod();renderRemind();}
+  if(page==='admin')initAdmin();
+  if(page==='firebase'){loadFBCfg();
+    // Always fill inputs from stored config
+    setTimeout(()=>{
+      const fc=JSON.parse(localStorage.getItem('em52_fb')||'{}');
+      ['k','d','pid','a'].forEach(x=>{const el=document.getElementById('fb-'+x);if(el)el.value=fc[x]||'';});
+    },100);
+  }
+}
+function toggleSB(){document.getElementById('sb').classList.toggle('open');document.getElementById('sbo').classList.toggle('open');}
+function closeSB(){document.getElementById('sb').classList.remove('open');document.getElementById('sbo').classList.remove('open');}
+
+// ══════════════ SCHEDULE PASTE PARSER ══════════════
+function parsePaste(){
+  const txt=document.getElementById('sched-paste').value.trim();
+  if(!txt){alert('請貼上班表資料');return;}
+
+  const lines=txt.split('\n').map(l=>l.split('\t').map(c=>(c||'').trim()));
+  const defaultOrder=['A','B','C','D','E','F','G','H','J','K','L','M','N'];
+  const allResCodes=RES.map(r=>r.no).filter(Boolean);
+  const allResNames=RES.map(r=>r.n).filter(Boolean);
+
+  // ── Find header row: the row with most resident codes/names ──
+  let resHeaderIdx=-1;
+  let headerRow=null;
+  for(let i=0;i<Math.min(lines.length,8);i++){
+    const row=lines[i];
+    const mc=row.filter(c=>allResCodes.includes(c)||allResNames.includes(c)||defaultOrder.includes(c)).length;
+    if(mc>=3){resHeaderIdx=i;headerRow=row;break;}
+  }
+  if(!headerRow){alert('找不到住院醫師欄位，請確認格式');return;}
+
+  // ── Determine offset: col0 of date rows is always the date string ──
+  // If header[0] is a resident code → header has no leading empty cell
+  //   → dateColOffset = 1 (A's data in date row is at col 1, not col 0)
+  // If header[0] is empty/label → dateColOffset = 0 (no adjustment needed)
+  const firstCellIsRes=allResCodes.includes(headerRow[0])||allResNames.includes(headerRow[0])||defaultOrder.includes(headerRow[0]);
+  const dateColOffset=firstCellIsRes?1:0;
+
+  // ── Build resColMap: headerColIdx → resId, then map to dateColIdx ──
+  // In date rows, we read col = (headerColIdx + dateColOffset)
+  const resColMap={};  // dateColIdx → resId
+  headerRow.forEach((cell,hCol)=>{
+    let r=RES.find(x=>x.no&&String(x.no)===String(cell));
+    if(!r)r=RES.find(x=>x.n===cell);
+    if(r){
+      const dateCol=hCol+dateColOffset;
+      resColMap[dateCol]=r.id;
+    }
+  });
+
+  if(Object.keys(resColMap).length<3){
+    // Last resort: A at col(1+dateColOffset), map 13 residents from there
+    const anchorCol=1;
+    defaultOrder.forEach((code,i)=>{
+      const r=RES.find(x=>x.no===code)||RES.filter(x=>!x.grad)[i];
+      if(r)resColMap[anchorCol+i]=r.id;
+    });
+  }
+
+  // ── Parse date rows ──
+  const dateRe=/^(\d{1,2})[\/\-](\d{1,2})$/;
+  const year=new Date().getFullYear();
+  let ok=0,entries=0,skip=0;
+
+  // Collect all date strings in this paste, then clear them first
+  const pastedDates=new Set();
+  lines.forEach(row=>{
+    const first=(row[0]||'').trim();
+    const dm=first.match(dateRe);
+    if(!dm)return;
+    const m=parseInt(dm[1]),d=parseInt(dm[2]);
+    if(m<1||m>12||d<1||d>31)return;
+    pastedDates.add(`${year}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+  });
+  // Clear old schedule for those dates
+  pastedDates.forEach(ds=>{ SCHED[ds]=[]; });
+
+  lines.forEach(row=>{
+    const first=(row[0]||'').trim();
+    if(!first.match(dateRe))return;
+    const [,mm,dd]=first.match(dateRe);
+    const m=parseInt(mm),d=parseInt(dd);
+    if(m<1||m>12||d<1||d>31)return;
+    const dateStr=`${year}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    if(!SCHED[dateStr])SCHED[dateStr]=[];
+
+    Object.entries(resColMap).forEach(([col,resId])=>{
+      const cell=(row[parseInt(col)]||'').trim();
+      if(!cell||cell==='-'||cell==='0'||cell==='S'||cell==='')return;
+      const att=getAttByNo(cell);
+      if(!att){skip++;return;}
+      const res=getRes(resId);if(!res)return;
+      if(!SCHED[dateStr].some(e=>e.attId===att.id&&e.resId===res.id)){
+        SCHED[dateStr].push({attId:att.id,resId:res.id});
+        entries++;
+      }
+    });
+    ok++;
+  });
+
+  save();autoSync();renderSched();updateRmBadge();
+
+  const preview=Object.entries(resColMap).slice(0,5).map(([col,rid])=>{
+    const r=getRes(rid);return r?`欄${col}→${r.no}${r.n[0]}`:'';
+  }).filter(Boolean).join('、');
+  const el=document.getElementById('paste-result');
+  el.innerHTML=`✅ 解析完成！<b>${ok}</b> 個日期，<b>${entries}</b> 筆${skip>0?` <span style="color:var(--a3)">⚠ ${skip}格未識別</span>`:''}
+    <br><span style="font-size:12px;color:var(--t3)">偏移:${dateColOffset} ｜ ${preview}...</span>`;
+  el.className='al aok';el.classList.remove('hidden');
+}
+
+// ══════════════ DASHBOARD ══════════════
+function renderDash(){
+  const msA=visA().filter(a=>a.type==='ms');
+  document.getElementById('st-cnt').textContent=visA().length;
+  let ts=0;msA.forEach(a=>{if(a.msItems)Object.values(a.msItems).forEach(v=>{if(v==='stable')ts++;});});
+  document.getElementById('st-ms').textContent=ts;
+  const ev=msA.filter(a=>a.epaAvg).map(a=>parseFloat(a.epaAvg));
+  document.getElementById('st-epa').textContent=ev.length?(ev.reduce((a,b)=>a+b,0)/ev.length).toFixed(1):'—';
+  document.getElementById('st-td').textContent=visA().filter(a=>a.date===tod()).length;
+  const sub=document.getElementById('dash-sub');
+  if(!isAdmin&&currentAttId){const att=getAtt(currentAttId);sub.textContent=`${att?.n||''}醫師 — 我的評核紀錄`;}
+  else sub.textContent='今日評核進度與整體概況';
+  const admCharts=document.getElementById('admin-dash-charts');
+  if(isAdmin){admCharts.classList.remove('hidden');renderDashCharts();}
+  else admCharts.classList.add('hidden');
+  // Admin: today's attending bar
+  const bar=document.getElementById('dash-att-bar');
+  const td=getTodayDocs(tod());
+  if(isAdmin&&td.length){
+    bar.classList.remove('hidden');
+    document.getElementById('dash-att-list').innerHTML=td.map(e=>{
+      const att=getAtt(e.attId);const res=getRes(e.resId);if(!att||!res)return'';
+      const cnt=ASSESS.filter(a=>a.date===tod()&&a.attId===e.attId&&a.resId===e.resId).length;
+      return`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(30,45,69,.5)">
+        <div style="display:flex;align-items:center;gap:7px"><div class="dav">${att.n[0]}</div><span>${att.n}</span><span style="font-size:10px;color:var(--t3)">→</span><span style="font-size:12px;color:var(--a2)">${res.n}</span></div>
+        <div style="display:flex;align-items:center;gap:7px"><span style="font-size:11.5px;color:var(--t2)">${cnt}份</span>
+          <span class="pill ${cnt>0?'p4':'p1'}">${cnt>0?'有評核':'未評核'}</span>
+          ${cnt===0?`<button class="btn bp bxs" onclick="quickAssess('${e.attId}','${e.resId}')">＋快速填寫</button>`:''}
+        </div>
+      </div>`;
+    }).join('');
+  }else bar.classList.add('hidden');
+  // Non-admin: pending dates
+  const pendCard=document.getElementById('dash-pending-card');
+  if(!isAdmin&&currentAttId){
+    const pending=getPendingDates(currentAttId);
+    if(pending.length){
+      pendCard.classList.remove('hidden');
+      document.getElementById('dash-pending-list').innerHTML=pending.map(({date,resIds})=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(30,45,69,.5);flex-wrap:wrap">
+        <span style="font-family:'DM Mono';font-size:13px;color:var(--a3);min-width:90px">${date}</span>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">${resIds.map(id=>{const r=getRes(id);return r?`<button class="btn bp bxs" onclick="quickAssessOnDate('${currentAttId}','${id}','${date}')">${r.n}</button>`:''}).join('')}</div>
+      </div>`).join('');
+    }else{pendCard.classList.remove('hidden');document.getElementById('dash-pending-list').innerHTML='<div style="text-align:center;color:var(--acc);padding:10px">✅ 沒有未填寫的評核！</div>';}
+  }else pendCard.classList.add('hidden');
+  // Recent table
+  const tb=document.getElementById('dash-tbody');
+  tb.innerHTML=visA().slice(0,8).map(a=>`<tr>
+    <td>${a.date}</td><td style="color:var(--a2);font-size:11px">${a.attName||'—'}</td><td>${a.resName}</td><td style="color:var(--a2)">${a.resYear||''}</td>
+    <td>${a.msPresRate!=null?`<span class="pill ${a.msPresRate>=80?'p4':a.msPresRate>=60?'p3':'p1'}">${a.msPresRate}%</span>`:'—'}</td>
+    <td>${a.epaAvg?`<span class="pill p${Math.round(a.epaAvg)}">${a.epaAvg}</span>`:'—'}</td>
+    <td>${a.type==='imaging'?'🩻':'—'}</td>
+    <td class="ifl" style="gap:4px"><button class="btn bs bxs" onclick="viewDet(${a.id})">詳情</button><button class="btn bxs bd" onclick="delA(${a.id})">✕</button></td>
+  </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--t3);padding:16px">尚無紀錄</td></tr>';
+}
+function getTodayDocs(ds){return SCHED[ds]||[];}
+function getPendingDates(attId){
+  const result=[];
+  const today=tod();
+  Object.entries(SCHED).forEach(([date,entries])=>{
+    if(date>today)return;
+    const myEntries=entries.filter(e=>e.attId===attId);if(!myEntries.length)return;
+    const pendingRes=myEntries.filter(e=>{return ASSESS.filter(a=>a.date===date&&a.attId===attId&&a.resId===e.resId).length===0;}).map(e=>e.resId);
+    if(pendingRes.length)result.push({date,resIds:pendingRes});
+  });
+  return result.sort((a,b)=>b.date.localeCompare(a.date));
+}
+function quickAssess(attId,resId){nav('assess');setTimeout(()=>{document.getElementById('f-att').value=attId;document.getElementById('f-res').value=resId;onAttChange();},100);}
+function quickAssessDate(attId,date){nav('assess');setTimeout(()=>{document.getElementById('f-att').value=attId;document.getElementById('f-date').value=date;onAttChange();},100);}
+function quickAssessOnDate(attId,resId,date){nav('assess');setTimeout(()=>{document.getElementById('f-att').value=attId;document.getElementById('f-res').value=resId;document.getElementById('f-date').value=date;onAttChange();},100);}
+function renderDashCharts(){
+  dC('ch-epa-c');dC('ch-ms-c');
+  const msA=ASSESS.filter(a=>a.type==='ms');
+  const resIds=[...new Set(msA.map(a=>a.resId))].slice(0,6);
+  if(resIds.length){const ctx=document.getElementById('ch-epa-c').getContext('2d');const clrs=['#00c9a7','#3b82f6','#f59e0b','#ef4444','#a855f7','#ec4899'];const sorted=[...msA].sort((a,b)=>a.date.localeCompare(b.date));const labels=[...new Set(sorted.map(a=>a.date))];const ds=resIds.map((rid,i)=>({label:getRes(rid)?.n||rid,data:labels.map(d=>{const a=sorted.find(x=>x.resId===rid&&x.date===d&&x.epaAvg);return a?parseFloat(a.epaAvg):null;}),borderColor:clrs[i],tension:.3,fill:false,pointRadius:3,spanGaps:true}));charts['ch-epa-c']=new Chart(ctx,{type:'line',data:{labels,datasets:ds},options:cOpt('line',5)});}
+  const rd=RES.filter(r=>!r.grad).map(r=>{const as=msA.filter(a=>a.resId===r.id&&a.msPresRate!=null);return{n:r.n,p:as.length?as.reduce((s,a)=>s+a.msPresRate,0)/as.length:0};}).filter(d=>d.p>0);
+  if(rd.length){const ctx2=document.getElementById('ch-ms-c').getContext('2d');charts['ch-ms-c']=new Chart(ctx2,{type:'bar',data:{labels:rd.map(d=>d.n),datasets:[{label:'可呈現%',data:rd.map(d=>Math.round(d.p)),backgroundColor:rd.map(d=>d.p>=80?'rgba(0,201,167,.7)':d.p>=60?'rgba(245,158,11,.7)':'rgba(239,68,68,.7)'),borderRadius:4}]},options:cOpt('bar',100)});}
+}
+
+// ══════════════ ASSESS ══════════════
+function initAssess(){selEpa=[];selPcMs=[];selNpcMs=[];epaScores={};epaFb={};msScores={};embedImgType='';embedImgTab='req';embedImgStars={};embedImgSubCase='';document.getElementById('f-date').value=tod();document.getElementById('f-case').value='';const eib=document.getElementById('embed-img-enabled');if(eib){eib.checked=false;const inner=document.getElementById('embed-img-inner');if(inner)inner.style.display='none';}['ass-ok','ass-err'].forEach(id=>document.getElementById(id).classList.add('hidden'));populateSel('f-res',false);populateSel('f-att',true);if(currentAttId)document.getElementById('f-att').value=currentAttId;onAttChange();[0,1,2,3].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===0);document.getElementById('ws'+i).className='ws'+(i===0?' active':'');});syncMobBar(0);}
+function onAttChange(){const id=document.getElementById('f-att').value;const entries=(SCHED[tod()]||[]).filter(e=>e.attId===id);const si=document.getElementById('tshift');if(entries.length){const resNames=entries.map(e=>getRes(e.resId)?.n||'').filter(Boolean);si.textContent=resNames.length?`今日需評：${resNames.join('、')}`:'今日值班';}else si.textContent='';}
+function goStep(s){if(s===1&&!v0())return;if(s===2&&!v1())return;if(s===3&&!v2())return;[0,1,2,3].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===s);document.getElementById('ws'+i).className='ws'+(i===s?' active':i<s?' done':'');});window.scrollTo(0,0);if(s===1)renderSelStep();if(s===2)renderEpaStep();if(s===3)renderMsStep();syncMobBar(s);}
+function syncMobBar(s){
+  const bar=document.getElementById('mob-bar');if(!bar)return;
+  const isMobile=window.innerWidth<=768;
+  if(!isMobile){bar.classList.add('hidden');return;}
+  bar.classList.remove('hidden');
+  const prev=document.getElementById('mob-bar-prev');
+  const next=document.getElementById('mob-bar-next');
+  if(s===0){prev.style.visibility='hidden';}else{prev.style.visibility='visible';prev.onclick=()=>goStep(s-1);}
+  if(s<3){next.textContent='下一步 →';next.className='btn bp';next.onclick=()=>goStep(s+1);}
+  else{next.textContent='💾 儲存評核';next.className='btn bp';next.onclick=()=>saveAssess();}
+}
+function v0(){if(!document.getElementById('f-res').value){alert('請選擇住院醫師');return false;}return true;}
+function v1(){if(selEpa.length!==1){alert(`請選擇 1 項 EPA（目前 ${selEpa.length}）`);return false;}if(selPcMs.length!==2){alert(`PC Milestone 請選擇 2 項（目前 ${selPcMs.length}）`);return false;}if(selNpcMs.length!==2){alert(`非PC Milestone 請選擇 2 項（目前 ${selNpcMs.length}）`);return false;}return true;}
+function v2(){for(const id of selEpa){if(!epaScores[id]){alert(`EPA ${id} 尚未評分`);return false;}if(!epaFb[id]||epaFb[id].trim().length<5){alert(`EPA ${id} 的質性回饋為必填`);return false;}}return true;}
+function getMsUseCnt(resId,msId){if(!resId)return 0;return ASSESS.filter(a=>a.resId===resId&&a.type==='ms'&&a.selMs&&a.selMs.includes(msId)).length;}
+function getMsMonthCnt(resId,msId){
+  if(!resId)return 0;
+  // Use local time (Taiwan UTC+8) not UTC
+  const now=new Date();
+  const mon=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  return ASSESS.filter(a=>a.resId===resId&&a.type==='ms'&&a.selMs&&a.selMs.includes(msId)&&a.date.startsWith(mon)).length;
+}
+function getMsLimit(resId,msId){
+  // Get effective limit: per-resident override takes priority over global
+  const r=getRes(resId);
+  const ms=MS.find(m=>m.id===msId);
+  const isPc=ms?.cat==='PC';
+  if(r){
+    const override=isPc?r.qPcOverride:r.qNpcOverride;
+    if(override!=null)return parseInt(override)||0; // 0 means unlimited
+  }
+  return parseInt(CFG.qMsM)||0; // global default
+}
+function isMsOverMonthLimit(resId,msId){
+  const limit=getMsLimit(resId,msId);
+  if(limit<=0)return false;
+  return getMsMonthCnt(resId,msId)>=limit;
+}
+function renderSelStep(){
+  const resId=document.getElementById('f-res').value;updSelCnt();
+  const eg=document.getElementById('epa-grid');eg.innerHTML='';
+  EPA.forEach(epa=>{if(!CFG.enEpa[epa.id])return;const lkd=isEpaLkd(resId,epa.id),isSel=selEpa.includes(epa.id);let cls='epabtn';if(lkd)cls+=' lkd';else if(isSel)cls+=' sel';eg.innerHTML+=`<button class="${cls}" onclick="togEpa('${epa.id}')" ${lkd?'disabled':''}><div class="ec">${epa.id}</div><div class="en">${epa.n}</div>${lkd?'<div style="font-size:9.5px;color:var(--a3);margin-top:3px">🔒 CCC鎖定</div>':''}</button>`;});
+  const pcG=document.getElementById('ms-pc-chips');pcG.innerHTML='';
+  MS.filter(m=>m.cat==='PC'&&CFG.enMs[m.id]).forEach(m=>{const lkd=isMsLkd(resId,m.id),isSel=selPcMs.includes(m.id);let cls='mchip';if(lkd)cls+=' lkd';else if(isSel)cls+=' sel';const cnt_pc=getMsUseCnt(resId,m.id);const monCnt_pc=getMsMonthCnt(resId,m.id);const overLim_pc=isMsOverMonthLimit(resId,m.id);
+      const pct_pc=getMsPct(resId,m.id);
+      const pcCls=overLim_pc?'mchip lkd':(lkd?'mchip lkd':(selPcMs.includes(m.id)?'mchip sel':'mchip'));
+      const limVal=getMsLimit(resId,m.id);
+      const pcSub=overLim_pc?`<div style="font-size:11px;color:var(--danger);margin-top:2px">🔒已達上限(${monCnt_pc}/${limVal})</div>`:limVal>0?`<div style="font-size:11px;color:var(--t3);margin-top:2px">本月${monCnt_pc}/${limVal}次</div>`:`<div style="font-size:11px;color:var(--t3);margin-top:2px">共${cnt_pc}次</div>`;
+      pcG.innerHTML+=`<button class="${pcCls}" onclick="togPc('${m.id}')" ${(lkd||overLim_pc)?'disabled':''}><div style="font-weight:600">${m.id}</div><div style="font-size:11px;opacity:.8">${m.n.length>8?m.n.slice(0,8)+'…':m.n}</div>${pcSub}</button>`;});
+  const npcG=document.getElementById('ms-npc-chips');npcG.innerHTML='';
+  MS.filter(m=>m.cat!=='PC'&&CFG.enMs[m.id]).forEach(m=>{const lkd=isMsLkd(resId,m.id),isSel=selNpcMs.includes(m.id);let cls='mchip';if(lkd)cls+=' lkd';else if(isSel)cls+=' sel';const cnt_npc=getMsUseCnt(resId,m.id);const monCnt_npc=getMsMonthCnt(resId,m.id);const overLim_npc=isMsOverMonthLimit(resId,m.id);
+      const npcCls=overLim_npc?'mchip lkd':(lkd?'mchip lkd':(selNpcMs.includes(m.id)?'mchip sel':'mchip'));
+      const limVal2=getMsLimit(resId,m.id);
+      const npcSub=overLim_npc?`<div style="font-size:11px;color:var(--danger);margin-top:2px">🔒已達上限(${monCnt_npc}/${limVal2})</div>`:limVal2>0?`<div style="font-size:11px;color:var(--t3);margin-top:2px">本月${monCnt_npc}/${limVal2}次</div>`:`<div style="font-size:11px;color:var(--t3);margin-top:2px">共${cnt_npc}次</div>`;
+      npcG.innerHTML+=`<button class="${npcCls}" onclick="togNpc('${m.id}')" ${(lkd||overLim_npc)?'disabled':''}><div style="font-weight:600">${m.id}</div><div style="font-size:11px;opacity:.8">${m.n.length>8?m.n.slice(0,8)+'…':m.n}</div>${npcSub}</button>`;});
+}
+function togEpa(id){if(selEpa.includes(id))selEpa=selEpa.filter(x=>x!==id);else{if(selEpa.length>=1){alert('每次最多選 2 項 EPA');return;}selEpa.push(id);}updSelCnt();renderSelStep();}
+function togPc(id){
+  if(selPcMs.includes(id)){selPcMs=selPcMs.filter(x=>x!==id);}
+  else{
+    if(selPcMs.length>=2){alert('PC 每次最多選 2 項');return;}
+    const resId=document.getElementById('f-res').value;
+    if(isMsOverMonthLimit(resId,id)){
+      const lim=CFG.qMsM;const cnt=getMsMonthCnt(resId,id);
+      alert(`${id} 本月已評核 ${cnt} 次，已達上限 ${lim} 次。`);return;
+    }
+    selPcMs.push(id);
+  }
+  updSelCnt();renderSelStep();
+}
+function togNpc(id){
+  if(selNpcMs.includes(id)){selNpcMs=selNpcMs.filter(x=>x!==id);}
+  else{
+    if(selNpcMs.length>=2){alert('非PC 每次最多選 2 項');return;}
+    const resId=document.getElementById('f-res').value;
+    if(isMsOverMonthLimit(resId,id)){
+      const lim=CFG.qMsM;const cnt=getMsMonthCnt(resId,id);
+      alert(`${id} 本月已評核 ${cnt} 次，已達上限 ${lim} 次。`);return;
+    }
+    selNpcMs.push(id);
+  }
+  updSelCnt();renderSelStep();
+}
+function updSelCnt(){document.getElementById('ec').textContent=selEpa.length;document.getElementById('pc-cnt').textContent=selPcMs.length+'/2';document.getElementById('npc-cnt').textContent=selNpcMs.length+'/2';}
+function renderEpaStep(){
+  const form=document.getElementById('epa-form');form.innerHTML='';
+  const attId=document.getElementById('f-att').value;const att=getAtt(attId);
+  const presHtml=(att?.presets||[]).map(p=>`<button class="pre-btn" onclick="insPreset('epa-fb-${p.n.replace(/\s/g,'')}','${p.c.replace(/'/g,"\\'")}')">＋${p.n}</button>`).join('');
+  selEpa.forEach(id=>{const epa=EPA.find(e=>e.id===id);if(!epa)return;const val=epaScores[id]||0;const fb=epaFb[id]||'';
+    form.innerHTML+=`<div class="rg"><div style="font-size:9.5px;color:var(--a2);font-family:'DM Mono';margin-bottom:1px">${epa.id}</div>
+      <div class="rl">${epa.n}</div><div class="rd">${epa.d}</div>
+      <div class="epa-lv-box">${EPA_LVL.map((d,i)=>`<div style="display:flex;align-items:flex-start;gap:5px;margin-bottom:2px"><span style="font-family:'DM Mono';font-size:10px;font-weight:700;color:${['#ef4444','#f97316','#eab308','#22c55e','#00c9a7'][i]};min-width:16px">${i+1}</span><span style="font-size:10.5px">${d}</span></div>`).join('')}</div>
+      <div class="rscale">${[1,2,3,4,5].map(n=>`<button class="rb l${n}${val===n?' s':''}" onclick="setEpaS('${id}',${n},this)">${n}<br><span style="font-size:8.5px">${['觀察','直督','間督','獨立','教學'][n-1]}</span></button>`).join('')}</div>
+      <div class="sclbl"><span>Level 1</span><span>Level 5</span></div>
+      <div class="fb-box mt3"><div class="fb-title">💬 質性回饋<span style="color:var(--danger);margin-left:2px">*</span>
+        
+      </div><div class="fb-tools">${presHtml}</div>
+      <textarea id="epa-fb-${id.replace(/-/g,'')}" class="mf" oninput="saveEpaFb('${id}',this)" placeholder="請具體描述觀察與建議...">${fb}</textarea></div>
+    </div>`;
+  });
+}
+function setEpaS(id,val,btn){epaScores[id]=val;btn.closest('.rscale').querySelectorAll('.rb').forEach((b,i)=>{b.classList.remove('s');b.className=b.className.replace(/l\d/,'l'+(i+1));if(i+1===val)b.classList.add('s');});}
+function saveEpaFb(id,el){epaFb[id]=el.value;checkFb(el);}
+function checkFb(el){el.classList.toggle('fil',el.value.trim().length>=5);el.classList.toggle('mf',el.value.trim().length<5);}
+function renderMsStep(){
+  const form=document.getElementById('ms-form');form.innerHTML='';
+  const resId=document.getElementById('f-res').value;const allMs=[...selPcMs,...selNpcMs];
+  allMs.forEach(msId=>{const ms=MS.find(m=>m.id===msId);if(!ms)return;
+    let tbody='';let lastLv=0;
+    ms.items.filter(i=>i.lv<=4).forEach(item=>{
+      const selClass=msScores[item.id]?` style="background:rgba(0,201,167,.06)"`:'';
+
+      if(item.lv!==lastLv){tbody+=`<tr class="lvsep"><td colspan="4"><span class="lvtag lv${item.lv}">Level ${item.lv}</span></td></tr>`;lastLv=item.lv;}
+      const cur=msScores[item.id]||'';const lkd=isItemLkd(resId,item.id);
+      tbody+=`<tr${lkd?' class="lkd-row"':selClass}>
+        <td style="font-size:14px;line-height:1.6">${item.t}${lkd?' <span style="font-size:10px;color:var(--a3)">🔒</span>':''}</td>
+        <td style="padding:8px 4px"><label class="ropt" style="cursor:pointer"><input type="radio" name="ms-${item.id}" value="unstable" ${cur==='unstable'?'checked':''} onchange="setMsItem('${item.id}','unstable')" ${lkd?'disabled':''}></label></td>
+        <td style="padding:8px 4px"><label class="ropt" style="cursor:pointer"><input type="radio" name="ms-${item.id}" value="notobserved" ${cur==='notobserved'?'checked':''} onchange="setMsItem('${item.id}','notobserved')" ${lkd?'disabled':''}></label></td>
+        <td style="padding:8px 4px"><label class="ropt" style="cursor:pointer"><input type="radio" name="ms-${item.id}" value="stable" ${cur==='stable'?'checked':''} onchange="setMsItem('${item.id}','stable')" ${lkd?'disabled':''}></label></td>
+      </tr>`;
+    });
+    const useCnt=getMsUseCnt(resId,msId);
+    const msFbId='msfb_'+msId.replace(/\W/g,'_');
+    const attForFb=getAtt(document.getElementById('f-att').value);
+    const msPreHtml=(attForFb?.presets||[]).map(p=>`<button class="pre-btn" onclick="insertFb('${msFbId}','${p.c.replace(/'/g,"\\'").replace(/`/g,'\\`')}')">＋${p.n}</button>`).join('');
+    form.innerHTML+=`<div class="ms-section"><div class="ms-sec-hd" style="padding:10px 0 7px;border-bottom:2px solid var(--acc)">
+        <span style="display:flex;align-items:center;gap:8px">
+          <span class="lvtag lv1" style="font-size:12px;padding:3px 10px">${ms.id}</span>
+          <span style="font-size:17px;font-weight:700">${ms.n}</span>
+          <span style="font-size:13px;color:var(--t2);font-weight:400">— ${MS_CAT_LBL[ms.cat]}</span>
+        </span>
+        <span style="font-size:12px;color:var(--acc);font-family:'DM Mono',monospace;background:rgba(0,201,167,.1);padding:3px 10px;border-radius:14px;white-space:nowrap">已評 ${useCnt} 次</span>
+      </div>
+      <div class="ms-sec-desc">${ms.d}</div>
+      <div style="overflow-x:auto"><table class="ms-tbl"><thead><tr><th>細項描述</th><th>未穩定呈現</th><th>未觀察</th><th>可穩定呈現</th></tr></thead>
+      <tbody>${tbody}</tbody></table></div>
+      <div style="padding:9px 14px 12px;background:rgba(0,201,167,.03);border-top:1px solid var(--border)">
+        <div style="font-size:12px;color:var(--t2);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:7px;flex-wrap:wrap">💬 質性回饋（選填）</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">${msPreHtml}</div>
+        <textarea id="${msFbId}" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:10px 12px;font-size:14px;font-family:inherit;outline:none;resize:vertical;min-height:72px" placeholder="針對「${ms.n}」的具體觀察或建議..."></textarea>
+      </div></div>`;
+  });
+}
+
+function insertFb(taId,content){const ta=document.getElementById(taId);if(!ta)return;ta.value=ta.value?(ta.value+'\n\n'+content):content;}
+function setMsItem(id,val){msScores[id]=val;}
+function navToPending(){
+  if(!lastSavedAttId){nav('dashboard');return;}
+  // Find pending dates for this attending
+  const pending=[];
+  Object.entries(SCHED).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([date,pairs])=>{
+    const myPairs=pairs.filter(p=>p.attId===lastSavedAttId);
+    const unfinished=myPairs.filter(p=>!ASSESS.some(a=>a.date===date&&a.attId===lastSavedAttId&&a.resId===p.resId));
+    if(unfinished.length)pending.push({date,pairs:unfinished});
+  });
+  if(pending.length){
+    // Pre-fill the assess form with first pending
+    const {date,pairs}=pending[0];
+    nav('assess');
+    setTimeout(()=>{
+      document.getElementById('f-att').value=lastSavedAttId;
+      document.getElementById('f-date').value=date;
+      document.getElementById('f-res').value=pairs[0].resId;
+      onAttChange();
+    },100);
+  }else{
+    alert('✅ 所有排班日期均已填寫評核！');nav('dashboard');
+  }
+}
+function saveAssess(){
+  const resId=document.getElementById('f-res').value;if(!resId){alert('請選擇住院醫師');return;}
+  const res=getRes(resId);const attId=document.getElementById('f-att').value;const att=getAtt(attId);
+  const allMs=[...selPcMs,...selNpcMs];const ev=selEpa.map(id=>epaScores[id]).filter(Boolean);
+  let tot=0,stb=0;allMs.forEach(msId=>{const ms=MS.find(m=>m.id===msId);ms?.items.filter(i=>i.lv<=4).forEach(i=>{const v=msScores[i.id];if(v){tot++;if(v==='stable')stb++;}});});
+  const pct=tot?Math.round(stb/tot*100):null;const selMs=[...selPcMs,...selNpcMs];
+  // Collect MS feedback
+  const msFbData={};selMs.forEach(msId=>{const el=document.getElementById('msfb_'+msId.replace(/\W/g,'_'));if(el?.value?.trim())msFbData[msId]=el.value.trim();});
+  // Get embedded imaging data
+  const embedImgResult=getEmbedImgData();if(embedImgResult===false)return;// user saw alert
+  const rec={id:Date.now(),type:'ms',date:document.getElementById('f-date').value,resId,resName:res?.n||'',resYear:res?.y||'',attId:attId||null,attName:att?.n||'',caseDesc:document.getElementById('f-case').value,selEpa,selPcMs,selNpcMs,selMs,epaScores:{...epaScores},epaFb:{...epaFb},msItems:{...msScores},msFb:msFbData,imgData:embedImgResult||null,epaAvg:ev.length?(ev.reduce((a,b)=>a+b,0)/ev.length).toFixed(2):null,msPresRate:pct};
+  ASSESS.unshift(rec);save();autoSync();updateRmBadge();
+  lastSavedAttId=attId;nav('thankyou');
+}
+
+// ══════════════ IMAGING (Independent, Mandatory) ══════════════
+function initImg(){imgType='';imgTab='req';imgStars={};imgSubCase='';document.getElementById('im-date').value=tod();document.getElementById('im-pid').value='';document.getElementById('im-comment').value='';document.getElementById('im-comment').className='mf';populateSel('im-res',false);populateSel('im-att',true);document.querySelectorAll('.itbtn').forEach(b=>b.classList.remove('sel'));if(currentAttId)document.getElementById('im-att').value=currentAttId;renderImgCaseList();renderImgStars();renderImgPresets();['img-ok','img-err'].forEach(id=>document.getElementById(id).classList.add('hidden'));}
+function selImgType(t,btn){imgType=t;document.querySelectorAll('.itbtn').forEach(b=>b.classList.remove('sel'));btn.classList.add('sel');}
+function swImgTab(tab,el){imgTab=tab;document.querySelectorAll('#im-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');imgSubCase='';document.getElementById('im-sub-wrap').classList.add('hidden');renderImgCaseList();}
+function renderImgCaseList(){const cases=imgTab==='req'?IMG_REQ:IMG_SEL;const el=document.getElementById('im-case-list');el.innerHTML=cases.map((c,i)=>`<div class="img-item"><input type="radio" name="imgcase" id="ic-${i}" value="${c}" onchange="onImgCase('${c}')"><label for="ic-${i}">${c}</label></div>`).join('');}
+function onImgCase(v){imgSubCase='';const sub=document.getElementById('im-sub-wrap');if(v==='其他'&&imgTab==='req'){sub.classList.remove('hidden');document.getElementById('im-sub-list').innerHTML=IMG_SEL.map((c,i)=>`<div class="img-item"><input type="radio" name="imgsub" id="ics-${i}" value="${c}" onchange="imgSubCase='${c.replace(/'/g,"\\'")}';"><label for="ics-${i}">${c}</label></div>`).join('');}else sub.classList.add('hidden');}
+function renderImgStars(){const el=document.getElementById('im-stars');el.innerHTML=IMG_CR.map(c=>`<div class="star-row"><div style="font-size:12.5px;color:var(--text)">${c}</div><div style="display:flex;gap:4px">${[1,2,3,4,5].map(n=>`<button class="starbtn ${(imgStars[c]||0)>=n?'on':''}" onclick="setStar('${c}',${n},this.parentElement)">★</button>`).join('')}</div></div>`).join('');}
+function setStar(c,n,grp){imgStars[c]=n;grp.querySelectorAll('.starbtn').forEach((b,i)=>b.classList.toggle('on',i<n));}
+function renderImgPresets(){const attId=document.getElementById('im-att').value;const att=getAtt(attId);document.getElementById('im-pre-tools').innerHTML=(att?.presets||[]).map(p=>`<button class="pre-btn" onclick="insPreset('im-comment','${p.c.replace(/'/g,"\\'")}')">＋${p.n}</button>`).join('');}
+function saveImg(){
+  const resId=document.getElementById('im-res').value;if(!resId){alert('請選擇住院醫師');return;}
+  const radios=document.querySelectorAll('input[name="imgcase"]');let chosen='';radios.forEach(r=>{if(r.checked)chosen=r.value;});
+  if(!chosen){showErr('img-err','⚠ 請選擇案例');return;}if(!imgType){showErr('img-err','⚠ 請選擇影像種類');return;}
+  const comment=document.getElementById('im-comment').value.trim();if(!comment){showErr('img-err','⚠ 請填寫評核意見');return;}
+  const attId=document.getElementById('im-att').value;const res=getRes(resId);const att=getAtt(attId);
+  const rec={id:Date.now(),type:'imaging',date:document.getElementById('im-date').value,resId,resName:res?.n||'',resYear:res?.y||'',attId:attId||null,attName:att?.n||'',pid:document.getElementById('im-pid').value,imgType,caseTab:imgTab,caseChosen:chosen,caseSubChosen:imgSubCase,stars:{...imgStars},comment};
+  ASSESS.unshift(rec);save();autoSync();updateRmBadge();nav('thankyou');
+}
+function clearImg(){initImg();}
+function showErr(id,msg){const el=document.getElementById(id);el.textContent=msg;el.classList.remove('hidden');}
+function insPreset(taId,content){const ta=document.getElementById(taId);if(!ta)return;ta.value=ta.value?(ta.value+'\n\n'+content):content;checkFb(ta);}
+
+// ══════════════ AI POLISH ══════════════
+async 
+
+// ══════════════ LOCK LOGIC ══════════════
+function getLatestEpaScore(resId,epaId){const v=ASSESS.filter(a=>a.resId===resId&&a.type==='ms'&&a.epaScores?.[epaId]).sort((a,b)=>b.date.localeCompare(a.date));return v.length?v[0].epaScores[epaId]:0;}
+function getMsPct(resId,msId){const recent=ASSESS.filter(a=>a.resId===resId&&a.type==='ms'&&a.selMs?.includes(msId)).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,2);if(!recent.length)return 0;const ms=MS.find(m=>m.id===msId);if(!ms)return 0;let t=0,s=0;recent.forEach(a=>ms.items.forEach(i=>{const v=a.msItems?.[i.id];if(v){t++;if(v==='stable')s++;}}));return t?s/t*100:0;}
+function isEpaLkd(resId,epaId){
+  const r=getRes(resId);if(!r)return false;
+  if(r.itemLocks?.[epaId]===true)return true;
+  return false; // removed auto-lock at L4
+}
+function isMsLkd(resId,msId){
+  // Only lock if manually set via CCC admin panel
+  const r=getRes(resId);if(!r)return false;
+  if(r.itemLocks?.[msId]===true)return true;
+  return false; // removed auto-lock at 80% - that was causing confusion
+}
+function isItemLkd(resId,itemId){const r=getRes(resId);return r?.itemLocks?.[itemId]===true;}
+
+// ══════════════ HISTORY ══════════════
+function renderHistory(){
+  populateSel('hf-a',true);populateSel('hf-r',false);
+  const fA=document.getElementById('hf-a').value,fR=document.getElementById('hf-r').value,fM=document.getElementById('hf-m').value;
+  let data=visA();if(fA)data=data.filter(a=>a.attId===fA);if(fR)data=data.filter(a=>a.resId===fR);if(fM)data=data.filter(a=>a.date.startsWith(fM));
+  document.getElementById('hist-tbody').innerHTML=data.map(a=>`<tr>
+    <td>${a.date}</td><td style="color:var(--a2);font-size:11px">${a.attName||'—'}</td><td>${a.resName}</td>
+    <td>${a.msPresRate!=null?`<span class="pill ${a.msPresRate>=80?'p4':a.msPresRate>=60?'p3':'p1'}">${a.msPresRate}%</span>`:'—'}</td>
+    <td>${a.epaAvg?`<span class="pill p${Math.round(a.epaAvg)}">${a.epaAvg}</span>`:'—'}</td>
+    <td>${a.type==='imaging'?'🩻':'—'}</td>
+    <td class="ifl" style="gap:4px"><button class="btn bs bxs" onclick="viewDet(${a.id})">詳情</button><button class="btn bxs bd" onclick="delA(${a.id})">✕</button></td>
+  </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:16px">無紀錄</td></tr>';
+}
+function clearHF(){['hf-a','hf-r','hf-m'].forEach(id=>document.getElementById(id).value='');renderHistory();}
+
+// ══════════════ ANALYTICS ══════════════
+function renderAnalytics(){
+  populateSel('ana-r',false);const fR=document.getElementById('ana-r').value;
+  const msD=(fR?ASSESS.filter(a=>a.resId===fR):visA()).filter(a=>a.type==='ms');
+  dC('ch-epa-l');const sorted=[...msD].sort((a,b)=>a.date.localeCompare(b.date));
+  if(sorted.length>=2){const ctx=document.getElementById('ch-epa-l').getContext('2d');const ds=EPA.slice(0,4).map((epa,i)=>({label:epa.id,data:sorted.map(a=>a.epaScores?.[epa.id]||null),borderColor:['#00c9a7','#3b82f6','#f59e0b','#ef4444'][i],tension:.3,fill:false,pointRadius:3}));charts['ch-epa-l']=new Chart(ctx,{type:'line',data:{labels:sorted.map(a=>a.date.slice(5)),datasets:ds},options:cOpt('line',5)});}
+  dC('ch-ms-r');const cpct=MS_CATS.map(cat=>{let t=0,s=0;msD.forEach(a=>{MS.filter(m=>m.cat===cat).forEach(ms=>{ms.items.forEach(i=>{const v=a.msItems?.[i.id];if(v){t++;if(v==='stable')s++;}});});});return t?s/t*100:0;});
+  const ctx1=document.getElementById('ch-ms-r').getContext('2d');charts['ch-ms-r']=new Chart(ctx1,{type:'radar',data:{labels:MS_CATS.map(c=>MS_CAT_LBL[c]),datasets:[{label:'可穩定呈現%',data:cpct,backgroundColor:'rgba(0,201,167,.15)',borderColor:'#00c9a7',pointBackgroundColor:'#00c9a7'}]},options:{...cOpt('radar',100),scales:{r:{min:0,max:100,ticks:{color:'#475569',stepSize:25,callback:v=>v+'%'},grid:{color:'#1e2d45'},pointLabels:{color:'#94a3b8',font:{size:11,weight:'bold'}}}}}});
+  const ep=document.getElementById('epa-prog');ep.innerHTML='';EPA.forEach(epa=>{const vs=msD.filter(a=>a.epaScores?.[epa.id]).map(a=>a.epaScores[epa.id]);const avg=vs.length?vs.reduce((a,b)=>a+b,0)/vs.length:0;const col=avg>=4?'var(--acc)':avg>=3?'var(--a2)':avg>=2?'var(--a3)':'var(--danger)';ep.innerHTML+=`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="font-size:12px"><span style="color:var(--a2);font-size:9.5px;font-family:'DM Mono'">${epa.id}</span> ${epa.n}</span><span style="font-family:'DM Mono';font-size:12px;color:${col}">${vs.length?avg.toFixed(1):'—'}</span></div><div class="prog-wrap"><div class="prog-bar" style="width:${(avg/5)*100}%;background:${col}"></div></div></div>`;});
+  const mds=document.getElementById('ms-detail-stats');mds.innerHTML='';MS_CATS.forEach(cat=>{let html=`<div style="margin-bottom:13px"><div style="font-size:11px;color:var(--a2);font-weight:600;margin-bottom:5px">${cat}</div>`;MS.filter(m=>m.cat===cat).forEach(ms=>{let t=0,s=0;msD.forEach(a=>{ms.items.forEach(i=>{const v=a.msItems?.[i.id];if(v){t++;if(v==='stable')s++;}});});if(!t)return;const pct=Math.round(s/t*100);const col=pct>=80?'var(--acc)':pct>=60?'var(--a3)':'var(--danger)';html+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:3px"><span style="font-size:11px;min-width:65px;font-family:'DM Mono';color:var(--a2)">${ms.id}</span><span style="font-size:11.5px;min-width:100px;color:var(--t2)">${ms.n}</span><div class="prog-wrap" style="flex:1"><div class="prog-bar" style="width:${pct}%;background:${col}"></div></div><span style="font-size:10.5px;color:${col};font-family:'DM Mono';min-width:35px;text-align:right">${pct}%</span></div>`;});mds.innerHTML+=html+'</div>';});
+}
+
+// ══════════════ SHHER MATRIX ══════════════
+function getCCCScore(res, epaId, nthBack){
+  // Get CCC level for EPA from history (nthBack: 0=latest, 1=prev, 2=prev2)
+  const hist=(res.cccHistory||[]);
+  let levels={};
+  if(hist.length>0){
+    const idx=Math.max(0,hist.length-1-nthBack);
+    levels=hist[idx]?.levels||{};
+  }else{
+    levels=res.cccLevels||{};
+  }
+  const lv=levels[epaId]||'';
+  // Convert CCC level string to numeric
+  const map={'1':1,'2a':2,'2b':2,'3a':3,'3b':3,'3c':3,'4':4,'5':5};
+  return map[lv]||getLatestEpaScore(res.id,epaId);
+}
+function renderShher(){
+  const yr=document.getElementById('shher-yr')?.value||'';
+  const cccNth=parseInt(document.getElementById('shher-ccc')?.value||'0');
+  // Only ungraduated residents
+  const activeRes=RES.filter(r=>!r.grad&&(yr?r.y===yr:true));
+  if(!activeRes.length){document.getElementById('shher-table').innerHTML='<div class="al ai">目前無未畢業住院醫師資料</div>';return;}
+  let html='';
+  // ─ EPA section ─
+  html+=buildShherSection('EPA',SHHER_EPA,activeRes,(res,id)=>getCCCScore(res,id,cccNth));
+  // ─ MS section ─
+  html+=buildShherSection('Milestone',SHHER_MS,activeRes,(res,id)=>getMsPct(res.id,id)/25);
+  document.getElementById('shher-table').innerHTML=html;
+}
+function buildShherSection(title,rows,activeRes,getScore){
+  const expHdrs=['R1早','R1晚','R2早','R2晚','R3早','R3晚','R4早','R4晚'];
+  // Build header: item col + 8 exp cols + 3 threshold cols + one col per resident
+  let html=`<div class="card mb4"><div class="ct"><span class="dot"></span>${title}</div><div style="overflow-x:auto"><table class="shher-tbl"><thead>
+  <tr>
+    <th style="text-align:left;min-width:110px">項目</th>
+    ${expHdrs.map(h=>`<th>${h}</th>`).join('')}
+    <th>獨立診<br><small>門檻</small></th><th>留觀<br><small>門檻</small></th><th>九診<br><small>門檻</small></th>
+    ${activeRes.map(r=>`<th>${r.no||r.n[0]}<br><small style="font-weight:400">${r.n.slice(0,2)}</small><br><small style="color:var(--t3)">${r.y}</small></th>`).join('')}
+  </tr></thead><tbody>`;
+  rows.forEach(row=>{
+    const[id,name,...rest]=row;const expCols=rest.slice(0,8);const thrCols=rest.slice(8,11);
+    html+=`<tr>
+      <td style="text-align:left;font-weight:600;font-size:13px"><span class="lvtag lv1" style="font-size:10px;margin-right:4px">${id}</span>${name}</td>
+      ${expCols.map(v=>`<td style="font-size:11px;color:var(--a2)">${v}</td>`).join('')}
+      ${thrCols.map(v=>`<td style="font-weight:700;color:var(--a3)">${v}</td>`).join('')}
+      ${activeRes.map(res=>{
+        const score=getScore(res,id);
+        const yrI={'R1':0,'R2':2,'R3':4,'R4':6}[res.y]??0;
+        const expScore=expCols[yrI]||expCols[0]; // use early-year expectation
+        const pass=score>=expScore;
+        return`<td class="${pass?'cell-pass':'cell-fail'}" style="font-size:12px">${score.toFixed(1)}<br><small style="opacity:.65">/${expScore}</small></td>`;
+      }).join('')}
+    </tr>`;
+  });
+  html+=`</tbody></table></div></div>`;
+  return html;
+}
+
+// ══════════════ RESIDENTS ══════════════
+function renderRes(){const tb=document.getElementById('res-tbody');const active=RES.filter(r=>!r.grad);if(!active.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:16px">尚無資料</td></tr>';return;}tb.innerHTML=active.map(r=>{const as=ASSESS.filter(a=>a.resId===r.id&&a.type==='ms');const pcts=as.filter(a=>a.msPresRate!=null).map(a=>a.msPresRate);const msPct=pcts.length?(pcts.reduce((a,b)=>a+b,0)/pcts.length).toFixed(0)+'%':'—';const ev=as.filter(a=>a.epaAvg).map(a=>parseFloat(a.epaAvg));const epaAvg=ev.length?(ev.reduce((a,b)=>a+b,0)/ev.length).toFixed(1):'—';return`<tr><td style="font-family:'DM Mono';font-size:10.5px;color:var(--t3)">${r.no||'—'}</td><td>${r.n}</td><td style="color:var(--a2)">${r.y}</td><td>${as.length}</td><td>${msPct!=='—'?`<span class="pill ${parseInt(msPct)>=80?'p4':parseInt(msPct)>=60?'p3':'p1'}">${msPct}</span>`:'—'}</td><td>${epaAvg!=='—'?`<span class="pill p${Math.round(epaAvg)}">${epaAvg}</span>`:'—'}</td><td class="ifl" style="gap:4px"><button class="btn bs bxs" onclick="editRes('${r.id}')">編輯</button><button class="btn bxs bd" onclick="delRes('${r.id}')">刪除</button></td></tr>`;}).join('');}
+function openResM(){document.getElementById('r-id').value='';['r-no','r-n','r-qpc','r-qnpc'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('r-y').value='R1';document.getElementById('r-grad').checked=false;document.getElementById('m-res-t').textContent='新增住院醫師';openM('m-res');}
+function editRes(id){const r=getRes(id);if(!r)return;document.getElementById('r-id').value=id;document.getElementById('r-no').value=r.no||'';document.getElementById('r-n').value=r.n;document.getElementById('r-y').value=r.y;document.getElementById('r-grad').checked=r.grad||false;
+  const rqpc=document.getElementById('r-qpc');const rqnpc=document.getElementById('r-qnpc');
+  if(rqpc)rqpc.value=r.qPcOverride!=null?r.qPcOverride:'';
+  if(rqnpc)rqnpc.value=r.qNpcOverride!=null?r.qNpcOverride:'';document.getElementById('m-res-t').textContent='編輯住院醫師';openM('m-res');}
+function saveRes(){const n=document.getElementById('r-n').value.trim();if(!n)return alert('請輸入姓名');const eid=document.getElementById('r-id').value;if(eid){const r=getRes(eid);if(r){r.n=n;r.y=document.getElementById('r-y').value;r.no=document.getElementById('r-no').value;const newGrad=document.getElementById('r-grad').checked;if(newGrad&&!r.grad){if(!confirm('確定將「'+r.n+'」標記為已畢業？\n已畢業後將不出現在一般評核列表中，可隨時在住院醫師管理取消。'))return;}r.grad=newGrad;
+    const qpc=document.getElementById('r-qpc')?.value;
+    const qnpc=document.getElementById('r-qnpc')?.value;
+    r.qPcOverride=(!qpc||qpc==='')?null:parseInt(qpc);
+    r.qNpcOverride=(!qnpc||qnpc==='')?null:parseInt(qnpc);
+  }}else RES.push({id:Date.now().toString(),no:document.getElementById('r-no').value,n,y:document.getElementById('r-y').value,grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}});save();autoSync();closeM('m-res');renderRes();}
+function delRes(id){if(!confirm('確定刪除此住院醫師的所有資料？\n此操作無法復原。'))return;RES=RES.filter(r=>r.id!==id);save();renderRes();}
+
+// ══════════════ ATTENDINGS ══════════════
+function renderAtt(){const sortedATT=[...ATT].sort((a,b)=>{const na=parseInt(a.no)||999,nb=parseInt(b.no)||999;return na-nb;});const tb=document.getElementById('att-tbody');if(!ATT.length){tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--t3);padding:16px">尚無資料</td></tr>';return;}const m=mkStr();tb.innerHTML=sortedATT.map(a=>{const c=ASSESS.filter(x=>x.attId===a.id&&x.date.startsWith(m)).length;return`<tr><td style="font-family:'DM Mono';font-size:10.5px;color:var(--t3)">${a.no||'—'}</td><td><div style="display:flex;align-items:center;gap:7px"><div class="dav">${a.n[0]}</div>${a.n}</div></td><td>${c} 份</td><td style="font-size:11px;color:var(--t3)">${a.note||'—'}</td><td class="ifl" style="gap:4px"><button class="btn bs bxs" onclick="editAtt('${a.id}')">編輯</button><button class="btn bxs" style="background:rgba(59,130,246,.12);color:var(--a2);border:1px solid rgba(59,130,246,.25)" onclick="showAccCal('${a.id}')">📅</button><button class="btn bxs bd" onclick="delAtt('${a.id}')">刪除</button></td></tr>`;}).join('');}
+function showAccCal(id){accId=id;accY=new Date().getFullYear();accMo=new Date().getMonth();renderAccCal();}
+function accM(d){accMo+=d;if(accMo>11){accMo=0;accY++;}else if(accMo<0){accMo=11;accY--;}renderAccCal();}
+function renderAccCal(){const att=getAtt(accId);if(!att)return;const cal=document.getElementById('att-cal');cal.style.display='block';document.getElementById('acc-title').textContent=`${att.n} 評核日曆`;document.getElementById('acc-mon').textContent=`${accY}年${accMo+1}月`;const t=tod(),fd=new Date(accY,accMo,1).getDay(),days=new Date(accY,accMo+1,0).getDate();const grid=document.getElementById('acc-grid');grid.innerHTML='';for(let i=0;i<fd;i++)grid.innerHTML+=`<div class="acd empty"></div>`;for(let d=1;d<=days;d++){const ds=`${accY}-${String(accMo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;const hasSched=(SCHED[ds]||[]).some(e=>e.attId===accId);const cnt=ASSESS.filter(a=>a.date===ds&&a.attId===accId).length;let cls='acd';if(!hasSched)cls+=' nosc';else if(cnt>0)cls+=' hass';else cls+=' noss';if(ds===t)cls+=' tod';grid.innerHTML+=`<div class="${cls}"><div style="font-size:9.5px">${d}</div>${hasSched&&cnt>0?`<div style="font-size:7.5px">${cnt}份</div>`:''}</div>`;}cal.scrollIntoView({behavior:'smooth',block:'nearest'});}
+function openAttM(){editAttId=null;['a-id','a-n','a-e','a-l','a-no'].forEach(id=>document.getElementById(id).value='');document.getElementById('att-pre-wrap').innerHTML='';document.getElementById('m-att-t').textContent='新增主治醫師';openM('m-att');}
+function editAtt(id){editAttId=id;const a=getAtt(id);if(!a)return;document.getElementById('a-id').value=id;document.getElementById('a-n').value=a.n;document.getElementById('a-e').value=a.email||'';document.getElementById('a-l').value=a.line||'';document.getElementById('a-no').value=a.no||'';renderAttPreWrap(a);document.getElementById('m-att-t').textContent=`編輯 — ${a.n}`;openM('m-att');}
+function renderAttPreWrap(att){document.getElementById('att-pre-wrap').innerHTML=(att?.presets||[]).map((p,i)=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid rgba(30,45,69,.4)"><span style="font-size:11px;color:var(--acc)">${p.n}</span><span style="font-size:10px;color:var(--t3);flex:1">${p.c.slice(0,30)}…</span><button class="btn bxs bd" onclick="delAttPre(${i})">✕</button></div>`).join('')||'<div style="font-size:10.5px;color:var(--t3);padding:3px 0">尚無個人套餐</div>';}
+function addAttPre(){const n=document.getElementById('atp-n').value.trim(),c=document.getElementById('atp-c').value.trim();if(!n||!c)return alert('請填寫套餐名稱和內容');const id=editAttId||document.getElementById('a-id').value;const att=getAtt(id);if(!att)return;if(!att.presets)att.presets=[];att.presets.push({n,c});save();renderAttPreWrap(att);document.getElementById('atp-n').value='';document.getElementById('atp-c').value='';}
+function delAttPre(idx){const id=editAttId||document.getElementById('a-id').value;const att=getAtt(id);if(!att)return;att.presets.splice(idx,1);save();renderAttPreWrap(att);}
+function saveAtt(){const n=document.getElementById('a-n').value.trim();if(!n)return alert('請輸入姓名');const eid=document.getElementById('a-id').value;const d={n,email:document.getElementById('a-e').value,line:document.getElementById('a-l').value,no:document.getElementById('a-no').value};if(eid){const a=getAtt(eid);if(a)Object.assign(a,d);}else ATT.push({id:Date.now().toString(),...d,presets:[]});save();autoSync();closeM('m-att');renderAtt();}
+function delAtt(id){if(!confirm('確定刪除？'))return;ATT=ATT.filter(a=>a.id!==id);save();renderAtt();}
+
+// ══════════════ SCHEDULE ══════════════
+function clearSchedMonth(){
+  const mon=`${schedY}-${String(schedMo+1).padStart(2,'0')}`;
+  const keys=Object.keys(SCHED).filter(d=>d.startsWith(mon));
+  if(!keys.length){alert('本月無班表資料');return;}
+  if(!confirm(`確定清除 ${schedY}年${schedMo+1}月 全部班表（${keys.length}天）？`))return;
+  keys.forEach(k=>delete SCHED[k]);
+  save();autoSync();renderSched();updateRmBadge();
+}
+function clearSchedAll(){
+  const total=Object.keys(SCHED).length;
+  if(!total){alert('目前無班表資料');return;}
+  if(!confirm(`確定清除全部班表資料（共${total}天）？此動作無法復原。`))return;
+  SCHED={};save();autoSync();renderSched();updateRmBadge();
+}
+function schedMon(d){schedMo+=d;if(schedMo>11){schedMo=0;schedY++;}else if(schedMo<0){schedMo=11;schedY--;}renderSched();}
+function renderSched(){
+  document.getElementById('sched-t').textContent=`${schedY}年${schedMo+1}月`;
+  const t=tod(),fd=new Date(schedY,schedMo,1).getDay(),days=new Date(schedY,schedMo+1,0).getDate();
+  const grid=document.getElementById('sc-grid');grid.innerHTML='';
+  for(let i=0;i<fd;i++)grid.innerHTML+=`<div></div>`;
+  for(let d=1;d<=days;d++){
+    const ds=`${schedY}-${String(schedMo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const entries=SCHED[ds]||[];const isT=ds===t;
+    // Group by att
+    const attIds=[...new Set(entries.map(e=>e.attId))];
+    const chips=attIds.map(aid=>{const att=getAtt(aid);return att?`<span class="dchip">${att.n[0]}</span>`:''}).join('');
+    const cntAssess=ASSESS.filter(a=>a.date===ds).length;
+    const detailChips=attIds.map(aid=>{
+      const att=getAtt(aid);if(!att)return'';
+      const resForAtt=entries.filter(e=>e.attId===aid).map(e=>{
+        const r=getRes(e.resId);
+        return r?`<span style="background:rgba(59,130,246,.12);border-radius:4px;padding:1px 5px;margin:1px;font-size:10px;display:inline-block">${r.no?r.no+'.':''}${r.n}</span>`:'?';
+      }).join('');
+      return`<div style="font-size:11px;line-height:1.5;margin-bottom:4px;padding-bottom:3px;border-bottom:1px solid var(--border)"><b style="color:var(--a2)">${att.n}</b><div style="margin-top:2px">${resForAtt}</div></div>`;
+    }).join('');
+    grid.innerHTML+=`<div class="sc-cell${entries.length?' hd':''}${isT?' td':''}" title="${ds}">
+      <div style="font-size:10px;font-weight:700;color:${isT?'var(--a2)':'var(--t3)'};margin-bottom:2px">${d}</div>
+      <div>${detailChips}</div>
+      ${cntAssess>0?`<div style="font-size:9px;color:var(--acc);margin-top:1px">✓${cntAssess}</div>`:''}
+    </div>`;
+  }
+}
+
+// ══════════════ GRADUATED ══════════════
+function renderGrad(){const grad=RES.filter(r=>r.grad);const list=document.getElementById('grad-list');document.getElementById('grad-detail').classList.add('hidden');if(!grad.length){list.innerHTML='<div style="text-align:center;color:var(--t3);padding:16px">尚無已畢業住院醫師</div>';return;}list.innerHTML=grad.map(r=>{const as=ASSESS.filter(a=>a.resId===r.id&&a.type==='ms');const pcts=as.filter(a=>a.msPresRate!=null).map(a=>a.msPresRate);const avg=pcts.length?(pcts.reduce((a,b)=>a+b,0)/pcts.length).toFixed(0)+'%':'—';return`<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(30,45,69,.5)"><div style="display:flex;align-items:center;gap:9px"><div class="dav" style="background:linear-gradient(135deg,var(--purple),var(--acc))">${r.n[0]}</div><div><div style="font-weight:600">${r.n} <span class="grad-badge">🎓 已畢業</span></div><div style="font-size:10.5px;color:var(--t3)">評核 ${as.length} 次　MS可呈現 ${avg}</div></div></div><div class="ifl" style="gap:6px"><button class="btn bs bsm" onclick="showGrad('${r.id}')">查看報告</button><button class="btn bsm" style="border:1px solid var(--a3);color:var(--a3);background:rgba(245,158,11,.08)" onclick="restoreRes('${r.id}')">↩ 恢復現役</button></div></div>`;}).join('');}
+function showGrad(id){const res=getRes(id);if(!res)return;document.getElementById('grad-list').classList.add('hidden');const det=document.getElementById('grad-detail');det.classList.remove('hidden');document.getElementById('grad-name').textContent=`🎓 ${res.n} — 畢業評核總覽`;const data=ASSESS.filter(a=>a.resId===id&&a.type==='ms');dC('grad-epa');dC('grad-ms');const sorted=[...data].sort((a,b)=>a.date.localeCompare(b.date));if(sorted.length>=2){const ctx=document.getElementById('grad-epa').getContext('2d');const ds=EPA.slice(0,4).map((epa,i)=>({label:epa.id,data:sorted.map(a=>a.epaScores?.[epa.id]||null),borderColor:['#00c9a7','#3b82f6','#f59e0b','#ef4444'][i],tension:.3,fill:false,pointRadius:3}));charts['grad-epa']=new Chart(ctx,{type:'line',data:{labels:sorted.map(a=>a.date.slice(5)),datasets:ds},options:cOpt('line',5)});}const rd=data.filter(a=>a.msPresRate!=null).sort((a,b)=>a.date.localeCompare(b.date));if(rd.length){const ctx2=document.getElementById('grad-ms').getContext('2d');charts['grad-ms']=new Chart(ctx2,{type:'line',data:{labels:rd.map(a=>a.date.slice(5)),datasets:[{label:'MS可呈現%',data:rd.map(a=>a.msPresRate),borderColor:'#00c9a7',tension:.3,fill:true,backgroundColor:'rgba(0,201,167,.07)'}]},options:cOpt('line',100)});}document.getElementById('grad-tbody').innerHTML=data.map(a=>`<tr><td>${a.date}</td><td>${a.attName||'—'}</td><td>${a.msPresRate!=null?`<span class="pill ${a.msPresRate>=80?'p4':'p2'}">${a.msPresRate}%</span>`:'—'}</td><td>${a.epaAvg?`<span class="pill p${Math.round(a.epaAvg)}">${a.epaAvg}</span>`:'—'}</td><td><button class="btn bs bxs" onclick="viewDet(${a.id})">詳情</button></td></tr>`).join('')||'<tr><td colspan="5" style="color:var(--t3);padding:14px">尚無紀錄</td></tr>';}
+function closeGrad(){document.getElementById('grad-detail').classList.add('hidden');document.getElementById('grad-list').classList.remove('hidden');}
+function restoreRes(id){
+  const r=getRes(id);if(!r)return;
+  if(!confirm('確定將「'+r.n+'」恢復為現役住院醫師？'))return;
+  r.grad=false;save();autoSync();renderGrad();
+  alert('✅ 已將「'+r.n+'」恢復為現役，現在可以再次為其新增評核。');
+}
+
+// ══════════════ REMIND ══════════════
+function updateRmBadge(){const t=tod();const sched=getTodayDocs(t);const miss=sched.filter(e=>{const cnt=ASSESS.filter(a=>a.date===t&&a.attId===e.attId&&a.resId===e.resId).length;return cnt===0;});const b=document.getElementById('rbadge');if(isAdmin&&miss.length>0){b.textContent=miss.length;b.classList.remove('hidden');}else b.classList.add('hidden');}
+function renderRemind(){
+  const ds=document.getElementById('rmd-date').value||tod();
+  const entries=SCHED[ds]||[];const attGroups={};
+  entries.forEach(e=>{if(!attGroups[e.attId])attGroups[e.attId]=[];attGroups[e.attId].push(e.resId);});
+  let total=0,miss=0,ok=0;const rows=[];
+  Object.entries(attGroups).forEach(([attId,resIds])=>{const att=getAtt(attId);if(!att)return;resIds.forEach(resId=>{const res=getRes(resId);if(!res)return;total++;const cnt=ASSESS.filter(a=>a.date===ds&&a.attId===attId&&a.resId===resId).length;if(cnt===0)miss++;else ok++;rows.push({att,res,cnt});});});
+  document.getElementById('rs-t').textContent=total;document.getElementById('rs-m').textContent=miss;document.getElementById('rs-o').textContent=ok;
+  const list=document.getElementById('rmd-list');if(!rows.length){list.innerHTML='<div style="text-align:center;color:var(--t3);padding:14px">此日期無排班資料</div>';return;}
+  list.innerHTML=rows.map(({att,res,cnt})=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(30,45,69,.5);flex-wrap:wrap;gap:6px">
+    <div style="display:flex;align-items:center;gap:8px"><div class="dav">${att.n[0]}</div><div><div style="font-weight:600;font-size:12.5px">${att.n} <span style="font-size:10px;color:var(--t3)">→</span> ${res.n}</div><div style="font-size:10.5px;color:var(--t3)">已填 ${cnt} 份</div></div></div>
+    <span class="pill ${cnt>0?'p4':'p1'}">${cnt>0?'已評核':'未評核'}</span>
+  </div>`).join('');
+}
+function buildBatch(ds){const entries=SCHED[ds]||[];const attGroups={};entries.forEach(e=>{if(!attGroups[e.attId])attGroups[e.attId]=[];attGroups[e.attId].push(e.resId);});const miss=[];Object.entries(attGroups).forEach(([attId,resIds])=>{const att=getAtt(attId);if(!att)return;const missing=resIds.filter(rid=>{const cnt=ASSESS.filter(a=>a.date===ds&&a.attId===attId&&a.resId===rid).length;return cnt===0;});if(missing.length){const resNames=missing.map(rid=>getRes(rid)?.n||'?').join('、');miss.push(`• ${att.n}（尚未評核：${resNames}）`);}});return miss.length?`【急診住院醫師評核提醒】\n\n以下主治醫師於 ${ds} 尚未完成評核：\n\n${miss.join('\n')}\n\n請於輪班結束前完成評核，謝謝！`:'無需提醒';}
+function batchEmail(){const ds=document.getElementById('rmd-date').value||tod();const entries=SCHED[ds]||[];const emails=[...new Set(entries.map(e=>getAtt(e.attId)?.email).filter(Boolean))].join(',');if(!emails)return alert('無 Email 可發送');window.open(`mailto:${emails}?subject=${encodeURIComponent('評核提醒 '+ds)}&body=${encodeURIComponent(buildBatch(ds))}`);}
+function batchLine(){const ds=document.getElementById('rmd-date').value||tod();document.getElementById('line-txt').textContent=buildBatch(ds);openM('m-line');}
+function copyBatch(){navigator.clipboard.writeText(document.getElementById('batch-txt').textContent).then(()=>alert('已複製！'));}
+
+// ══════════════ ADMIN ══════════════
+// ══════════════════════════════════════════
+// CUSTOM EPA / MILESTONE ITEM EDITOR
+// ══════════════════════════════════════════
+function swItemTab(tab,el){
+  document.querySelectorAll('#item-editor-tabs .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('item-editor-epa').classList.toggle('hidden',tab!=='epa');
+  document.getElementById('item-editor-ms').classList.toggle('hidden',tab!=='ms');
+  if(tab==='epa')renderEpaEditor();else renderMsEditor();
+}
+function renderItemEditor(){renderEpaEditor();renderMsEditor();}
+
+// ── EPA editor ──
+function renderEpaEditor(){
+  const wrap=document.getElementById('item-editor-epa');if(!wrap)return;
+  let html=EPA.map((e,i)=>`
+    <div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;background:var(--bg3)">
+      <div class="g2" style="gap:7px;margin-bottom:6px">
+        <div class="fg" style="margin-bottom:0"><label style="font-size:11px">代碼 ID</label><input value="${e.id}" oninput="updateEpaField(${i},'id',this.value)" style="font-family:'DM Mono',monospace;font-size:13px"></div>
+        <div class="fg" style="margin-bottom:0"><label style="font-size:11px">名稱</label><input value="${e.n}" oninput="updateEpaField(${i},'n',this.value)"></div>
+      </div>
+      <div class="fg" style="margin-bottom:6px"><label style="font-size:11px">說明</label><input value="${e.d||''}" oninput="updateEpaField(${i},'d',this.value)"></div>
+      <button class="btn bxs bd" onclick="deleteEpaRow(${i})">🗑 刪除此項目</button>
+    </div>
+  `).join('');
+  html+=`<button class="btn bp bsm mt3" onclick="addEpaRow()">＋ 新增 EPA 項目</button>`;
+  wrap.innerHTML=html;
+}
+function updateEpaField(idx,field,val){if(EPA[idx])EPA[idx][field]=val;}
+function addEpaRow(){
+  const n=EPA.length+1;
+  EPA.push({id:'EPA'+n,n:'新項目'+n,d:''});
+  renderEpaEditor();
+}
+function deleteEpaRow(idx){
+  if(!confirm(`確定刪除「${EPA[idx].n}」？\n（已存在的評核紀錄不受影響，但此項目將無法再被選取）`))return;
+  EPA.splice(idx,1);
+  renderEpaEditor();
+}
+
+// ── Milestone editor ──
+function renderMsEditor(){
+  const wrap=document.getElementById('item-editor-ms');if(!wrap)return;
+  let html=MS.map((ms,ci)=>`
+    <div style="border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px;background:var(--bg3)">
+      <div class="g2" style="gap:7px;margin-bottom:6px">
+        <div class="fg" style="margin-bottom:0"><label style="font-size:11px">代碼 ID</label><input value="${ms.id}" oninput="updateMsCatField(${ci},'id',this.value)" style="font-family:'DM Mono',monospace;font-size:13px"></div>
+        <div class="fg" style="margin-bottom:0"><label style="font-size:11px">面向類別</label><select onchange="updateMsCatField(${ci},'cat',this.value)">${MS_CATS.map(c=>`<option ${ms.cat===c?'selected':''} value="${c}">${c} ${MS_CAT_LBL[c]}</option>`).join('')}</select></div>
+      </div>
+      <div class="fg" style="margin-bottom:6px"><label style="font-size:11px">類別名稱</label><input value="${ms.n}" oninput="updateMsCatField(${ci},'n',this.value)"></div>
+      <div class="fg" style="margin-bottom:8px"><label style="font-size:11px">類別說明</label><textarea oninput="updateMsCatField(${ci},'d',this.value)" style="min-height:44px;font-size:12px">${ms.d||''}</textarea></div>
+      <div style="font-size:11px;color:var(--t2);font-weight:600;margin-bottom:5px">細項（Level 1-5，L5預設不評分）</div>
+      ${ms.items.map((item,ii)=>`
+        <div class="ifl" style="gap:6px;margin-bottom:5px;align-items:flex-start">
+          <select onchange="updateMsItemField(${ci},${ii},'lv',parseInt(this.value))" style="width:64px;flex-shrink:0;font-size:12px">
+            ${[1,2,3,4,5].map(l=>`<option value="${l}" ${item.lv===l?'selected':''}>L${l}</option>`).join('')}
+          </select>
+          <input value="${item.t}" oninput="updateMsItemField(${ci},${ii},'t',this.value)" style="flex:1;font-size:12px">
+          <button class="btn bxs bd" style="flex-shrink:0" onclick="deleteMsItem(${ci},${ii})">✕</button>
+        </div>
+      `).join('')}
+      <div class="ifl mt3" style="gap:8px">
+        <button class="btn bs bxs" onclick="addMsItem(${ci})">＋ 新增細項</button>
+        <button class="btn bxs bd" onclick="deleteMsCategory(${ci})">🗑 刪除整個類別</button>
+      </div>
+    </div>
+  `).join('');
+  html+=`<button class="btn bp bsm mt3" onclick="addMsCategory()">＋ 新增 Milestone 類別</button>`;
+  wrap.innerHTML=html;
+}
+function updateMsCatField(ci,field,val){if(MS[ci])MS[ci][field]=val;}
+function updateMsItemField(ci,ii,field,val){if(MS[ci]&&MS[ci].items[ii])MS[ci].items[ii][field]=val;}
+function addMsItem(ci){
+  const ms=MS[ci];if(!ms)return;
+  const n=ms.items.length+1;
+  ms.items.push({id:ms.id+'-NEW'+n,lv:1,t:'新細項描述'});
+  renderMsEditor();
+}
+function deleteMsItem(ci,ii){
+  MS[ci].items.splice(ii,1);
+  renderMsEditor();
+}
+function addMsCategory(){
+  const n=MS.length+1;
+  MS.push({id:'NEW'+n,cat:'PC',n:'新類別'+n,d:'',items:[{id:'NEW'+n+'-L1-1',lv:1,t:'請編輯此細項描述'}]});
+  renderMsEditor();
+}
+function deleteMsCategory(ci){
+  if(!confirm(`確定刪除「${MS[ci].n}」整個類別及其所有細項？\n（已存在的評核紀錄不受影響，但此類別將無法再被選取）`))return;
+  MS.splice(ci,1);
+  renderMsEditor();
+}
+function commitItemEdits(){
+  // Ensure CFG.enEpa / enMs have entries for new items
+  EPA.forEach(e=>{if(!(e.id in CFG.enEpa))CFG.enEpa[e.id]=true;});
+  MS.forEach(m=>{if(!(m.id in CFG.enMs))CFG.enMs[m.id]=true;});
+  saveCustomItems();
+  autoSync();
+  renderAdmToggles(); // refresh the enable/disable toggle lists too
+  const el=document.getElementById('item-editor-ok');
+  el.classList.remove('hidden');setTimeout(()=>el.classList.add('hidden'),3000);
+}
+function restoreDefaultItems(){
+  EPA=JSON.parse(JSON.stringify(DEFAULT_EPA));
+  MS=JSON.parse(JSON.stringify(DEFAULT_MS));
+  EPA.forEach(e=>{if(!(e.id in CFG.enEpa))CFG.enEpa[e.id]=true;});
+  MS.forEach(m=>{if(!(m.id in CFG.enMs))CFG.enMs[m.id]=true;});
+  saveCustomItems();
+  renderItemEditor();
+  renderAdmToggles();
+  alert('✅ 已還原為系統預設的 EPA / Milestone 內容');
+}
+function initAdmin(){const qem=document.getElementById('q-em');const qmm=document.getElementById('q-mm');if(qem)qem.value=CFG.qEpaM||0;if(qmm)qmm.value=CFG.qMsM||0;populateSel('ccc-res',false);populateSel('ward-res',false);renderAdmToggles();renderItemEditor();}
+function renderCCCPanel(){
+  const resId=document.getElementById('ccc-res').value;const panel=document.getElementById('ccc-panel');if(!resId){panel.innerHTML='';return;}
+  const r=getRes(resId);
+  let html=`<div class="g2 mt3">
+    <div><div style="font-size:11px;color:var(--t2);font-weight:600;margin-bottom:6px">EPA 細分等級（CCC決定）</div>
+    ${EPA.map(epa=>{const lv=r?.cccLevels?.[epa.id]||'';return`<div class="tw"><div><div class="tl">${epa.id} ${epa.n}</div><div class="tsb">目前：${lv||'未設定'}</div></div>
+      <select style="width:75px;font-size:11px" onchange="setCCCLv('${resId}','${epa.id}',this.value)"><option value="">—</option>${['1','2a','2b','3a','3b','3c','4','5'].map(v=>`<option ${lv===v?'selected':''}>${v}</option>`).join('')}</select>
+    </div>`;}).join('')}
+    <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
+      <button class="btn bpu bsm" onclick="saveCCCSnapshot('${resId}')">📸 儲存CCC快照</button>
+      <div style="font-size:11px;color:var(--t3);margin-top:5px">歷史快照：${(r?.cccHistory||[]).map((h,i)=>`${i+1}. ${h.date}`).join('　')||'（尚無）'}</div>
+      <div style="font-size:11px;color:var(--t3)">儲存快照後，SHHER矩陣可選擇查看不同次 CCC 的資料。</div>
+    </div>
+    </div>
+    <div><div style="font-size:11px;color:var(--t2);font-weight:600;margin-bottom:6px">Milestone 子項目鎖定</div>
+    ${MS.map(ms=>{
+      let msHtml=`<div style="font-size:10.5px;color:var(--a3);font-weight:600;padding:4px 0">${ms.id} ${ms.n}</div>`;
+      msHtml+=ms.items.filter(i=>i.lv<=4).map(item=>{const lkd=r?.itemLocks?.[item.id]===true;return`<div class="tw"><div><div class="tl" style="font-size:11px"><span class="lvtag lv${item.lv}" style="font-size:8.5px;margin-right:3px">L${item.lv}</span>${item.t.slice(0,30)}…</div></div><label class="tog"><input type="checkbox" ${lkd?'checked':''} onchange="setItemLk('${resId}','${item.id}',this.checked)"><span class="tsl"></span></label></div>`;}).join('');
+      return msHtml;
+    }).join('')}</div>
+  </div>`;
+  panel.innerHTML=html;
+}
+function setCCCLv(resId,id,val){const r=getRes(resId);if(!r)return;if(!r.cccLevels)r.cccLevels={};r.cccLevels[id]=val;save();autoSync();}
+function saveCCCSnapshot(resId){
+  const r=getRes(resId);if(!r)return;
+  if(!r.cccHistory)r.cccHistory=[];
+  const snap={date:new Date().toISOString().split('T')[0],levels:{...r.cccLevels}};
+  r.cccHistory.push(snap);
+  save();
+  alert('CCC 快照已儲存！（共 '+r.cccHistory.length+' 次）\nSHHER 矩陣下拉選單可選擇查看前幾次的 CCC 資料。');
+  renderCCCPanel();
+}
+function setItemLk(resId,id,val){const r=getRes(resId);if(!r)return;if(!r.itemLocks)r.itemLocks={};r.itemLocks[id]=val;save();}
+function renderWardPanel(){
+  const resId=document.getElementById('ward-res').value;const panel=document.getElementById('ward-panel');if(!resId){panel.innerHTML='';return;}
+  const r=getRes(resId);const ward=r?.ward||{ind:'',obs:'',er:''};
+  panel.innerHTML=`<div class="g3 mt3">${[['ind','獨立診'],['obs','留觀'],['er','九診']].map(([k,label])=>`<div class="fg"><label>${label}</label><select onchange="setWard('${resId}','${k}',this.value)"><option value="">—（自動）</option>${['可','特','否'].map(v=>`<option ${ward[k]===v?'selected':''} value="${v}">${v==='可'?'可執行':v==='特'?'特定狀況':'不可執行'}</option>`).join('')}</select></div>`).join('')}</div>`;
+}
+function setWard(resId,key,val){const r=getRes(resId);if(!r)return;if(!r.ward)r.ward={};r.ward[key]=val;save();autoSync();}
+function renderAdmToggles(){document.getElementById('adm-ep').innerHTML=EPA.map(e=>`<div class="tw"><div class="tl">${e.id} ${e.n}</div><label class="tog"><input type="checkbox" ${CFG.enEpa[e.id]?'checked':''} onchange="togEn('epa','${e.id}',this.checked)"><span class="tsl"></span></label></div>`).join('');document.getElementById('adm-ms').innerHTML=MS_CATS.map(cat=>`<div style="margin-bottom:5px"><div style="font-size:9.5px;color:var(--a2);padding:4px 0;font-weight:600">${cat}</div>${MS.filter(m=>m.cat===cat).map(m=>`<div class="tw"><div class="tl" style="font-size:11px">${m.id} ${m.n}</div><label class="tog"><input type="checkbox" ${CFG.enMs[m.id]?'checked':''} onchange="togEn('ms','${m.id}',this.checked)"><span class="tsl"></span></label></div>`).join('')}</div>`).join('');}
+function togEn(t,id,val){if(t==='epa')CFG.enEpa[id]=val;else CFG.enMs[id]=val;saveAdmin(true);}
+function saveAdmin(silent=false){const _em=document.getElementById('q-em');const _mm=document.getElementById('q-mm');if(_em&&_em.value!=='')CFG.qEpaM=parseInt(_em.value)||0;if(_mm&&_mm.value!=='')CFG.qMsM=parseInt(_mm.value)||0;save();fsSetDoc('config','cfg',CFG).catch(()=>{});if(!silent){['admin-ok','admin-limit-ok'].forEach(id=>{const el=document.getElementById(id);if(el){el.classList.remove('hidden');setTimeout(()=>el.classList.add('hidden'),2500);}});}}
+
+
+// ══════════════ DETAIL ══════════════
+function viewDet(id){
+  const a=ASSESS.find(x=>x.id===id);if(!a)return;
+  document.getElementById('m-det-t').textContent=`${a.resName} — ${a.date} (${a.type==='imaging'?'影像評核':'MS+EPA'})`;
+  let html=`<div style="font-size:11.5px;color:var(--t2);margin-bottom:11px">📋 ${a.caseDesc||'—'}　🩺 ${a.attName||'—'}</div>`;
+  if(a.type==='imaging'){
+    html+=`<div style="font-size:11.5px;color:var(--t2);margin-bottom:10px">影像：${a.imgType}　案例：${a.caseChosen}${a.caseSubChosen?' → '+a.caseSubChosen:''}　病歷：${a.pid||'—'}</div>`;
+    IMG_CR.forEach(c=>{const s=a.stars?.[c]||0;html+=`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px">${c}</span><span style="color:var(--a3)">★ ${s}/5</span></div>`;});
+    if(a.comment)html+=`<div style="margin-top:10px"><div style="font-size:10.5px;color:var(--a2);margin-bottom:4px">📝 評核意見</div><div style="font-size:12px;color:var(--t2)">${a.comment}</div></div>`;
+  }else{
+    if(a.selEpa?.length){html+=`<div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:7px">EPA（均分 ${a.epaAvg}）</div>`;a.selEpa.forEach(id=>{const epa=EPA.find(e=>e.id===id);const s=a.epaScores?.[id];if(!epa||!s)return;html+=`<div style="padding:5px 0;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between"><span style="font-size:12px"><span style="color:var(--a2);font-size:9.5px">${epa.id}</span> ${epa.n}</span><span class="pill p${s}">Level ${s}</span></div>${a.epaFb?.[id]?`<div style="font-size:10.5px;color:var(--t2);margin-top:2px">💬 ${a.epaFb[id]}</div>`:''}</div>`;});}
+    if(a.selMs?.length&&a.msItems){html+=`<div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;margin:11px 0 7px">MILESTONE（可呈現率 ${a.msPresRate??'—'}%）</div>`;a.selMs.forEach(msId=>{const ms=MS.find(m=>m.id===msId);if(!ms)return;html+=`<div style="margin-bottom:9px"><div style="font-size:10.5px;color:var(--a3);margin-bottom:4px">${ms.id} ${ms.n}</div>`;ms.items.filter(i=>i.lv<=4).forEach(item=>{const v=a.msItems[item.id];if(!v)return;const col=v==='stable'?'var(--acc)':v==='unstable'?'var(--danger)':'var(--t3)';html+=`<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(30,45,69,.4);font-size:11.5px"><span style="color:var(--t2)">${item.t}</span><span style="color:${col};font-size:10.5px;white-space:nowrap;margin-left:8px">${v==='stable'?'✅ 可穩定':v==='unstable'?'❌ 未穩定':'⬜ 未觀察'}</span></div>`;});html+=`</div>`;});}
+  }
+  document.getElementById('m-det-b').innerHTML=html;openM('m-detail');
+}
+function delA(id){if(!confirm('確定刪除？'))return;ASSESS=ASSESS.filter(a=>a.id!==id);save();autoSync();updateRmBadge();renderDash();if(document.getElementById('page-history').classList.contains('active'))renderHistory();}
+
+// EXPORT
+function exportCSV(){
+  let data=[...visA()];
+  const resId=document.getElementById('exp-r').value,s=document.getElementById('exp-s').value,e=document.getElementById('exp-e').value;
+  if(resId)data=data.filter(a=>a.resId===resId);
+  if(s)data=data.filter(a=>a.date>=s);
+  if(e)data=data.filter(a=>a.date<=e);
+  // Headers
+  const hdrs=[
+    '日期','主治','住院醫師','年級','臨床情境',
+    'EPA均分','EPA%（/5）','MS可穩定%',
+    ...EPA.map(x=>x.id+'評分'),
+    ...EPA.map(x=>x.id+'質性回饋'),
+    ...MS.flatMap(m=>m.items.map(i=>i.id)),
+    ...MS.map(m=>m.id+'質性回饋'),
+    '影像種類','影像案例','影像評核意見'
+  ];
+  const rows=data.map(a=>{
+    const epaAvgPct=a.epaAvg?((parseFloat(a.epaAvg)/5)*100).toFixed(1)+'%':'';
+    return [
+      a.date,a.attName||'',a.resName,a.resYear||'',a.caseDesc||'',
+      a.epaAvg||'',epaAvgPct,a.msPresRate!=null?a.msPresRate+'%':'',
+      ...EPA.map(x=>a.epaScores?.[x.id]||''),
+      ...EPA.map(x=>(a.epaFb?.[x.id]||'').replace(/\n/g,' ')),
+      ...MS.flatMap(m=>m.items.map(i=>{const v=a.msItems?.[i.id]||'';return v==='stable'?'可穩定呈現':v==='unstable'?'未穩定呈現':v==='notobserved'?'未觀察':''})),
+      ...MS.map(m=>(a.msFb?.[m.id]||'').replace(/\n/g,' ')),
+      a.imgData?.imgType||'',a.imgData?.caseChosen||'',(a.imgData?.comment||'').replace(/\n/g,' ')
+    ];
+  });
+  const csv=[hdrs,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const u=URL.createObjectURL(blob);const a2=document.createElement('a');a2.href=u;a2.download=`急診評核_${tod()}.csv`;a2.click();
+}
+function exportJSON(){
+  const backup={version:'5.4',date:tod(),assessments:ASSESS,residents:RES,attendings:ATT,schedule:SCHED,config:CFG};
+  const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json;charset=utf-8'});
+  const u=URL.createObjectURL(blob);const a2=document.createElement('a');a2.href=u;a2.download=`急診評核備份_${tod()}.json`;a2.click();
+}
+function importJSON(){
+  const raw=document.getElementById('import-json').value.trim();
+  const el=document.getElementById('import-result');
+  if(!raw){el.textContent='請先貼上 JSON 資料';el.className='al ae';el.classList.remove('hidden');return;}
+  try{
+    const data=JSON.parse(raw);
+    let addedA=0,addedR=0,addedAt=0;
+    // Merge assessments
+    if(Array.isArray(data.assessments)){
+      data.assessments.forEach(a=>{if(!ASSESS.find(x=>x.id===a.id)){ASSESS.push(a);addedA++;}});
+    }
+    // Merge residents
+    if(Array.isArray(data.residents)){
+      data.residents.forEach(r=>{if(!RES.find(x=>x.id===r.id)){RES.push(r);addedR++;}});
+    }
+    // Merge attendings
+    if(Array.isArray(data.attendings)){
+      data.attendings.forEach(a=>{if(!ATT.find(x=>x.id===a.id)){ATT.push(a);addedAt++;}});
+    }
+    // Merge schedule
+    if(data.schedule&&typeof data.schedule==='object'){
+      Object.entries(data.schedule).forEach(([date,entries])=>{
+        if(!SCHED[date])SCHED[date]=[];
+        entries.forEach(e=>{if(!SCHED[date].find(x=>x.attId===e.attId&&x.resId===e.resId))SCHED[date].push(e);});
+      });
+    }
+    save();autoSync();
+    el.textContent='✅ 匯入成功！新增評核 '+addedA+' 筆、住院醫師 '+addedR+' 位、主治醫師 '+addedAt+' 位。';
+    el.className='al aok';el.classList.remove('hidden');
+    renderDash();
+  }catch(err){
+    el.textContent='❌ JSON 格式錯誤：'+err.message;el.className='al ae';el.classList.remove('hidden');
+  }
+}
+function printReport(){const resId=document.getElementById('prt-r').value;const data=resId?ASSESS.filter(a=>a.resId===resId):visA();const nm=resId?getRes(resId)?.n:'所有住院醫師';const win=window.open('','_blank');win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>急診評核報告</title><style>body{font-family:sans-serif;padding:28px;color:#222}h1{border-bottom:2px solid #00c9a7;padding-bottom:6px;font-size:18px}table{width:100%;border-collapse:collapse;font-size:11px;margin:12px 0}th{background:#f0f4f8;padding:6px;border:1px solid #ddd}td{padding:5px 6px;border:1px solid #ddd}@media print{button{display:none}}</style></head><body><h1>急診醫學科住院醫師評核報告（TSEM 2025 v3）</h1><p style="color:#666;margin:10px 0 16px">住院醫師：<b>${nm}</b>　評核次數：${data.length}　日期：${new Date().toLocaleDateString('zh-TW')}</p><table><thead><tr><th>日期</th><th>主治</th><th>EPA均</th><th>MS%</th></tr></thead><tbody>${data.map(a=>`<tr><td>${a.date}</td><td>${a.attName||''}</td><td>${a.epaAvg||'—'}</td><td>${a.msPresRate!=null?a.msPresRate+'%':'—'}</td></tr>`).join('')}</tbody></table><button onclick="window.print()">🖨 列印</button></body></html>`);win.document.close();}
+
+// HELPERS
+function populateSel(id,isAtt=false){const sel=document.getElementById(id);if(!sel)return;const cur=sel.value;sel.querySelectorAll('option:not(:first-child)').forEach(o=>o.remove());(isAtt?[...ATT].sort((a,b)=>(parseInt(a.no)||999)-(parseInt(b.no)||999)):RES.filter(r=>!r.grad)).forEach(r=>{const o=document.createElement('option');o.value=r.id;o.textContent=isAtt?`${r.no?r.no+' ':''}${r.n}`:`${r.n} (${r.y})`;sel.appendChild(o);});sel.value=cur;}
+function dC(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+function cOpt(type,max){const base={responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#94a3b8',font:{size:10}}}}};if(type==='bar'||type==='line')base.scales={x:{ticks:{color:'#94a3b8'},grid:{color:'#1e2d45'}},y:{min:0,max,ticks:{color:'#94a3b8'},grid:{color:'#1e2d45'}}};return base;}
+function openM(id){document.getElementById(id).classList.add('open');}
+function closeM(id){document.getElementById(id).classList.remove('open');}
+function copyEl(id){navigator.clipboard.writeText(document.getElementById(id).textContent).then(()=>alert('已複製！'));}
+document.querySelectorAll('.ov').forEach(ov=>ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.remove('open');}));
+
+// INIT
+// ─── EMBEDDED IMAGING STATE ───
+let embedImgType='',embedImgTab='req',embedImgStars={},embedImgSubCase='';
+function toggleEmbedImg(){
+  const show=document.getElementById('embed-img-enabled').checked;
+  document.getElementById('embed-img-inner').style.display=show?'block':'none';
+  if(show){renderEmbedImgList();renderEmbedImgStars();renderEmbedPresets();}
+}
+function selEmbedIT(t,btn){embedImgType=t;btn.closest('div').querySelectorAll('.itbtn').forEach(b=>b.classList.remove('sel'));btn.classList.add('sel');}
+function swEmbedImgTab(tab,el){embedImgTab=tab;document.querySelectorAll('#embed-img-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');embedImgSubCase='';document.getElementById('embed-img-sub-wrap').classList.add('hidden');renderEmbedImgList();}
+function renderEmbedImgList(){const cases=embedImgTab==='req'?IMG_REQ:IMG_SEL;const el=document.getElementById('embed-img-case-list');if(!el)return;el.innerHTML=cases.map((c,i)=>`<div class="img-item"><input type="radio" name="embedimgcase" id="eic-${i}" value="${c}" onchange="onEmbedImgCase('${c.replace(/'/g,"\\'")}')"><label for="eic-${i}">${c}</label></div>`).join('');}
+function onEmbedImgCase(v){embedImgSubCase='';const sub=document.getElementById('embed-img-sub-wrap');if(v==='其他'&&embedImgTab==='req'){sub.classList.remove('hidden');document.getElementById('embed-img-sub-list').innerHTML=IMG_SEL.map((c,i)=>`<div class="img-item"><input type="radio" name="embedimgsub" id="eics-${i}" value="${c}" onchange="embedImgSubCase='${c.replace(/'/g,"\\'")}';"><label for="eics-${i}">${c}</label></div>`).join('');}else sub.classList.add('hidden');}
+function renderEmbedImgStars(){const el=document.getElementById('embed-img-stars');if(!el)return;el.innerHTML=IMG_CR.map(c=>`<div class="star-row"><div style="font-size:13px">${c}</div><div style="display:flex;gap:4px">${[1,2,3,4,5].map(n=>`<button class="starbtn ${(embedImgStars[c]||0)>=n?'on':''}" onclick="setEmbedStar('${c}',${n},this.parentElement)">★</button>`).join('')}</div></div>`).join('');}
+function setEmbedStar(c,n,grp){embedImgStars[c]=n;grp.querySelectorAll('.starbtn').forEach((b,i)=>b.classList.toggle('on',i<n));}
+function renderEmbedPresets(){const att=getAtt(document.getElementById('f-att')?.value);const el=document.getElementById('eimg-pre-tools');if(el)el.innerHTML=(att?.presets||[]).map(p=>`<button class="pre-btn" onclick="insertFb('eimg-comment','${p.c.replace(/'/g,"\\'")}')">＋${p.n}</button>`).join('');}
+function getEmbedImgData(){
+  if(!document.getElementById('embed-img-enabled')?.checked)return null;
+  const r=document.querySelector('input[name="embedimgcase"]:checked');if(!r)return null;
+  const comment=(document.getElementById('eimg-comment')?.value||'').trim();
+  if(!comment){alert('已啟用影像評核，請填寫評核意見');return false;}
+  if(!embedImgType){alert('請選擇影像種類');return false;}
+  return{imgType:embedImgType,caseTab:embedImgTab,caseChosen:r.value,caseSubChosen:embedImgSubCase,pid:(document.getElementById('eipid')?.value||''),stars:{...embedImgStars},comment};
+}
+function applyFontSize(px){
+  // Inject/update a dynamic style tag - this overrides ALL other CSS
+  let st=document.getElementById('font-override-style');
+  if(!st){st=document.createElement('style');st.id='font-override-style';document.head.appendChild(st);}
+  st.textContent=`*{font-size:${px}px !important}
+    .lvtag,.nb,.sb-tag,.cst,.mdb,.theme-btn,.ns,.badge{font-size:${Math.max(10,px-5)}px !important}
+    .sv{font-size:${px+8}px !important}
+    .st{font-size:${px+2}px !important}
+    h1{font-size:${px-2}px !important}`;
+  document.documentElement.style.setProperty('--base-font',px+'px');
+}
+function adjFont(delta){
+  const cur=parseInt(localStorage.getItem('em_fontsize'))||17;
+  const next=delta===0?17:Math.min(26,Math.max(13,cur+delta));
+  localStorage.setItem('em_fontsize',next);
+  applyFontSize(next);
+  const lbl=document.getElementById('font-size-label');
+  if(lbl)lbl.textContent=next+'px';
+}
+function loadFontSize(){
+  const saved=parseInt(localStorage.getItem('em_fontsize'))||17;
+  applyFontSize(saved);
+  setTimeout(()=>{const l=document.getElementById('font-size-label');if(l)l.textContent=saved+'px';},100);
+}
+function toggleTheme(){const h=document.documentElement;const cur=h.getAttribute('data-theme')||'dark';const next=cur==='dark'?'light':'dark';h.setAttribute('data-theme',next);localStorage.setItem('em53_theme',next);}
+function loadTheme(){const t=localStorage.getItem('em53_theme')||'light';document.documentElement.setAttribute('data-theme',t);}
+function init(){
+  loadTheme();loadFontSize();loadCustomItems();save();
+  // Detect unreliable hosting context (file://, or no real https origin)
+  if(location.protocol==='file:'||location.protocol==='about:'){
+    const b=document.getElementById('origin-warn-banner');
+    if(b){b.classList.remove('hidden');document.body.style.paddingTop='42px';}
+  }
+  loadFBCfg();
+  if(!isAdmin)showAttSel();
+  renderDash();updateRmBadge();
+}
+// Wait for Firebase to be available before init
+init();
+</script>
+</body>
+</html>
