@@ -727,6 +727,8 @@ body{font-size:var(--base-font,17px)}
       <button class="btn bs bsm" onclick="schedMon(-1)">‹</button>
       <span id="sched-t" style="font-size:13px;font-weight:600;min-width:86px;text-align:center"></span>
       <button class="btn bs bsm" onclick="schedMon(1)">›</button>
+      <button class="btn bs bsm" onclick="clearSchedMonth()">🗑 清除本月班表</button>
+      <button class="btn bsm" style="border:1px solid var(--danger);color:var(--danger)" onclick="clearSchedAll()">🗑 清除全部班表</button>
     </div>
   </div>
   <div class="card mb4">
@@ -740,6 +742,7 @@ body{font-size:var(--base-font,17px)}
     <div id="paste-result" class="al ai hidden mt3"></div>
   </div>
   <div class="card">
+    <p style="font-size:11px;color:var(--t3);margin-bottom:8px">💡 點擊任一有排班的日期格子，可單獨刪除當天的班表資料</p>
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
       <div style="text-align:center;font-size:9.5px;color:var(--t3);padding:2px">日</div><div style="text-align:center;font-size:9.5px;color:var(--t3);padding:2px">一</div><div style="text-align:center;font-size:9.5px;color:var(--t3);padding:2px">二</div><div style="text-align:center;font-size:9.5px;color:var(--t3);padding:2px">三</div><div style="text-align:center;font-size:9.5px;color:var(--t3);padding:2px">四</div><div style="text-align:center;font-size:9.5px;color:var(--t3);padding:2px">五</div><div style="text-align:center;font-size:9.5px;color:var(--t3);padding:2px">六</div>
     </div>
@@ -1265,15 +1268,22 @@ if(!ATT)ATT=DEF_ATT.map(a=>({...a}));
 // Only specific mutable fields should ever be overwritten by cloud sync,
 // so that stale/incomplete test data that may have landed in Firestore
 // during earlier development can never wipe out the correct name list.
-const RES_MUTABLE_FIELDS=['grad','ward','cccLevels','cccHistory','itemLocks','qPcOverride','qNpcOverride'];
-const ATT_MUTABLE_FIELDS=['email','line','presets'];
+// 'no'/'n'/'y' are EDITABLE by admins (代號/姓名/年級), so cloud edits to them
+// must persist — but we still always iterate over the fixed DEFAULT id list,
+// so corrupt/incomplete cloud data can never make people disappear entirely.
+const RES_MUTABLE_FIELDS=['no','n','y','grad','ward','cccLevels','cccHistory','itemLocks','qPcOverride','qNpcOverride'];
+const ATT_MUTABLE_FIELDS=['no','n','email','line','presets'];
 function mergeRosterWithCloud(defaults,cloudList,mutableFields){
   const cloudById={};
   (cloudList||[]).forEach(c=>{if(c&&c.id)cloudById[c.id]=c;});
   return defaults.map(def=>{
     const cloud=cloudById[def.id];
     const merged={...def};
-    if(cloud)mutableFields.forEach(f=>{if(cloud[f]!==undefined)merged[f]=cloud[f];});
+    if(cloud)mutableFields.forEach(f=>{
+      // Only override when cloud actually has a meaningful value (skip blank/undefined),
+      // so missing fields in old cloud data can't blank out no/n by accident.
+      if(cloud[f]!==undefined&&cloud[f]!==null&&cloud[f]!=='')merged[f]=cloud[f];
+    });
     return merged;
   });
 }
@@ -1551,7 +1561,7 @@ function checkPw(){if(document.getElementById('pw-in').value===CFG.pw){isAdmin=t
 function applyMode(){
   document.querySelectorAll('.admin-only').forEach(el=>el.classList.toggle('hidden',!isAdmin));
   const btn=document.getElementById('mdb'),bdg=document.getElementById('mbdg');
-  if(isAdmin){btn.textContent='🔓 切換回指導醫師模式';btn.classList.add('adm');bdg.textContent='管理員模式';bdg.className='badge bdp';document.getElementById('att-selector-wrap').classList.add('hidden');const _b=document.getElementById('att-selected-banner');if(_b){_b.classList.remove('hidden');const nb=document.getElementById('att-name-big');const ab=document.getElementById('att-avatar-big');if(nb&&att)nb.textContent=att.n;if(ab&&att)ab.textContent=att.n[0];}}
+  if(isAdmin){btn.textContent='🔓 切換回指導醫師模式';btn.classList.add('adm');bdg.textContent='管理員模式';bdg.className='badge bdp';document.getElementById('att-selector-wrap').classList.add('hidden');const _b=document.getElementById('att-selected-banner');if(_b)_b.classList.add('hidden');}
   else{btn.textContent='🔒 切換管理員模式';btn.classList.remove('adm');bdg.textContent='指導醫師模式';bdg.className='badge bdg';if(!currentAttId)showAttSel();}
   updateRmBadge();
 }
@@ -2163,6 +2173,13 @@ function clearSchedAll(){
   if(!confirm(`確定清除全部班表資料（共${total}天）？此動作無法復原。`))return;
   SCHED={};save();autoSync();renderSched();updateRmBadge();
 }
+function delSchedDay(dateStr){
+  const entries=SCHED[dateStr]||[];
+  if(!entries.length)return;
+  if(!confirm(`確定刪除 ${dateStr} 當天的班表（共${entries.length}筆）？`))return;
+  delete SCHED[dateStr];
+  save();autoSync();renderSched();updateRmBadge();
+}
 function schedMon(d){schedMo+=d;if(schedMo>11){schedMo=0;schedY++;}else if(schedMo<0){schedMo=11;schedY--;}renderSched();}
 function renderSched(){
   document.getElementById('sched-t').textContent=`${schedY}年${schedMo+1}月`;
@@ -2184,8 +2201,11 @@ function renderSched(){
       }).join('');
       return`<div style="font-size:11px;line-height:1.5;margin-bottom:4px;padding-bottom:3px;border-bottom:1px solid var(--border)"><b style="color:var(--a2)">${att.n}</b><div style="margin-top:2px">${resForAtt}</div></div>`;
     }).join('');
-    grid.innerHTML+=`<div class="sc-cell${entries.length?' hd':''}${isT?' td':''}" title="${ds}">
-      <div style="font-size:10px;font-weight:700;color:${isT?'var(--a2)':'var(--t3)'};margin-bottom:2px">${d}</div>
+    grid.innerHTML+=`<div class="sc-cell${entries.length?' hd':''}${isT?' td':''}" title="${ds}（點擊可刪除當日班表）" onclick="${entries.length?`delSchedDay('${ds}')`:''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="font-size:10px;font-weight:700;color:${isT?'var(--a2)':'var(--t3)'};margin-bottom:2px">${d}</div>
+        ${entries.length?`<span style="font-size:9px;color:var(--t3);opacity:.6">🗑</span>`:''}
+      </div>
       <div>${detailChips}</div>
       ${cntAssess>0?`<div style="font-size:9px;color:var(--acc);margin-top:1px">✓${cntAssess}</div>`:''}
     </div>`;
