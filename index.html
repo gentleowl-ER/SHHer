@@ -2019,9 +2019,6 @@ function clearImg(){initImg();}
 function showErr(id,msg){const el=document.getElementById(id);el.textContent=msg;el.classList.remove('hidden');}
 function insPreset(taId,content){const ta=document.getElementById(taId);if(!ta)return;ta.value=ta.value?(ta.value+'\n\n'+content):content;checkFb(ta);}
 
-// ══════════════ AI POLISH ══════════════
-async 
-
 // ══════════════ LOCK LOGIC ══════════════
 function getLatestEpaScore(resId,epaId){const v=ASSESS.filter(a=>a.resId===resId&&a.type==='ms'&&a.epaScores?.[epaId]).sort((a,b)=>b.date.localeCompare(a.date));return v.length?v[0].epaScores[epaId]:0;}
 function getMsPct(resId,msId){const recent=ASSESS.filter(a=>a.resId===resId&&a.type==='ms'&&a.selMs?.includes(msId)).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,2);if(!recent.length)return 0;const ms=MS.find(m=>m.id===msId);if(!ms)return 0;let t=0,s=0;recent.forEach(a=>ms.items.forEach(i=>{const v=a.msItems?.[i.id];if(v){t++;if(v==='stable')s++;}}));return t?s/t*100:0;}
