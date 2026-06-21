@@ -824,6 +824,10 @@ body{font-size:var(--base-font,17px)}
       <div class="fg"><label>每月每項 MS 上限（0=不限）</label><div class="ifl"><input type="number" id="q-mm" style="width:60px;text-align:center" min="0" max="50"></div></div>
       <button class="btn bpu bsm" onclick="saveAdmin()">💾 儲存上限設定</button>
       <div id="admin-limit-ok" class="al aok hidden mt3" style="font-size:12px">✅ 上限已儲存</div>
+      <div class="ah mt4">🛠 名單修復</div>
+      <p style="font-size:11px;color:var(--t2);margin-bottom:8px">若主治醫師/住院醫師名單顯示不完整或消失（例如雲端曾存有舊測試資料），點此鍵會用系統內建的正確固定名單修復本機與雲端。</p>
+      <button class="btn bsm" style="border:1px solid var(--danger);color:var(--danger)" onclick="repairRoster()">🔧 修復名單（本機+雲端）</button>
+      <div id="repair-result" class="hidden mt3" style="font-size:12px"></div>
       <div class="ah mt4">🔐 密碼</div>
       <div class="g2"><div class="fg"><label>新密碼</label><input type="password" id="pw-n"></div><div class="fg"><label>確認</label><input type="password" id="pw-c"></div></div>
       <button class="btn bs bsm" onclick="changePw()">更新密碼</button>
@@ -1223,6 +1227,23 @@ let SCHED=JSON.parse(localStorage.getItem('em52_sched')||'{}'); // {dateStr:[{at
 let CFG=JSON.parse(localStorage.getItem('em52_cfg')||'null')||{pw:'admin123',qEpaM:10,qMsM:8,enEpa:Object.fromEntries(EPA.map(e=>[e.id,true])),enMs:Object.fromEntries(MS.map(m=>[m.id,true]))};
 if(!RES)RES=DEF_RES.map(r=>({...r}));
 if(!ATT)ATT=DEF_ATT.map(a=>({...a}));
+// ── Roster protection ──
+// RES/ATT base identity (id, no, n, y) is a FIXED roster baked into the app.
+// Only specific mutable fields should ever be overwritten by cloud sync,
+// so that stale/incomplete test data that may have landed in Firestore
+// during earlier development can never wipe out the correct name list.
+const RES_MUTABLE_FIELDS=['grad','ward','cccLevels','cccHistory','itemLocks','qPcOverride','qNpcOverride'];
+const ATT_MUTABLE_FIELDS=['email','line','presets'];
+function mergeRosterWithCloud(defaults,cloudList,mutableFields){
+  const cloudById={};
+  (cloudList||[]).forEach(c=>{if(c&&c.id)cloudById[c.id]=c;});
+  return defaults.map(def=>{
+    const cloud=cloudById[def.id];
+    const merged={...def};
+    if(cloud)mutableFields.forEach(f=>{if(cloud[f]!==undefined)merged[f]=cloud[f];});
+    return merged;
+  });
+}
 let isAdmin=false,currentAttId=null;
 let charts={};
 let schedY=new Date().getFullYear(),schedMo=new Date().getMonth();
@@ -1457,8 +1478,10 @@ async function syncDown(silent=false){
       fsGetDoc('config','customItems'),
     ]);
     if(assessList.length)ASSESS=assessList;
-    if(resList.length)RES=resList;
-    if(attList.length)ATT=attList;
+    // Protect the fixed roster: merge mutable fields only, never let cloud
+    // garbage/test data replace the baked-in attending/resident name list.
+    RES=mergeRosterWithCloud(DEF_RES,resList,RES_MUTABLE_FIELDS);
+    ATT=mergeRosterWithCloud(DEF_ATT,attList,ATT_MUTABLE_FIELDS);
     if(schedDoc&&schedDoc.data)SCHED=schedDoc.data;
     if(cfgDoc)Object.assign(CFG,cfgDoc);
     if(itemsDoc&&Array.isArray(itemsDoc.epa)&&itemsDoc.epa.length){EPA=itemsDoc.epa;localStorage.setItem('em_custom_epa',JSON.stringify(EPA));}
@@ -2318,6 +2341,25 @@ function renderWardPanel(){
 function setWard(resId,key,val){const r=getRes(resId);if(!r)return;if(!r.ward)r.ward={};r.ward[key]=val;save();autoSync();}
 function renderAdmToggles(){document.getElementById('adm-ep').innerHTML=EPA.map(e=>`<div class="tw"><div class="tl">${e.id} ${e.n}</div><label class="tog"><input type="checkbox" ${CFG.enEpa[e.id]?'checked':''} onchange="togEn('epa','${e.id}',this.checked)"><span class="tsl"></span></label></div>`).join('');document.getElementById('adm-ms').innerHTML=MS_CATS.map(cat=>`<div style="margin-bottom:5px"><div style="font-size:9.5px;color:var(--a2);padding:4px 0;font-weight:600">${cat}</div>${MS.filter(m=>m.cat===cat).map(m=>`<div class="tw"><div class="tl" style="font-size:11px">${m.id} ${m.n}</div><label class="tog"><input type="checkbox" ${CFG.enMs[m.id]?'checked':''} onchange="togEn('ms','${m.id}',this.checked)"><span class="tsl"></span></label></div>`).join('')}</div>`).join('');}
 function togEn(t,id,val){if(t==='epa')CFG.enEpa[id]=val;else CFG.enMs[id]=val;saveAdmin(true);}
+async function repairRoster(){
+  if(!confirm('將以系統內建的固定名單（29位主治醫師、13位住院醫師）覆蓋目前本機與雲端的名單資料。\n已設定的已畢業狀態、CCC紀錄等個人資料會盡量保留，但若雲端先前存有錯誤/測試資料，此動作會清除它們。\n\n確定要修復名單嗎？'))return;
+  // Rebuild from defaults, keeping any good mutable data found in current RES/ATT by id
+  RES=mergeRosterWithCloud(DEF_RES,RES,RES_MUTABLE_FIELDS);
+  ATT=mergeRosterWithCloud(DEF_ATT,ATT,ATT_MUTABLE_FIELDS);
+  save();
+  const el=document.getElementById('repair-result');
+  if(el){el.textContent='⏳ 正在將正確名單寫回雲端...';el.className='al ai';el.classList.remove('hidden');}
+  try{
+    await fsWriteMany('residents',RES,r=>r.id);
+    await fsWriteMany('attendings',ATT,a=>a.id);
+    if(el){el.textContent='✅ 名單已修復！本機與雲端現在都是正確的 29 位主治醫師、13 位住院醫師。';el.className='al aok';}
+    renderDash();
+    if(typeof renderRes==='function')renderRes();
+    if(typeof renderAtt==='function')renderAtt();
+  }catch(e){
+    if(el){el.textContent='⚠️ 本機名單已修復，但寫回雲端失敗：'+e.message+'（請稍後點「⬆ 上傳資料」重試）';el.className='al ae';}
+  }
+}
 function saveAdmin(silent=false){const _em=document.getElementById('q-em');const _mm=document.getElementById('q-mm');if(_em&&_em.value!=='')CFG.qEpaM=parseInt(_em.value)||0;if(_mm&&_mm.value!=='')CFG.qMsM=parseInt(_mm.value)||0;save();fsSetDoc('config','cfg',CFG).catch(()=>{});if(!silent){['admin-ok','admin-limit-ok'].forEach(id=>{const el=document.getElementById(id);if(el){el.classList.remove('hidden');setTimeout(()=>el.classList.add('hidden'),2500);}});}}
 
 
