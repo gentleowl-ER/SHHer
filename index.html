@@ -357,6 +357,7 @@ body{font-size:var(--base-font,17px)}
     <div class="ns">工具</div>
     <div class="ni" onclick="nav('graduated',this)"><span class="ic">🎓</span>已畢業學員</div>
     <div class="ni" onclick="nav('export',this)"><span class="ic">⬇️</span>匯出報告</div>
+    <div class="ni" onclick="nav('gstats',this)"><span class="ic">📊</span>看診 / 技術統計</div>
     <div class="ni admin-only hidden" id="ni-remind" onclick="nav('remind',this)">
       <span class="ic">🔔</span>提醒未填答<span class="nb hidden" id="rbadge">0</span>
     </div>
@@ -419,7 +420,11 @@ body{font-size:var(--base-font,17px)}
     <div id="dash-att-list"></div>
   </div>
   <!-- Non-admin: pending dates -->
-  <div id="dash-pending-card" class="card mb4 hidden">
+<div class="card mb4">
+    <div class="ct"><span class="dot" style="background:var(--acc)"></span>最近評核紀錄（最新15筆，最新在上）</div>
+    <div id="dash-recent"><div style="font-size:12px;color:var(--t3)">載入中...</div></div>
+  </div>
+    <div id="dash-pending-card" class="card mb4 hidden">
     <div class="ct"><span class="dot" style="background:var(--danger)"></span>尚未填寫評核的日期</div>
     <div id="dash-pending-list"></div>
   </div>
@@ -727,12 +732,12 @@ body{font-size:var(--base-font,17px)}
       <button class="btn bs bsm" onclick="schedMon(-1)">‹</button>
       <span id="sched-t" style="font-size:13px;font-weight:600;min-width:86px;text-align:center"></span>
       <button class="btn bs bsm" onclick="schedMon(1)">›</button>
-      <button class="btn bs bsm" onclick="clearSchedMonth()">🗑 清除本月班表</button>
-      <button class="btn bsm" style="border:1px solid var(--danger);color:var(--danger)" onclick="clearSchedAll()">🗑 清除全部班表</button>
+      <button class="btn bs bsm admin-only hidden" onclick="clearSchedMonth()">🗑 清除本月班表</button>
+      <button class="btn bsm admin-only hidden" style="border:1px solid var(--danger);color:var(--danger)" onclick="clearSchedAll()">🗑 清除全部班表</button>
     </div>
   </div>
-  <div class="card mb4">
-    <div class="ct"><span class="dot" style="background:var(--purple)"></span>貼上班表</div>
+  <div class="card mb4 admin-only hidden">
+    <div class="ct"><span class="dot" style="background:var(--purple)"></span>貼上班表（管理員）</div>
     <p style="font-size:11px;color:var(--t3);margin-bottom:8px">請將班表資料（Tab分隔格式）貼至下方，格式如：日期欄位在第一欄，住院醫師代號在第一列，數字代表主治醫師編號，- 代表未上班。</p>
     <textarea class="paste-area" id="sched-paste" placeholder="貼上班表資料...&#10;&#9;A&#9;B&#9;C&#9;...&#10;4/1&#9;4&#9;-&#9;-&#9;..."></textarea>
     <div class="ifl mt3" style="flex-wrap:wrap;gap:6px">
@@ -1004,6 +1009,48 @@ body{font-size:var(--base-font,17px)}
 </div>
 
 </div></main>
+
+<div class="page" id="page-gstats">
+  <div class="sh mb4"><div><div class="st">看診 / 技術統計</div><div class="ss2">從 Google Sheets 抓取資料</div></div></div>
+
+  <div class="card mb4" style="border-left:4px solid var(--a2)">
+    <div class="ct"><span class="dot" style="background:var(--a2)"></span>設定 Google Sheet 連結</div>
+    <p style="font-size:13px;color:var(--t2);margin-bottom:10px">
+      將 Google Sheets 設為「<b>知道連結的任何人均可檢視</b>」，再把試算表 ID 填入。<br>
+      格式：第一列為標題，第一欄為住院醫師代號（A/B/C...），第二欄以後為資料。
+    </p>
+    <div class="g2">
+      <div class="fg"><label>看診數 Sheet ID</label>
+        <input type="text" id="gs-visit-id" placeholder="貼上 Google Sheets 網址中的 ID（...spreadsheets/d/【ID】/edit...）">
+        <small style="color:var(--t3);font-size:11px">可選：工作表名稱（空白=第一張表）</small>
+        <input type="text" id="gs-visit-sheet" placeholder="工作表名稱（選填）" style="margin-top:4px">
+      </div>
+      <div class="fg"><label>技術統計 Sheet ID</label>
+        <input type="text" id="gs-proc-id" placeholder="貼上 Google Sheets 網址中的 ID">
+        <small style="color:var(--t3);font-size:11px">可選：工作表名稱（空白=第一張表）</small>
+        <input type="text" id="gs-proc-sheet" placeholder="工作表名稱（選填）" style="margin-top:4px">
+      </div>
+    </div>
+    <div class="ifl mt3" style="gap:8px">
+      <button class="btn bp bsm" onclick="fetchGStats()">📥 抓取並顯示統計</button>
+      <button class="btn bs bsm" onclick="saveGSConfig()">💾 儲存設定</button>
+    </div>
+    <div id="gs-status" class="hidden mt3"></div>
+  </div>
+
+  <div class="g2">
+    <div class="card">
+      <div class="ct"><span class="dot"></span>看診數統計</div>
+      <div style="height:280px"><canvas id="ch-visits"></canvas></div>
+      <div id="visits-detail" class="mt3"></div>
+    </div>
+    <div class="card">
+      <div class="ct"><span class="dot" style="background:var(--a2)"></span>技術執行統計</div>
+      <div style="height:280px"><canvas id="ch-procs"></canvas></div>
+      <div id="procs-detail" class="mt3"></div>
+    </div>
+  </div>
+</div>
 
 <!-- MODALS -->
 <div class="ov" id="m-detail"><div class="modal" style="max-width:800px"><div class="mh"><div class="mt2" id="m-det-t"></div><button class="mc" onclick="closeM('m-detail')">✕</button></div><div id="m-det-b" style="overflow-x:auto"></div></div></div>
@@ -1609,7 +1656,7 @@ function getAttByNo(no){return ATT.find(a=>String(a.no)===String(no));}
 function getResByNo(no){return RES.find(r=>r.no===no);}
 
 // NAV
-const PT={dashboard:'儀表板',assess:'新增評核',thankyou:'謝謝填寫',history:'評核紀錄',analytics:'統計分析',shher:'SHHER 執業矩陣',residents:'住院醫師管理',attendings:'主治醫師管理',schedule:'班表管理',graduated:'已畢業學員',export:'匯出 / 匯入資料',remind:'提醒未填答',admin:'系統管理員',firebase:'雲端設定'};
+const PT={dashboard:'儀表板',assess:'新增評核',thankyou:'謝謝填寫',history:'評核紀錄',analytics:'統計分析',shher:'SHHER 執業矩陣',residents:'住院醫師管理',attendings:'主治醫師管理',schedule:'班表管理',graduated:'已畢業學員',export:'匯出 / 匯入資料',gstats:'看診 / 技術統計',remind:'提醒未填答',admin:'系統管理員',firebase:'雲端設定'};
 function nav(page,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
@@ -1628,6 +1675,7 @@ function nav(page,el){
   if(page==='schedule')renderSched();
   if(page==='graduated')renderGrad();
   if(page==='export'){populateSel('exp-r');populateSel('prt-r');}
+  if(page==='gstats')initGStats();
   if(page==='remind'){document.getElementById('rmd-date').value=tod();renderRemind();}
   if(page==='admin')initAdmin();
   if(page==='firebase'){loadFBCfg();
@@ -1643,6 +1691,7 @@ function closeSB(){document.getElementById('sb').classList.remove('open');docume
 
 // ══════════════ SCHEDULE PASTE PARSER ══════════════
 function parsePaste(){
+  if(!isAdmin){alert('班表修改僅限系統管理員');return;}
   const txt=document.getElementById('sched-paste').value.trim();
   if(!txt){alert('請貼上班表資料');return;}
 
@@ -1794,6 +1843,8 @@ function renderDash(){
     <td>${a.type==='imaging'?'🩻':'—'}</td>
     <td class="ifl" style="gap:4px"><button class="btn bs bxs" onclick="viewDet(${a.id})">詳情</button><button class="btn bxs bd" onclick="delA(${a.id})">✕</button></td>
   </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--t3);padding:16px">尚無紀錄</td></tr>';
+
+  renderRecentAssess(15);
 }
 function getTodayDocs(ds){return SCHED[ds]||[];}
 function getPendingDates(attId){
@@ -1866,14 +1917,16 @@ function renderSelStep(){
   const eg=document.getElementById('epa-grid');eg.innerHTML='';
   EPA.forEach(epa=>{if(!CFG.enEpa[epa.id])return;const lkd=isEpaLkd(resId,epa.id),isSel=selEpa.includes(epa.id);let cls='epabtn';if(lkd)cls+=' lkd';else if(isSel)cls+=' sel';eg.innerHTML+=`<button class="${cls}" onclick="togEpa('${epa.id}')" ${lkd?'disabled':''}><div class="ec">${epa.id}</div><div class="en">${epa.n}</div>${lkd?'<div style="font-size:9.5px;color:var(--a3);margin-top:3px">🔒 CCC鎖定</div>':''}</button>`;});
   const pcG=document.getElementById('ms-pc-chips');pcG.innerHTML='';
-  MS.filter(m=>m.cat==='PC'&&CFG.enMs[m.id]).forEach(m=>{const lkd=isMsLkd(resId,m.id),isSel=selPcMs.includes(m.id);let cls='mchip';if(lkd)cls+=' lkd';else if(isSel)cls+=' sel';const cnt_pc=getMsUseCnt(resId,m.id);const monCnt_pc=getMsMonthCnt(resId,m.id);const overLim_pc=isMsOverMonthLimit(resId,m.id);
+  MS.filter(m=>m.cat==='PC'&&CFG.enMs[m.id]).forEach(m=>{const lkd=isMsLkd(resId,m.id),isSel=selPcMs.includes(m.id);if(isMsAllItemsLocked(resId,m.id))return;
+      let cls='mchip';if(lkd)cls+=' lkd';else if(isSel)cls+=' sel';const cnt_pc=getMsUseCnt(resId,m.id);const monCnt_pc=getMsMonthCnt(resId,m.id);const overLim_pc=isMsOverMonthLimit(resId,m.id);
       const pct_pc=getMsPct(resId,m.id);
       const pcCls=overLim_pc?'mchip lkd':(lkd?'mchip lkd':(selPcMs.includes(m.id)?'mchip sel':'mchip'));
       const limVal=getMsLimit(resId,m.id);
       const pcSub=overLim_pc?`<div style="font-size:11px;color:var(--danger);margin-top:2px">🔒已達上限(${monCnt_pc}/${limVal})</div>`:limVal>0?`<div style="font-size:11px;color:var(--t3);margin-top:2px">本月${monCnt_pc}/${limVal}次</div>`:`<div style="font-size:11px;color:var(--t3);margin-top:2px">共${cnt_pc}次</div>`;
       pcG.innerHTML+=`<button class="${pcCls}" onclick="togPc('${m.id}')" ${(lkd||overLim_pc)?'disabled':''}><div style="font-weight:600">${m.id}</div><div style="font-size:11px;opacity:.8">${m.n.length>8?m.n.slice(0,8)+'…':m.n}</div>${pcSub}</button>`;});
   const npcG=document.getElementById('ms-npc-chips');npcG.innerHTML='';
-  MS.filter(m=>m.cat!=='PC'&&CFG.enMs[m.id]).forEach(m=>{const lkd=isMsLkd(resId,m.id),isSel=selNpcMs.includes(m.id);let cls='mchip';if(lkd)cls+=' lkd';else if(isSel)cls+=' sel';const cnt_npc=getMsUseCnt(resId,m.id);const monCnt_npc=getMsMonthCnt(resId,m.id);const overLim_npc=isMsOverMonthLimit(resId,m.id);
+  MS.filter(m=>m.cat!=='PC'&&CFG.enMs[m.id]).forEach(m=>{const lkd=isMsLkd(resId,m.id),isSel=selNpcMs.includes(m.id);let cls='mchip';if(lkd)cls+=' lkd';else if(isSel)cls+=' sel';if(isMsAllItemsLocked(resId,m.id))return; // all sub-items locked → hide entirely
+      const cnt_npc=getMsUseCnt(resId,m.id);const monCnt_npc=getMsMonthCnt(resId,m.id);const overLim_npc=isMsOverMonthLimit(resId,m.id);
       const npcCls=overLim_npc?'mchip lkd':(lkd?'mchip lkd':(selNpcMs.includes(m.id)?'mchip sel':'mchip'));
       const limVal2=getMsLimit(resId,m.id);
       const npcSub=overLim_npc?`<div style="font-size:11px;color:var(--danger);margin-top:2px">🔒已達上限(${monCnt_npc}/${limVal2})</div>`:limVal2>0?`<div style="font-size:11px;color:var(--t3);margin-top:2px">本月${monCnt_npc}/${limVal2}次</div>`:`<div style="font-size:11px;color:var(--t3);margin-top:2px">共${cnt_npc}次</div>`;
@@ -1931,6 +1984,7 @@ function renderMsStep(){
   const form=document.getElementById('ms-form');form.innerHTML='';
   const resId=document.getElementById('f-res').value;const allMs=[...selPcMs,...selNpcMs];
   allMs.forEach(msId=>{const ms=MS.find(m=>m.id===msId);if(!ms)return;
+    if(isMsAllItemsLocked(resId,msId))return; // all sub-items locked → skip
     let tbody='';let lastLv=0;
     ms.items.filter(i=>i.lv<=4).forEach(item=>{
       const selClass=msScores[item.id]?` style="background:rgba(0,201,167,.06)"`:'';
@@ -2038,10 +2092,18 @@ function isEpaLkd(resId,epaId){
   return false; // removed auto-lock at L4
 }
 function isMsLkd(resId,msId){
-  // Only lock if manually set via CCC admin panel
   const r=getRes(resId);if(!r)return false;
   if(r.itemLocks?.[msId]===true)return true;
-  return false; // removed auto-lock at 80% - that was causing confusion
+  return false;
+}
+function isMsAllItemsLocked(resId,msId){
+  // Returns true when ALL lv<=4 sub-items are individually locked
+  // → the whole category should disappear from the assessment form
+  const r=getRes(resId);if(!r)return false;
+  const ms=MS.find(m=>m.id===msId);if(!ms)return false;
+  const items=ms.items.filter(i=>i.lv<=4);
+  if(!items.length)return false;
+  return items.every(item=>r.itemLocks?.[item.id]===true);
 }
 function isItemLkd(resId,itemId){const r=getRes(resId);return r?.itemLocks?.[itemId]===true;}
 
@@ -2160,6 +2222,7 @@ function delAtt(id){if(!confirm('確定刪除？'))return;ATT=ATT.filter(a=>a.id
 
 // ══════════════ SCHEDULE ══════════════
 function clearSchedMonth(){
+  if(!isAdmin){alert('班表修改僅限系統管理員');return;}
   const mon=`${schedY}-${String(schedMo+1).padStart(2,'0')}`;
   const keys=Object.keys(SCHED).filter(d=>d.startsWith(mon));
   if(!keys.length){alert('本月無班表資料');return;}
@@ -2168,12 +2231,14 @@ function clearSchedMonth(){
   save();autoSync();renderSched();updateRmBadge();
 }
 function clearSchedAll(){
+  if(!isAdmin){alert('班表修改僅限系統管理員');return;}
   const total=Object.keys(SCHED).length;
   if(!total){alert('目前無班表資料');return;}
   if(!confirm(`確定清除全部班表資料（共${total}天）？此動作無法復原。`))return;
   SCHED={};save();autoSync();renderSched();updateRmBadge();
 }
 function delSchedDay(dateStr){
+  if(!isAdmin){alert('班表修改僅限系統管理員');return;}
   const entries=SCHED[dateStr]||[];
   if(!entries.length)return;
   if(!confirm(`確定刪除 ${dateStr} 當天的班表（共${entries.length}筆）？`))return;
@@ -2358,247 +2423,185 @@ function restoreDefaultItems(){
 }
 function initAdmin(){const qem=document.getElementById('q-em');const qmm=document.getElementById('q-mm');if(qem)qem.value=CFG.qEpaM||0;if(qmm)qmm.value=CFG.qMsM||0;populateSel('ccc-res',false);populateSel('ward-res',false);renderAdmToggles();renderItemEditor();}
 function renderCCCPanel(){
-  const resId=document.getElementById('ccc-res').value;const panel=document.getElementById('ccc-panel');if(!resId){panel.innerHTML='';return;}
-  const r=getRes(resId);
-  let html=`<div class="g2 mt3">
-    <div><div style="font-size:11px;color:var(--t2);font-weight:600;margin-bottom:6px">EPA 細分等級（CCC決定）</div>
-    ${EPA.map(epa=>{const lv=r?.cccLevels?.[epa.id]||'';return`<div class="tw"><div><div class="tl">${epa.id} ${epa.n}</div><div class="tsb">目前：${lv||'未設定'}</div></div>
-      <select style="width:75px;font-size:11px" onchange="setCCCLv('${resId}','${epa.id}',this.value)"><option value="">—</option>${['1','2a','2b','3a','3b','3c','4','5'].map(v=>`<option ${lv===v?'selected':''}>${v}</option>`).join('')}</select>
-    </div>`;}).join('')}
-    <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
-      <button class="btn bpu bsm" onclick="saveCCCSnapshot('${resId}')">📸 儲存CCC快照</button>
-      <div style="font-size:11px;color:var(--t3);margin-top:5px">歷史快照：${(r?.cccHistory||[]).map((h,i)=>`${i+1}. ${h.date}`).join('　')||'（尚無）'}</div>
-      <div style="font-size:11px;color:var(--t3)">儲存快照後，SHHER矩陣可選擇查看不同次 CCC 的資料。</div>
-    </div>
-    </div>
-    <div><div style="font-size:11px;color:var(--t2);font-weight:600;margin-bottom:6px">Milestone 子項目鎖定</div>
-    ${MS.map(ms=>{
-      let msHtml=`<div style="font-size:10.5px;color:var(--a3);font-weight:600;padding:4px 0">${ms.id} ${ms.n}</div>`;
-      msHtml+=ms.items.filter(i=>i.lv<=4).map(item=>{const lkd=r?.itemLocks?.[item.id]===true;return`<div class="tw"><div><div class="tl" style="font-size:11px"><span class="lvtag lv${item.lv}" style="font-size:8.5px;margin-right:3px">L${item.lv}</span>${item.t.slice(0,30)}…</div></div><label class="tog"><input type="checkbox" ${lkd?'checked':''} onchange="setItemLk('${resId}','${item.id}',this.checked)"><span class="tsl"></span></label></div>`;}).join('');
-      return msHtml;
-    }).join('')}</div>
-  </div>`;
-  panel.innerHTML=html;
-}
-function setCCCLv(resId,id,val){const r=getRes(resId);if(!r)return;if(!r.cccLevels)r.cccLevels={};r.cccLevels[id]=val;save();autoSync();}
-function saveCCCSnapshot(resId){
+  const resId=document.getElementById('ccc-res').value;
+  const panel=document.getElementById('ccc-panel');
+  if(!resId){panel.innerHTML='<div class="al ai">請先選擇住院醫師</div>';return;}
   const r=getRes(resId);if(!r)return;
   if(!r.cccHistory)r.cccHistory=[];
-  const snap={date:new Date().toISOString().split('T')[0],levels:{...r.cccLevels}};
-  r.cccHistory.push(snap);
-  save();
-  alert('CCC 快照已儲存！（共 '+r.cccHistory.length+' 次）\nSHHER 矩陣下拉選單可選擇查看前幾次的 CCC 資料。');
-  renderCCCPanel();
-}
-function setItemLk(resId,id,val){const r=getRes(resId);if(!r)return;if(!r.itemLocks)r.itemLocks={};r.itemLocks[id]=val;save();}
-function renderWardPanel(){
-  const resId=document.getElementById('ward-res').value;const panel=document.getElementById('ward-panel');if(!resId){panel.innerHTML='';return;}
-  const r=getRes(resId);const ward=r?.ward||{ind:'',obs:'',er:''};
-  panel.innerHTML=`<div class="g3 mt3">${[['ind','獨立診'],['obs','留觀'],['er','九診']].map(([k,label])=>`<div class="fg"><label>${label}</label><select onchange="setWard('${resId}','${k}',this.value)"><option value="">—（自動）</option>${['可','特','否'].map(v=>`<option ${ward[k]===v?'selected':''} value="${v}">${v==='可'?'可執行':v==='特'?'特定狀況':'不可執行'}</option>`).join('')}</select></div>`).join('')}</div>`;
-}
-function setWard(resId,key,val){const r=getRes(resId);if(!r)return;if(!r.ward)r.ward={};r.ward[key]=val;save();autoSync();}
-function renderAdmToggles(){document.getElementById('adm-ep').innerHTML=EPA.map(e=>`<div class="tw"><div class="tl">${e.id} ${e.n}</div><label class="tog"><input type="checkbox" ${CFG.enEpa[e.id]?'checked':''} onchange="togEn('epa','${e.id}',this.checked)"><span class="tsl"></span></label></div>`).join('');document.getElementById('adm-ms').innerHTML=MS_CATS.map(cat=>`<div style="margin-bottom:5px"><div style="font-size:9.5px;color:var(--a2);padding:4px 0;font-weight:600">${cat}</div>${MS.filter(m=>m.cat===cat).map(m=>`<div class="tw"><div class="tl" style="font-size:11px">${m.id} ${m.n}</div><label class="tog"><input type="checkbox" ${CFG.enMs[m.id]?'checked':''} onchange="togEn('ms','${m.id}',this.checked)"><span class="tsl"></span></label></div>`).join('')}</div>`).join('');}
-function togEn(t,id,val){if(t==='epa')CFG.enEpa[id]=val;else CFG.enMs[id]=val;saveAdmin(true);}
-async function repairRoster(){
-  if(!confirm('將以系統內建的固定名單（29位主治醫師、13位住院醫師）覆蓋目前本機與雲端的名單資料。\n已設定的已畢業狀態、CCC紀錄等個人資料會盡量保留，但若雲端先前存有錯誤/測試資料，此動作會清除它們。\n\n確定要修復名單嗎？'))return;
-  // Rebuild from defaults, keeping any good mutable data found in current RES/ATT by id
-  RES=mergeRosterWithCloud(DEF_RES,RES,RES_MUTABLE_FIELDS);
-  ATT=mergeRosterWithCloud(DEF_ATT,ATT,ATT_MUTABLE_FIELDS);
-  save();
-  const el=document.getElementById('repair-result');
-  if(el){el.textContent='⏳ 正在將正確名單寫回雲端...';el.className='al ai';el.classList.remove('hidden');}
-  try{
-    await fsWriteMany('residents',RES,r=>r.id);
-    await fsWriteMany('attendings',ATT,a=>a.id);
-    if(el){el.textContent='✅ 名單已修復！本機與雲端現在都是正確的 29 位主治醫師、13 位住院醫師。';el.className='al aok';}
-    renderDash();
-    if(typeof renderRes==='function')renderRes();
-    if(typeof renderAtt==='function')renderAtt();
-  }catch(e){
-    if(el){el.textContent='⚠️ 本機名單已修復，但寫回雲端失敗：'+e.message+'（請稍後點「⬆ 上傳資料」重試）';el.className='al ae';}
+  const sessions=r.cccHistory;
+  
+  panel.innerHTML=`
+  <div class="ifl mb4" style="flex-wrap:wrap;gap:8px">
+    <button class="btn bp bsm" onclick="addCCCSession('${resId}')">＋ 新增CCC評核</button>
+    <span style="font-size:12px;color:var(--t3);align-self:center">共 ${sessions.length} 次CCC紀錄</span>
+  </div>
+  ${sessions.length===0?'<div class="al ai">尚無CCC評核紀錄</div>':sessions.map((s,i)=>renderCCCCard(resId,s,i)).join('')}
+  ${sessions.length>=2?`<div class="card mt4"><div class="ct"><span class="dot"></span>EPA 成長曲線</div><div style="height:220px"><canvas id="ccc-growth-chart"></canvas></div></div>`:''}
+  `;
+  if(sessions.length>=2){
+    setTimeout(()=>{
+      const existing=charts['ccc-growth-chart'];if(existing)existing.destroy();
+      const ctx=document.getElementById('ccc-growth-chart');if(!ctx)return;
+      const numLv=v=>({'1':1,'2a':1.5,'2b':2,'3a':2.5,'3b':3,'3c':3.5,'4':4,'5':5}[v]||0);
+      const datasets=EPA.map((epa,i)=>({
+        label:epa.id,
+        data:sessions.map(s=>numLv(s.epaLevels?.[epa.id]||'')),
+        borderColor:['#00c9a7','#3b82f6','#f59e0b','#ef4444','#a855f7','#ec4899','#06b6d4'][i%7],
+        tension:.3,fill:false,pointRadius:5,
+      }));
+      charts['ccc-growth-chart']=new Chart(ctx,{type:'line',data:{labels:sessions.map(s=>s.date||('第'+(sessions.indexOf(s)+1)+'次')),datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'var(--t2)',font:{size:11}}}},scales:{x:{ticks:{color:'var(--t3)'},grid:{color:'var(--border)'}},y:{min:0,max:5,ticks:{callback:v=>['','L1','L2a/b','L3a-c','L4','L5'][v]||v,color:'var(--t3)'},grid:{color:'var(--border)'}}}}});
+    },100);
   }
 }
-function saveAdmin(silent=false){const _em=document.getElementById('q-em');const _mm=document.getElementById('q-mm');if(_em&&_em.value!=='')CFG.qEpaM=parseInt(_em.value)||0;if(_mm&&_mm.value!=='')CFG.qMsM=parseInt(_mm.value)||0;save();fsSetDoc('config','cfg',CFG).catch(()=>{});if(!silent){['admin-ok','admin-limit-ok'].forEach(id=>{const el=document.getElementById(id);if(el){el.classList.remove('hidden');setTimeout(()=>el.classList.add('hidden'),2500);}});}}
-
-
-// ══════════════ DETAIL ══════════════
-function viewDet(id){
-  const a=ASSESS.find(x=>x.id===id);if(!a)return;
-  document.getElementById('m-det-t').textContent=`${a.resName} — ${a.date} (${a.type==='imaging'?'影像評核':'MS+EPA'})`;
-  let html=`<div style="font-size:11.5px;color:var(--t2);margin-bottom:11px">📋 ${a.caseDesc||'—'}　🩺 ${a.attName||'—'}</div>`;
-  if(a.type==='imaging'){
-    html+=`<div style="font-size:11.5px;color:var(--t2);margin-bottom:10px">影像：${a.imgType}　案例：${a.caseChosen}${a.caseSubChosen?' → '+a.caseSubChosen:''}　病歷：${a.pid||'—'}</div>`;
-    IMG_CR.forEach(c=>{const s=a.stars?.[c]||0;html+=`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px">${c}</span><span style="color:var(--a3)">★ ${s}/5</span></div>`;});
-    if(a.comment)html+=`<div style="margin-top:10px"><div style="font-size:10.5px;color:var(--a2);margin-bottom:4px">📝 評核意見</div><div style="font-size:12px;color:var(--t2)">${a.comment}</div></div>`;
-  }else{
-    if(a.selEpa?.length){html+=`<div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:7px">EPA（均分 ${a.epaAvg}）</div>`;a.selEpa.forEach(id=>{const epa=EPA.find(e=>e.id===id);const s=a.epaScores?.[id];if(!epa||!s)return;html+=`<div style="padding:5px 0;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between"><span style="font-size:12px"><span style="color:var(--a2);font-size:9.5px">${epa.id}</span> ${epa.n}</span><span class="pill p${s}">Level ${s}</span></div>${a.epaFb?.[id]?`<div style="font-size:10.5px;color:var(--t2);margin-top:2px">💬 ${a.epaFb[id]}</div>`:''}</div>`;});}
-    if(a.selMs?.length&&a.msItems){html+=`<div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;margin:11px 0 7px">MILESTONE（可呈現率 ${a.msPresRate??'—'}%）</div>`;a.selMs.forEach(msId=>{const ms=MS.find(m=>m.id===msId);if(!ms)return;html+=`<div style="margin-bottom:9px"><div style="font-size:10.5px;color:var(--a3);margin-bottom:4px">${ms.id} ${ms.n}</div>`;ms.items.filter(i=>i.lv<=4).forEach(item=>{const v=a.msItems[item.id];if(!v)return;const col=v==='stable'?'var(--acc)':v==='unstable'?'var(--danger)':'var(--t3)';html+=`<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(30,45,69,.4);font-size:11.5px"><span style="color:var(--t2)">${item.t}</span><span style="color:${col};font-size:10.5px;white-space:nowrap;margin-left:8px">${v==='stable'?'✅ 可穩定':v==='unstable'?'❌ 未穩定':'⬜ 未觀察'}</span></div>`;});html+=`</div>`;});}
-  }
-  document.getElementById('m-det-b').innerHTML=html;openM('m-detail');
+function renderCCCCard(resId,s,idx){
+  const epaRows=EPA.map(epa=>{
+    const lv=s.epaLevels?.[epa.id]||'';
+    return`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:11px;font-family:'DM Mono',monospace;color:var(--a2);min-width:45px">${epa.id}</span>
+      <span style="font-size:12px;flex:1">${epa.n}</span>
+      <select onchange="cccSetEpa('${resId}',${idx},'${epa.id}',this.value)" style="width:75px;font-size:12px">
+        <option value="">—</option>${['1','2a','2b','3a','3b','3c','4','5'].map(v=>`<option ${lv===v?'selected':''}>${v}</option>`).join('')}
+      </select>
+    </div>`;
+  }).join('');
+  const msRows=MS.map(ms=>{
+    const pct=s.msPct?.[ms.id]??'';
+    return`<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:11px;font-family:'DM Mono',monospace;color:var(--purple);min-width:45px">${ms.id}</span>
+      <span style="font-size:12px;flex:1">${ms.n}</span>
+      <div style="display:flex;align-items:center;gap:4px">
+        <input type="number" min="0" max="100" value="${pct}" onchange="cccSetMs('${resId}',${idx},'${ms.id}',this.value)" style="width:56px;font-size:12px;text-align:center">
+        <span style="font-size:11px;color:var(--t3)">%</span>
+      </div>
+    </div>`;
+  }).join('');
+  return`<div class="card mb4" style="border-left:4px solid var(--acc)">
+    <div class="ifl" style="justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      <div>
+        <span style="font-size:15px;font-weight:700">第 ${idx+1} 次 CCC</span>
+        <input type="date" value="${s.date||''}" onchange="cccSetDate('${resId}',${idx},this.value)" style="margin-left:10px;font-size:13px;border:1px solid var(--border);border-radius:6px;padding:3px 8px;background:var(--bg3);color:var(--text)">
+      </div>
+      <button class="btn bsm" style="border:1px solid var(--danger);color:var(--danger)" onclick="deleteCCCSession('${resId}',${idx})">🗑 刪除此次CCC</button>
+    </div>
+    <div class="g2">
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:5px">EPA 執業等級</div>
+        ${epaRows}
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:5px">Milestone 可穩定呈現率</div>
+        ${msRows}
+      </div>
+    </div>
+    <div class="ifl fe mt3">
+      <button class="btn bp bsm" onclick="saveCCCSession('${resId}',${idx})">💾 儲存此次CCC</button>
+    </div>
+  </div>`;
 }
-function delA(id){if(!confirm('確定刪除？'))return;ASSESS=ASSESS.filter(a=>a.id!==id);save();autoSync();updateRmBadge();renderDash();if(document.getElementById('page-history').classList.contains('active'))renderHistory();}
+function addCCCSession(resId){
+  const r=getRes(resId);if(!r)return;
+  if(!r.cccHistory)r.cccHistory=[];
+  r.cccHistory.push({date:tod(),epaLevels:{},msPct:{}});
+  save();renderCCCPanel();
+}
+function cccSetDate(resId,idx,val){const r=getRes(resId);if(!r||!r.cccHistory[idx])return;r.cccHistory[idx].date=val;}
+function cccSetEpa(resId,idx,epaId,val){const r=getRes(resId);if(!r||!r.cccHistory[idx])return;if(!r.cccHistory[idx].epaLevels)r.cccHistory[idx].epaLevels={};r.cccHistory[idx].epaLevels[epaId]=val;}
+function cccSetMs(resId,idx,msId,val){const r=getRes(resId);if(!r||!r.cccHistory[idx])return;if(!r.cccHistory[idx].msPct)r.cccHistory[idx].msPct={};r.cccHistory[idx].msPct[msId]=val===''?'':parseFloat(val);}
+function deleteCCCSession(resId,idx){
+  const r=getRes(resId);if(!r)return;
+  if(!confirm(`確定刪除第 ${idx+1} 次CCC評核紀錄？`))return;
+  r.cccHistory.splice(idx,1);
+  save();autoSync();renderCCCPanel();
+}
+function saveCCCSession(resId,idx){
+  const r=getRes(resId);if(!r)return;
+  // Also sync EPA levels to cccLevels (current summary)
+  if(r.cccHistory[idx])r.cccLevels={...r.cccHistory[idx].epaLevels};
+  save();autoSync();
+  alert(`✅ 第 ${idx+1} 次CCC已儲存並同步雲端`);
+}
 
-// EXPORT
-function exportCSV(){
-  let data=[...visA()];
-  const resId=document.getElementById('exp-r').value,s=document.getElementById('exp-s').value,e=document.getElementById('exp-e').value;
-  if(resId)data=data.filter(a=>a.resId===resId);
-  if(s)data=data.filter(a=>a.date>=s);
-  if(e)data=data.filter(a=>a.date<=e);
-  // Headers
-  const hdrs=[
-    '日期','主治','住院醫師','年級','臨床情境',
-    'EPA均分','EPA%（/5）','MS可穩定%',
-    ...EPA.map(x=>x.id+'評分'),
-    ...EPA.map(x=>x.id+'質性回饋'),
-    ...MS.flatMap(m=>m.items.map(i=>i.id)),
-    ...MS.map(m=>m.id+'質性回饋'),
-    '影像種類','影像案例','影像評核意見'
-  ];
-  const rows=data.map(a=>{
-    const epaAvgPct=a.epaAvg?((parseFloat(a.epaAvg)/5)*100).toFixed(1)+'%':'';
-    return [
-      a.date,a.attName||'',a.resName,a.resYear||'',a.caseDesc||'',
-      a.epaAvg||'',epaAvgPct,a.msPresRate!=null?a.msPresRate+'%':'',
-      ...EPA.map(x=>a.epaScores?.[x.id]||''),
-      ...EPA.map(x=>(a.epaFb?.[x.id]||'').replace(/\n/g,' ')),
-      ...MS.flatMap(m=>m.items.map(i=>{const v=a.msItems?.[i.id]||'';return v==='stable'?'可穩定呈現':v==='unstable'?'未穩定呈現':v==='notobserved'?'未觀察':''})),
-      ...MS.map(m=>(a.msFb?.[m.id]||'').replace(/\n/g,' ')),
-      a.imgData?.imgType||'',a.imgData?.caseChosen||'',(a.imgData?.comment||'').replace(/\n/g,' ')
-    ];
+
+// ══════════════ GOOGLE SHEETS STATS ══════════════
+function saveGSConfig(){
+  CFG.gsVisitId=document.getElementById('gs-visit-id')?.value.trim()||'';
+  CFG.gsVisitSheet=document.getElementById('gs-visit-sheet')?.value.trim()||'';
+  CFG.gsProcId=document.getElementById('gs-proc-id')?.value.trim()||'';
+  CFG.gsProcSheet=document.getElementById('gs-proc-sheet')?.value.trim()||'';
+  save();fsSetDoc('config','cfg',CFG).catch(()=>{});
+  alert('✅ Google Sheets 設定已儲存');
+}
+function initGStats(){
+  const gs=[['gs-visit-id','gsVisitId'],['gs-visit-sheet','gsVisitSheet'],['gs-proc-id','gsProcId'],['gs-proc-sheet','gsProcSheet']];
+  gs.forEach(([elId,cfgKey])=>{const e=document.getElementById(elId);if(e&&CFG[cfgKey])e.value=CFG[cfgKey];});
+}
+async function fetchSheetCSV(sheetId,sheetName){
+  let url=`https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+  if(sheetName&&!isNaN(sheetName))url+=`&gid=${sheetName}`;
+  else if(sheetName)url+=`&range=${encodeURIComponent(sheetName)}`;
+  const res=await fsFetch(url,{},12000);
+  if(!res.ok)throw new Error(`無法讀取 Sheet（${res.status}）— 請確認試算表已設為「知道連結者可檢視」且 Sheet ID 正確`);
+  return res.text();
+}
+function parseSheetCSV(csvText){
+  const lines=csvText.trim().split('\n').map(l=>{
+    const result=[];let inQ=false;let cur='';
+    for(const ch of l){if(ch==='"')inQ=!inQ;else if(ch===','&&!inQ){result.push(cur.trim());cur='';}else cur+=ch;}
+    result.push(cur.trim());return result;
   });
-  const csv=[hdrs,...rows].map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
-  const u=URL.createObjectURL(blob);const a2=document.createElement('a');a2.href=u;a2.download=`急診評核_${tod()}.csv`;a2.click();
+  if(lines.length<2)return{headers:[],rows:[]};
+  const headers=lines[0].slice(1).filter(h=>h);
+  const rows=lines.slice(1).filter(l=>l.length>1&&l[0]).map(l=>({
+    who:l[0],values:l.slice(1,1+headers.length).map(v=>parseFloat(v.replace(/[^0-9.-]/g,''))||0)
+  }));
+  return{headers,rows};
 }
-function exportJSON(){
-  const backup={version:'5.4',date:tod(),assessments:ASSESS,residents:RES,attendings:ATT,schedule:SCHED,config:CFG};
-  const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json;charset=utf-8'});
-  const u=URL.createObjectURL(blob);const a2=document.createElement('a');a2.href=u;a2.download=`急診評核備份_${tod()}.json`;a2.click();
+function renderStatsChart(canvasId,detailId,data,label){
+  dC(canvasId);
+  const canvas=document.getElementById(canvasId);
+  const detail=document.getElementById(detailId);
+  if(!canvas||!data.rows.length){if(detail)detail.innerHTML='<div class="al ai">無資料</div>';return;}
+  const totalByRes=[...data.rows].sort((a,b)=>b.values.reduce((x,y)=>x+y,0)-a.values.reduce((x,y)=>x+y,0));
+  const C=['#00c9a7','#3b82f6','#f59e0b','#ef4444','#a855f7','#ec4899','#06b6d4','#84cc16','#f97316','#8b5cf6','#14b8a6','#6366f1','#f43f5e'];
+  const datasets=data.headers.length<=1?
+    [{label,data:totalByRes.map(r=>r.values[0]||0),backgroundColor:totalByRes.map((_,i)=>C[i%C.length]),borderRadius:5,borderWidth:0}]:
+    data.headers.map((h,i)=>({label:h,data:totalByRes.map(r=>r.values[i]||0),backgroundColor:C[i%C.length],borderRadius:3,stack:'s',borderWidth:0}));
+  charts[canvasId]=new Chart(canvas,{type:'bar',data:{labels:totalByRes.map(r=>r.who),datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:data.headers.length>1,labels:{color:'var(--t2)',font:{size:10}}}},scales:{x:{ticks:{color:'var(--t3)',font:{size:11}},grid:{color:'var(--border)'}},y:{ticks:{color:'var(--t3)'},grid:{color:'var(--border)'},beginAtZero:true}}}});
+  if(detail)detail.innerHTML='<div style="font-size:12px;color:var(--t3);margin-top:6px">'+totalByRes.map(r=>`<b>${r.who}</b>: ${r.values.reduce((a,b)=>a+b,0)}`).join('　')+'</div>';
 }
-function importJSON(){
-  const raw=document.getElementById('import-json').value.trim();
-  const el=document.getElementById('import-result');
-  if(!raw){el.textContent='請先貼上 JSON 資料';el.className='al ae';el.classList.remove('hidden');return;}
-  try{
-    const data=JSON.parse(raw);
-    let addedA=0,addedR=0,addedAt=0;
-    // Merge assessments
-    if(Array.isArray(data.assessments)){
-      data.assessments.forEach(a=>{if(!ASSESS.find(x=>x.id===a.id)){ASSESS.push(a);addedA++;}});
-    }
-    // Merge residents
-    if(Array.isArray(data.residents)){
-      data.residents.forEach(r=>{if(!RES.find(x=>x.id===r.id)){RES.push(r);addedR++;}});
-    }
-    // Merge attendings
-    if(Array.isArray(data.attendings)){
-      data.attendings.forEach(a=>{if(!ATT.find(x=>x.id===a.id)){ATT.push(a);addedAt++;}});
-    }
-    // Merge schedule
-    if(data.schedule&&typeof data.schedule==='object'){
-      Object.entries(data.schedule).forEach(([date,entries])=>{
-        if(!SCHED[date])SCHED[date]=[];
-        entries.forEach(e=>{if(!SCHED[date].find(x=>x.attId===e.attId&&x.resId===e.resId))SCHED[date].push(e);});
-      });
-    }
-    save();autoSync();
-    el.textContent='✅ 匯入成功！新增評核 '+addedA+' 筆、住院醫師 '+addedR+' 位、主治醫師 '+addedAt+' 位。';
-    el.className='al aok';el.classList.remove('hidden');
-    renderDash();
-  }catch(err){
-    el.textContent='❌ JSON 格式錯誤：'+err.message;el.className='al ae';el.classList.remove('hidden');
-  }
+async function fetchGStats(){
+  const visitId=document.getElementById('gs-visit-id')?.value.trim();
+  const visitSheet=document.getElementById('gs-visit-sheet')?.value.trim()||'';
+  const procId=document.getElementById('gs-proc-id')?.value.trim();
+  const procSheet=document.getElementById('gs-proc-sheet')?.value.trim()||'';
+  const st=document.getElementById('gs-status');
+  if(st){st.textContent='📥 抓取中...';st.className='al ai';st.classList.remove('hidden');}
+  const msgs=[];
+  if(visitId){try{const csv=await fetchSheetCSV(visitId,visitSheet);const d=parseSheetCSV(csv);renderStatsChart('ch-visits','visits-detail',d,'看診數');msgs.push(`✅ 看診數 ${d.rows.length}位 ${d.headers.length}欄`);}catch(e){msgs.push('❌ 看診數: '+e.message);}}else msgs.push('ℹ️ 看診數 ID 未填');
+  if(procId){try{const csv=await fetchSheetCSV(procId,procSheet);const d=parseSheetCSV(csv);renderStatsChart('ch-procs','procs-detail',d,'技術執行數');msgs.push(`✅ 技術 ${d.rows.length}位 ${d.headers.length}欄`);}catch(e){msgs.push('❌ 技術: '+e.message);}}else msgs.push('ℹ️ 技術 ID 未填');
+  if(st){st.innerHTML=msgs.join('<br>');st.className='al ai';}
 }
-function printReport(){const resId=document.getElementById('prt-r').value;const data=resId?ASSESS.filter(a=>a.resId===resId):visA();const nm=resId?getRes(resId)?.n:'所有住院醫師';const win=window.open('','_blank');win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>急診評核報告</title><style>body{font-family:sans-serif;padding:28px;color:#222}h1{border-bottom:2px solid #00c9a7;padding-bottom:6px;font-size:18px}table{width:100%;border-collapse:collapse;font-size:11px;margin:12px 0}th{background:#f0f4f8;padding:6px;border:1px solid #ddd}td{padding:5px 6px;border:1px solid #ddd}@media print{button{display:none}}</style></head><body><h1>急診醫學科住院醫師評核報告（TSEM 2025 v3）</h1><p style="color:#666;margin:10px 0 16px">住院醫師：<b>${nm}</b>　評核次數：${data.length}　日期：${new Date().toLocaleDateString('zh-TW')}</p><table><thead><tr><th>日期</th><th>主治</th><th>EPA均</th><th>MS%</th></tr></thead><tbody>${data.map(a=>`<tr><td>${a.date}</td><td>${a.attName||''}</td><td>${a.epaAvg||'—'}</td><td>${a.msPresRate!=null?a.msPresRate+'%':'—'}</td></tr>`).join('')}</tbody></table><button onclick="window.print()">🖨 列印</button></body></html>`);win.document.close();}
-
-// HELPERS
-function populateSel(id,isAtt=false){
-  const sel=document.getElementById(id);if(!sel)return;
-  const cur=sel.value;
-  sel.querySelectorAll('option:not(:first-child)').forEach(o=>o.remove());
-  // Belt-and-suspenders: fall back to built-in defaults if live data is empty/corrupted
-  const attSrc=(Array.isArray(ATT)&&ATT.length)?ATT:DEF_ATT;
-  const resSrc=(Array.isArray(RES)&&RES.length)?RES:DEF_RES;
-  (isAtt?[...attSrc].sort((a,b)=>(parseInt(a.no)||999)-(parseInt(b.no)||999)):resSrc.filter(r=>!r.grad)).forEach(r=>{
-    const o=document.createElement('option');o.value=r.id;o.textContent=isAtt?`${r.no?r.no+' ':''}${r.n}`:`${r.n} (${r.y})`;sel.appendChild(o);
-  });
-  sel.value=cur;
+// ══════════════ RECENT ASSESSMENTS ══════════════
+function renderRecentAssess(limit=15){
+  const el=document.getElementById('dash-recent');if(!el)return;
+  const recent=[...ASSESS].filter(a=>!currentAttId||a.attId===currentAttId).sort((a,b)=>b.date.localeCompare(a.date)||(b.id>a.id?1:-1)).slice(0,limit);
+  if(!recent.length){el.innerHTML='<div style="font-size:12px;color:var(--t3)">尚無評核紀錄</div>';return;}
+  el.innerHTML=recent.map(a=>{
+    const res=getRes(a.resId),att=getAtt(a.attId);
+    return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);flex-wrap:wrap"><span style="font-size:12px;font-family:'DM Mono',monospace;color:var(--a3);min-width:82px">${a.date}</span><span style="font-size:13px;font-weight:600;min-width:52px">${res?.n||'?'}</span><span style="font-size:12px;color:var(--t3)">${att?.n||''}</span><span style="font-size:11px;color:var(--acc);flex:1">${(a.selEpa||[]).join(' ')} ${(a.selMs||[]).join(' ')}</span><button class="btn bs bxs" onclick="viewDet('${a.id}')">查看</button></div>`;
+  }).join('');
 }
-function dC(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
-function cOpt(type,max){const base={responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#94a3b8',font:{size:10}}}}};if(type==='bar'||type==='line')base.scales={x:{ticks:{color:'#94a3b8'},grid:{color:'#1e2d45'}},y:{min:0,max,ticks:{color:'#94a3b8'},grid:{color:'#1e2d45'}}};return base;}
-function openM(id){document.getElementById(id).classList.add('open');}
-function closeM(id){document.getElementById(id).classList.remove('open');}
-function copyEl(id){navigator.clipboard.writeText(document.getElementById(id).textContent).then(()=>alert('已複製！'));}
-document.querySelectorAll('.ov').forEach(ov=>ov.addEventListener('click',e=>{if(e.target===ov)ov.classList.remove('open');}));
-
-// INIT
-// ─── EMBEDDED IMAGING STATE ───
-let embedImgType='',embedImgTab='req',embedImgStars={},embedImgSubCase='';
-function toggleEmbedImg(){
-  const show=document.getElementById('embed-img-enabled').checked;
-  document.getElementById('embed-img-inner').style.display=show?'block':'none';
-  if(show){renderEmbedImgList();renderEmbedImgStars();renderEmbedPresets();}
-}
-function selEmbedIT(t,btn){embedImgType=t;btn.closest('div').querySelectorAll('.itbtn').forEach(b=>b.classList.remove('sel'));btn.classList.add('sel');}
-function swEmbedImgTab(tab,el){embedImgTab=tab;document.querySelectorAll('#embed-img-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');embedImgSubCase='';document.getElementById('embed-img-sub-wrap').classList.add('hidden');renderEmbedImgList();}
-function renderEmbedImgList(){const cases=embedImgTab==='req'?IMG_REQ:IMG_SEL;const el=document.getElementById('embed-img-case-list');if(!el)return;el.innerHTML=cases.map((c,i)=>`<div class="img-item"><input type="radio" name="embedimgcase" id="eic-${i}" value="${c}" onchange="onEmbedImgCase('${c.replace(/'/g,"\\'")}')"><label for="eic-${i}">${c}</label></div>`).join('');}
-function onEmbedImgCase(v){embedImgSubCase='';const sub=document.getElementById('embed-img-sub-wrap');if(v==='其他'&&embedImgTab==='req'){sub.classList.remove('hidden');document.getElementById('embed-img-sub-list').innerHTML=IMG_SEL.map((c,i)=>`<div class="img-item"><input type="radio" name="embedimgsub" id="eics-${i}" value="${c}" onchange="embedImgSubCase='${c.replace(/'/g,"\\'")}';"><label for="eics-${i}">${c}</label></div>`).join('');}else sub.classList.add('hidden');}
-function renderEmbedImgStars(){const el=document.getElementById('embed-img-stars');if(!el)return;el.innerHTML=IMG_CR.map(c=>`<div class="star-row"><div style="font-size:13px">${c}</div><div style="display:flex;gap:4px">${[1,2,3,4,5].map(n=>`<button class="starbtn ${(embedImgStars[c]||0)>=n?'on':''}" onclick="setEmbedStar('${c}',${n},this.parentElement)">★</button>`).join('')}</div></div>`).join('');}
-function setEmbedStar(c,n,grp){embedImgStars[c]=n;grp.querySelectorAll('.starbtn').forEach((b,i)=>b.classList.toggle('on',i<n));}
-function renderEmbedPresets(){const att=getAtt(document.getElementById('f-att')?.value);const el=document.getElementById('eimg-pre-tools');if(el)el.innerHTML=(att?.presets||[]).map(p=>`<button class="pre-btn" onclick="insertFb('eimg-comment','${p.c.replace(/'/g,"\\'")}')">＋${p.n}</button>`).join('');}
-function getEmbedImgData(){
-  if(!document.getElementById('embed-img-enabled')?.checked)return null;
-  const r=document.querySelector('input[name="embedimgcase"]:checked');if(!r)return null;
-  const comment=(document.getElementById('eimg-comment')?.value||'').trim();
-  if(!comment){alert('已啟用影像評核，請填寫評核意見');return false;}
-  if(!embedImgType){alert('請選擇影像種類');return false;}
-  return{imgType:embedImgType,caseTab:embedImgTab,caseChosen:r.value,caseSubChosen:embedImgSubCase,pid:(document.getElementById('eipid')?.value||''),stars:{...embedImgStars},comment};
-}
-function applyFontSize(px){
-  // Inject/update a dynamic style tag - this overrides ALL other CSS
-  let st=document.getElementById('font-override-style');
-  if(!st){st=document.createElement('style');st.id='font-override-style';document.head.appendChild(st);}
-  st.textContent=`*{font-size:${px}px !important}
-    .lvtag,.nb,.sb-tag,.cst,.mdb,.theme-btn,.ns,.badge{font-size:${Math.max(10,px-5)}px !important}
-    .sv{font-size:${px+8}px !important}
-    .st{font-size:${px+2}px !important}
-    h1{font-size:${px-2}px !important}`;
-  document.documentElement.style.setProperty('--base-font',px+'px');
-}
-function adjFont(delta){
-  const cur=parseInt(localStorage.getItem('em_fontsize'))||17;
-  const next=delta===0?17:Math.min(26,Math.max(13,cur+delta));
-  localStorage.setItem('em_fontsize',next);
-  applyFontSize(next);
-  const lbl=document.getElementById('font-size-label');
-  if(lbl)lbl.textContent=next+'px';
-}
-function loadFontSize(){
-  const saved=parseInt(localStorage.getItem('em_fontsize'))||17;
-  applyFontSize(saved);
-  setTimeout(()=>{const l=document.getElementById('font-size-label');if(l)l.textContent=saved+'px';},100);
-}
-function toggleTheme(){const h=document.documentElement;const cur=h.getAttribute('data-theme')||'dark';const next=cur==='dark'?'light':'dark';h.setAttribute('data-theme',next);localStorage.setItem('em53_theme',next);}
-function loadTheme(){const t=localStorage.getItem('em53_theme')||'light';document.documentElement.setAttribute('data-theme',t);}
+// ══════════════ INIT ══════════════
 function init(){
-  // Each step wrapped individually: if one fails, the rest (including the
-  // critical attending-selector screen) still runs instead of the whole
-  // page silently breaking.
-  try{loadTheme();}catch(e){showJsError('loadTheme失敗: '+e.message);}
-  try{loadFontSize();}catch(e){showJsError('loadFontSize失敗: '+e.message);}
-  try{loadCustomItems();}catch(e){showJsError('loadCustomItems失敗: '+e.message);}
-  try{save();}catch(e){showJsError('save失敗: '+e.message);}
-  try{
-    if(location.protocol==='file:'||location.protocol==='about:'){
-      const b=document.getElementById('origin-warn-banner');
-      if(b){b.classList.remove('hidden');document.body.style.paddingTop='42px';}
-    }
-  }catch(e){}
-  try{loadFBCfg();}catch(e){showJsError('loadFBCfg失敗: '+e.message);}
-  try{if(!isAdmin)showAttSel();}catch(e){showJsError('showAttSel失敗: '+e.message);}
-  try{renderDash();}catch(e){showJsError('renderDash失敗: '+e.message);}
-  try{updateRmBadge();}catch(e){showJsError('updateRmBadge失敗: '+e.message);}
+  try{loadTheme();}catch(e){showJsError('loadTheme: '+e.message);}
+  try{loadFontSize();}catch(e){showJsError('loadFontSize: '+e.message);}
+  try{loadCustomItems();}catch(e){showJsError('loadCustomItems: '+e.message);}
+  try{save();}catch(e){showJsError('save: '+e.message);}
+  try{if(location.protocol==='file:'||location.protocol==='about:'){const b=document.getElementById('origin-warn-banner');if(b){b.classList.remove('hidden');document.body.style.paddingTop='42px';}}}catch(e){}
+  try{loadFBCfg();}catch(e){showJsError('loadFBCfg: '+e.message);}
+  try{if(!isAdmin)showAttSel();}catch(e){showJsError('showAttSel: '+e.message);}
+  try{renderDash();}catch(e){showJsError('renderDash: '+e.message);}
+  try{updateRmBadge();}catch(e){showJsError('updateRmBadge: '+e.message);}
 }
 init();
 </script>
