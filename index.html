@@ -357,6 +357,7 @@ body{font-size:var(--base-font,17px)}
     <div class="ns">工具</div>
     <div class="ni" onclick="nav('graduated',this)"><span class="ic">🎓</span>已畢業學員</div>
     <div class="ni" onclick="nav('export',this)"><span class="ic">⬇️</span>匯出報告</div>
+    <div class="ni" onclick="nav('gstats',this)"><span class="ic">📊</span>看診 / 技術統計</div>
     <div class="ni admin-only hidden" id="ni-remind" onclick="nav('remind',this)">
       <span class="ic">🔔</span>提醒未填答<span class="nb hidden" id="rbadge">0</span>
     </div>
@@ -419,6 +420,10 @@ body{font-size:var(--base-font,17px)}
     <div id="dash-att-list"></div>
   </div>
   <!-- Non-admin: pending dates -->
+  <div class="card mb4">
+    <div class="ct"><span class="dot" style="background:var(--acc)"></span>最近評核紀錄（最新15筆）</div>
+    <div id="dash-recent"><div style="font-size:12px;color:var(--t3)">載入中...</div></div>
+  </div>
   <div id="dash-pending-card" class="card mb4 hidden">
     <div class="ct"><span class="dot" style="background:var(--danger)"></span>尚未填寫評核的日期</div>
     <div id="dash-pending-list"></div>
@@ -728,11 +733,11 @@ body{font-size:var(--base-font,17px)}
       <span id="sched-t" style="font-size:13px;font-weight:600;min-width:86px;text-align:center"></span>
       <button class="btn bs bsm" onclick="schedMon(1)">›</button>
       <button class="btn bs bsm" onclick="clearSchedMonth()">🗑 清除本月班表</button>
-      <button class="btn bsm" style="border:1px solid var(--danger);color:var(--danger)" onclick="clearSchedAll()">🗑 清除全部班表</button>
+      <button class="btn bsm admin-only hidden" style="border:1px solid var(--danger);color:var(--danger)" onclick="clearSchedAll()">🗑 清除全部班表</button>
     </div>
   </div>
-  <div class="card mb4">
-    <div class="ct"><span class="dot" style="background:var(--purple)"></span>貼上班表</div>
+  <div class="card mb4 admin-only hidden">
+    <div class="ct"><span class="dot" style="background:var(--purple)"></span>貼上班表（管理員）</div>
     <p style="font-size:11px;color:var(--t3);margin-bottom:8px">請將班表資料（Tab分隔格式）貼至下方，格式如：日期欄位在第一欄，住院醫師代號在第一列，數字代表主治醫師編號，- 代表未上班。</p>
     <textarea class="paste-area" id="sched-paste" placeholder="貼上班表資料...&#10;&#9;A&#9;B&#9;C&#9;...&#10;4/1&#9;4&#9;-&#9;-&#9;..."></textarea>
     <div class="ifl mt3" style="flex-wrap:wrap;gap:6px">
@@ -1004,6 +1009,33 @@ body{font-size:var(--base-font,17px)}
 </div>
 
 </div></main>
+
+<div class="page" id="page-gstats">
+  <div class="sh mb4"><div><div class="st">看診 / 技術統計</div><div class="ss2">從 Google Sheets 抓取資料</div></div></div>
+  <div class="card mb4" style="border-left:4px solid var(--a2)">
+    <div class="ct"><span class="dot" style="background:var(--a2)"></span>設定 Google Sheet</div>
+    <p style="font-size:13px;color:var(--t2);margin-bottom:10px">試算表需先設為「<b>知道連結者可檢視</b>」。格式：第一列標題，第一欄住院醫師代號（A/B/C...），其餘欄為數字。</p>
+    <div class="g2">
+      <div class="fg"><label>看診數 Sheet ID</label>
+        <input type="text" id="gs-visit-id" placeholder="從試算表網址中複製 ID">
+        <input type="text" id="gs-visit-sheet" placeholder="工作表名稱（選填，空白=第一張）" style="margin-top:4px;font-size:13px">
+      </div>
+      <div class="fg"><label>技術統計 Sheet ID</label>
+        <input type="text" id="gs-proc-id" placeholder="從試算表網址中複製 ID">
+        <input type="text" id="gs-proc-sheet" placeholder="工作表名稱（選填）" style="margin-top:4px;font-size:13px">
+      </div>
+    </div>
+    <div class="ifl mt3" style="gap:8px">
+      <button class="btn bp bsm" onclick="fetchGStats()">📥 抓取並顯示統計</button>
+      <button class="btn bs bsm" onclick="saveGSConfig()">💾 儲存設定</button>
+    </div>
+    <div id="gs-status" class="hidden mt3"></div>
+  </div>
+  <div class="g2">
+    <div class="card"><div class="ct"><span class="dot"></span>看診數統計</div><div style="height:280px"><canvas id="ch-visits"></canvas></div><div id="visits-detail" class="mt3"></div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--a2)"></span>技術執行統計</div><div style="height:280px"><canvas id="ch-procs"></canvas></div><div id="procs-detail" class="mt3"></div></div>
+  </div>
+</div>
 
 <!-- MODALS -->
 <div class="ov" id="m-detail"><div class="modal" style="max-width:800px"><div class="mh"><div class="mt2" id="m-det-t"></div><button class="mc" onclick="closeM('m-detail')">✕</button></div><div id="m-det-b" style="overflow-x:auto"></div></div></div>
@@ -1609,7 +1641,7 @@ function getAttByNo(no){return ATT.find(a=>String(a.no)===String(no));}
 function getResByNo(no){return RES.find(r=>r.no===no);}
 
 // NAV
-const PT={dashboard:'儀表板',assess:'新增評核',thankyou:'謝謝填寫',history:'評核紀錄',analytics:'統計分析',shher:'SHHER 執業矩陣',residents:'住院醫師管理',attendings:'主治醫師管理',schedule:'班表管理',graduated:'已畢業學員',export:'匯出 / 匯入資料',remind:'提醒未填答',admin:'系統管理員',firebase:'雲端設定'};
+const PT={dashboard:'儀表板',assess:'新增評核',thankyou:'謝謝填寫',history:'評核紀錄',analytics:'統計分析',shher:'SHHER 執業矩陣',residents:'住院醫師管理',attendings:'主治醫師管理',schedule:'班表管理',graduated:'已畢業學員',export:'匯出 / 匯入資料',gstats:'看診 / 技術統計',remind:'提醒未填答',admin:'系統管理員',firebase:'雲端設定'};
 function nav(page,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
@@ -1643,6 +1675,7 @@ function closeSB(){document.getElementById('sb').classList.remove('open');docume
 
 // ══════════════ SCHEDULE PASTE PARSER ══════════════
 function parsePaste(){
+  if(!isAdmin){alert('班表修改僅限系統管理員');return;}
   const txt=document.getElementById('sched-paste').value.trim();
   if(!txt){alert('請貼上班表資料');return;}
 
@@ -1794,6 +1827,8 @@ function renderDash(){
     <td>${a.type==='imaging'?'🩻':'—'}</td>
     <td class="ifl" style="gap:4px"><button class="btn bs bxs" onclick="viewDet(${a.id})">詳情</button><button class="btn bxs bd" onclick="delA(${a.id})">✕</button></td>
   </tr>`).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--t3);padding:16px">尚無紀錄</td></tr>';
+
+  renderRecentAssess(15);
 }
 function getTodayDocs(ds){return SCHED[ds]||[];}
 function getPendingDates(attId){
@@ -1866,14 +1901,16 @@ function renderSelStep(){
   const eg=document.getElementById('epa-grid');eg.innerHTML='';
   EPA.forEach(epa=>{if(!CFG.enEpa[epa.id])return;const lkd=isEpaLkd(resId,epa.id),isSel=selEpa.includes(epa.id);let cls='epabtn';if(lkd)cls+=' lkd';else if(isSel)cls+=' sel';eg.innerHTML+=`<button class="${cls}" onclick="togEpa('${epa.id}')" ${lkd?'disabled':''}><div class="ec">${epa.id}</div><div class="en">${epa.n}</div>${lkd?'<div style="font-size:9.5px;color:var(--a3);margin-top:3px">🔒 CCC鎖定</div>':''}</button>`;});
   const pcG=document.getElementById('ms-pc-chips');pcG.innerHTML='';
-  MS.filter(m=>m.cat==='PC'&&CFG.enMs[m.id]).forEach(m=>{const lkd=isMsLkd(resId,m.id),isSel=selPcMs.includes(m.id);let cls='mchip';if(lkd)cls+=' lkd';else if(isSel)cls+=' sel';const cnt_pc=getMsUseCnt(resId,m.id);const monCnt_pc=getMsMonthCnt(resId,m.id);const overLim_pc=isMsOverMonthLimit(resId,m.id);
+  MS.filter(m=>m.cat==='PC'&&CFG.enMs[m.id]).forEach(m=>{const lkd=isMsLkd(resId,m.id),isSel=selPcMs.includes(m.id);if(isMsAllItemsLocked(resId,m.id))return;
+      let cls='mchip';if(lkd)cls+=' lkd';else if(isSel)cls+=' sel';const cnt_pc=getMsUseCnt(resId,m.id);const monCnt_pc=getMsMonthCnt(resId,m.id);const overLim_pc=isMsOverMonthLimit(resId,m.id);
       const pct_pc=getMsPct(resId,m.id);
       const pcCls=overLim_pc?'mchip lkd':(lkd?'mchip lkd':(selPcMs.includes(m.id)?'mchip sel':'mchip'));
       const limVal=getMsLimit(resId,m.id);
       const pcSub=overLim_pc?`<div style="font-size:11px;color:var(--danger);margin-top:2px">🔒已達上限(${monCnt_pc}/${limVal})</div>`:limVal>0?`<div style="font-size:11px;color:var(--t3);margin-top:2px">本月${monCnt_pc}/${limVal}次</div>`:`<div style="font-size:11px;color:var(--t3);margin-top:2px">共${cnt_pc}次</div>`;
       pcG.innerHTML+=`<button class="${pcCls}" onclick="togPc('${m.id}')" ${(lkd||overLim_pc)?'disabled':''}><div style="font-weight:600">${m.id}</div><div style="font-size:11px;opacity:.8">${m.n.length>8?m.n.slice(0,8)+'…':m.n}</div>${pcSub}</button>`;});
   const npcG=document.getElementById('ms-npc-chips');npcG.innerHTML='';
-  MS.filter(m=>m.cat!=='PC'&&CFG.enMs[m.id]).forEach(m=>{const lkd=isMsLkd(resId,m.id),isSel=selNpcMs.includes(m.id);let cls='mchip';if(lkd)cls+=' lkd';else if(isSel)cls+=' sel';const cnt_npc=getMsUseCnt(resId,m.id);const monCnt_npc=getMsMonthCnt(resId,m.id);const overLim_npc=isMsOverMonthLimit(resId,m.id);
+  MS.filter(m=>m.cat!=='PC'&&CFG.enMs[m.id]).forEach(m=>{const lkd=isMsLkd(resId,m.id),isSel=selNpcMs.includes(m.id);let cls='mchip';if(lkd)cls+=' lkd';else if(isSel)cls+=' sel';if(isMsAllItemsLocked(resId,m.id))return;
+      const cnt_npc=getMsUseCnt(resId,m.id);const monCnt_npc=getMsMonthCnt(resId,m.id);const overLim_npc=isMsOverMonthLimit(resId,m.id);
       const npcCls=overLim_npc?'mchip lkd':(lkd?'mchip lkd':(selNpcMs.includes(m.id)?'mchip sel':'mchip'));
       const limVal2=getMsLimit(resId,m.id);
       const npcSub=overLim_npc?`<div style="font-size:11px;color:var(--danger);margin-top:2px">🔒已達上限(${monCnt_npc}/${limVal2})</div>`:limVal2>0?`<div style="font-size:11px;color:var(--t3);margin-top:2px">本月${monCnt_npc}/${limVal2}次</div>`:`<div style="font-size:11px;color:var(--t3);margin-top:2px">共${cnt_npc}次</div>`;
@@ -1931,6 +1968,7 @@ function renderMsStep(){
   const form=document.getElementById('ms-form');form.innerHTML='';
   const resId=document.getElementById('f-res').value;const allMs=[...selPcMs,...selNpcMs];
   allMs.forEach(msId=>{const ms=MS.find(m=>m.id===msId);if(!ms)return;
+    if(isMsAllItemsLocked(resId,msId))return;
     let tbody='';let lastLv=0;
     ms.items.filter(i=>i.lv<=4).forEach(item=>{
       const selClass=msScores[item.id]?` style="background:rgba(0,201,167,.06)"`:'';
@@ -2038,10 +2076,16 @@ function isEpaLkd(resId,epaId){
   return false; // removed auto-lock at L4
 }
 function isMsLkd(resId,msId){
-  // Only lock if manually set via CCC admin panel
   const r=getRes(resId);if(!r)return false;
   if(r.itemLocks?.[msId]===true)return true;
-  return false; // removed auto-lock at 80% - that was causing confusion
+  return false;
+}
+function isMsAllItemsLocked(resId,msId){
+  const r=getRes(resId);if(!r)return false;
+  const ms=MS.find(m=>m.id===msId);if(!ms)return false;
+  const items=ms.items.filter(i=>i.lv<=4);
+  if(!items.length)return false;
+  return items.every(item=>r.itemLocks?.[item.id]===true);
 }
 function isItemLkd(resId,itemId){const r=getRes(resId);return r?.itemLocks?.[itemId]===true;}
 
@@ -2160,6 +2204,7 @@ function delAtt(id){if(!confirm('確定刪除？'))return;ATT=ATT.filter(a=>a.id
 
 // ══════════════ SCHEDULE ══════════════
 function clearSchedMonth(){
+  if(!isAdmin){alert('班表修改僅限系統管理員');return;}
   const mon=`${schedY}-${String(schedMo+1).padStart(2,'0')}`;
   const keys=Object.keys(SCHED).filter(d=>d.startsWith(mon));
   if(!keys.length){alert('本月無班表資料');return;}
@@ -2168,12 +2213,14 @@ function clearSchedMonth(){
   save();autoSync();renderSched();updateRmBadge();
 }
 function clearSchedAll(){
+  if(!isAdmin){alert('班表修改僅限系統管理員');return;}
   const total=Object.keys(SCHED).length;
   if(!total){alert('目前無班表資料');return;}
   if(!confirm(`確定清除全部班表資料（共${total}天）？此動作無法復原。`))return;
   SCHED={};save();autoSync();renderSched();updateRmBadge();
 }
 function delSchedDay(dateStr){
+  if(!isAdmin){alert('班表修改僅限系統管理員');return;}
   const entries=SCHED[dateStr]||[];
   if(!entries.length)return;
   if(!confirm(`確定刪除 ${dateStr} 當天的班表（共${entries.length}筆）？`))return;
@@ -2358,28 +2405,50 @@ function restoreDefaultItems(){
 }
 function initAdmin(){const qem=document.getElementById('q-em');const qmm=document.getElementById('q-mm');if(qem)qem.value=CFG.qEpaM||0;if(qmm)qmm.value=CFG.qMsM||0;populateSel('ccc-res',false);populateSel('ward-res',false);renderAdmToggles();renderItemEditor();}
 function renderCCCPanel(){
-  const resId=document.getElementById('ccc-res').value;const panel=document.getElementById('ccc-panel');if(!resId){panel.innerHTML='';return;}
-  const r=getRes(resId);
-  let html=`<div class="g2 mt3">
-    <div><div style="font-size:11px;color:var(--t2);font-weight:600;margin-bottom:6px">EPA 細分等級（CCC決定）</div>
-    ${EPA.map(epa=>{const lv=r?.cccLevels?.[epa.id]||'';return`<div class="tw"><div><div class="tl">${epa.id} ${epa.n}</div><div class="tsb">目前：${lv||'未設定'}</div></div>
-      <select style="width:75px;font-size:11px" onchange="setCCCLv('${resId}','${epa.id}',this.value)"><option value="">—</option>${['1','2a','2b','3a','3b','3c','4','5'].map(v=>`<option ${lv===v?'selected':''}>${v}</option>`).join('')}</select>
-    </div>`;}).join('')}
-    <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
-      <button class="btn bpu bsm" onclick="saveCCCSnapshot('${resId}')">📸 儲存CCC快照</button>
-      <div style="font-size:11px;color:var(--t3);margin-top:5px">歷史快照：${(r?.cccHistory||[]).map((h,i)=>`${i+1}. ${h.date}`).join('　')||'（尚無）'}</div>
-      <div style="font-size:11px;color:var(--t3)">儲存快照後，SHHER矩陣可選擇查看不同次 CCC 的資料。</div>
-    </div>
-    </div>
-    <div><div style="font-size:11px;color:var(--t2);font-weight:600;margin-bottom:6px">Milestone 子項目鎖定</div>
-    ${MS.map(ms=>{
-      let msHtml=`<div style="font-size:10.5px;color:var(--a3);font-weight:600;padding:4px 0">${ms.id} ${ms.n}</div>`;
-      msHtml+=ms.items.filter(i=>i.lv<=4).map(item=>{const lkd=r?.itemLocks?.[item.id]===true;return`<div class="tw"><div><div class="tl" style="font-size:11px"><span class="lvtag lv${item.lv}" style="font-size:8.5px;margin-right:3px">L${item.lv}</span>${item.t.slice(0,30)}…</div></div><label class="tog"><input type="checkbox" ${lkd?'checked':''} onchange="setItemLk('${resId}','${item.id}',this.checked)"><span class="tsl"></span></label></div>`;}).join('');
-      return msHtml;
-    }).join('')}</div>
-  </div>`;
-  panel.innerHTML=html;
+  const resId=document.getElementById('ccc-res').value;
+  const panel=document.getElementById('ccc-panel');
+  if(!resId){panel.innerHTML='<div class="al ai">請先選擇住院醫師</div>';return;}
+  const r=getRes(resId);if(!r)return;
+  if(!r.cccHistory)r.cccHistory=[];
+  const sessions=r.cccHistory;
+  panel.innerHTML=`<div class="ifl mb4" style="flex-wrap:wrap;gap:8px">
+    <button class="btn bp bsm" onclick="addCCCSession('${resId}')">＋ 新增CCC評核</button>
+    <span style="font-size:12px;color:var(--t3);align-self:center">共 ${sessions.length} 次CCC紀錄</span>
+  </div>
+  ${sessions.length===0?'<div class="al ai">尚無CCC評核紀錄</div>':sessions.map((s,i)=>cccCard(resId,s,i)).join('')}
+  ${sessions.length>=2?'<div class="card mt4"><div class="ct"><span class="dot"></span>EPA成長曲線</div><div style="height:210px"><canvas id="ccc-gc"></canvas></div></div>':''}`;
+  if(sessions.length>=2){
+    setTimeout(()=>{
+      if(charts['ccc-gc'])charts['ccc-gc'].destroy();
+      const ctx=document.getElementById('ccc-gc');if(!ctx)return;
+      const nl=v=>({'1':1,'2a':1.5,'2b':2,'3a':2.5,'3b':3,'3c':3.5,'4':4,'5':5}[v]||0);
+      const C=['#00c9a7','#3b82f6','#f59e0b','#ef4444','#a855f7','#ec4899','#06b6d4'];
+      charts['ccc-gc']=new Chart(ctx,{type:'line',data:{labels:sessions.map((s,i)=>s.date||('第'+(i+1)+'次')),datasets:EPA.map((e,i)=>({label:e.id,data:sessions.map(s=>nl(s.epaLevels?.[e.id]||'')),borderColor:C[i%7],tension:.3,fill:false,pointRadius:4}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'var(--t2)',font:{size:10}}}},scales:{x:{ticks:{color:'var(--t3)'},grid:{color:'var(--border)'}},y:{min:0,max:5,ticks:{callback:v=>['','L1','L2a','L3a','L4','L5'][v]||'',color:'var(--t3)'},grid:{color:'var(--border)'}}}}});
+    },100);
+  }
 }
+function cccCard(resId,s,i){
+  const epaHtml=EPA.map(e=>{const lv=s.epaLevels?.[e.id]||'';return`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--border)"><span style="font-size:11px;font-family:'DM Mono',monospace;color:var(--a2);min-width:42px">${e.id}</span><span style="font-size:12px;flex:1">${e.n}</span><select onchange="cccSetEpa('${resId}',${i},'${e.id}',this.value)" style="width:72px;font-size:12px"><option value="">—</option>${['1','2a','2b','3a','3b','3c','4','5'].map(v=>`<option ${lv===v?'selected':''}>${v}</option>`).join('')}</select></div>`;}).join('');
+  const msHtml=MS.map(m=>{const pct=s.msPct?.[m.id]??'';return`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--border)"><span style="font-size:11px;font-family:'DM Mono',monospace;color:var(--purple);min-width:42px">${m.id}</span><span style="font-size:12px;flex:1">${m.n}</span><input type="number" min="0" max="100" value="${pct}" onchange="cccSetMs('${resId}',${i},'${m.id}',this.value)" style="width:54px;font-size:12px;text-align:center"><span style="font-size:11px;color:var(--t3)">%</span></div>`;}).join('');
+  return`<div class="card mb4" style="border-left:4px solid var(--acc)">
+    <div class="ifl" style="justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <div><b style="font-size:14px">第 ${i+1} 次 CCC</b>
+        <input type="date" value="${s.date||''}" onchange="cccSetDate('${resId}',${i},this.value)" style="margin-left:10px;font-size:13px;border:1px solid var(--border);border-radius:6px;padding:3px 8px;background:var(--bg3);color:var(--text)">
+      </div>
+      <button class="btn bsm" style="border:1px solid var(--danger);color:var(--danger)" onclick="deleteCCCSess('${resId}',${i})">🗑 刪除</button>
+    </div>
+    <div class="g2"><div><div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:4px">EPA 執業等級</div>${epaHtml}</div>
+    <div><div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:4px">MS 可穩定率</div>${msHtml}</div></div>
+    <div class="ifl fe mt3"><button class="btn bp bsm" onclick="saveCCCSess('${resId}',${i})">💾 儲存此次CCC</button></div>
+  </div>`;
+}
+function addCCCSession(resId){const r=getRes(resId);if(!r)return;if(!r.cccHistory)r.cccHistory=[];r.cccHistory.push({date:tod(),epaLevels:{},msPct:{}});save();renderCCCPanel();}
+function cccSetDate(resId,i,v){const r=getRes(resId);if(r?.cccHistory?.[i])r.cccHistory[i].date=v;}
+function cccSetEpa(resId,i,epaId,v){const r=getRes(resId);if(r?.cccHistory?.[i]){if(!r.cccHistory[i].epaLevels)r.cccHistory[i].epaLevels={};r.cccHistory[i].epaLevels[epaId]=v;}}
+function cccSetMs(resId,i,msId,v){const r=getRes(resId);if(r?.cccHistory?.[i]){if(!r.cccHistory[i].msPct)r.cccHistory[i].msPct={};r.cccHistory[i].msPct[msId]=v===''?'':parseFloat(v);}}
+function deleteCCCSess(resId,i){const r=getRes(resId);if(!r)return;if(!confirm(`確定刪除第${i+1}次CCC？`))return;r.cccHistory.splice(i,1);save();autoSync();renderCCCPanel();}
+function saveCCCSess(resId,i){const r=getRes(resId);if(!r)return;if(r.cccHistory[i])r.cccLevels={...r.cccHistory[i].epaLevels};save();autoSync();alert(`✅ 第${i+1}次CCC已儲存`);}
+
 function setCCCLv(resId,id,val){const r=getRes(resId);if(!r)return;if(!r.cccLevels)r.cccLevels={};r.cccLevels[id]=val;save();autoSync();}
 function saveCCCSnapshot(resId){
   const r=getRes(resId);if(!r)return;
@@ -2581,6 +2650,52 @@ function loadFontSize(){
 }
 function toggleTheme(){const h=document.documentElement;const cur=h.getAttribute('data-theme')||'dark';const next=cur==='dark'?'light':'dark';h.setAttribute('data-theme',next);localStorage.setItem('em53_theme',next);}
 function loadTheme(){const t=localStorage.getItem('em53_theme')||'light';document.documentElement.setAttribute('data-theme',t);}
+// ══ GSTATS ══
+function saveGSConfig(){CFG.gsVisitId=document.getElementById('gs-visit-id')?.value.trim()||'';CFG.gsVisitSheet=document.getElementById('gs-visit-sheet')?.value.trim()||'';CFG.gsProcId=document.getElementById('gs-proc-id')?.value.trim()||'';CFG.gsProcSheet=document.getElementById('gs-proc-sheet')?.value.trim()||'';save();fsSetDoc('config','cfg',CFG).catch(()=>{});alert('✅ 設定已儲存');}
+function initGStats(){[['gs-visit-id','gsVisitId'],['gs-visit-sheet','gsVisitSheet'],['gs-proc-id','gsProcId'],['gs-proc-sheet','gsProcSheet']].forEach(([el,k])=>{const e=document.getElementById(el);if(e&&CFG[k])e.value=CFG[k];});}
+async function fetchSheetCSV(id,sheet){
+  let url=`https://docs.google.com/spreadsheets/d/${id}/export?format=csv`;
+  if(sheet&&!isNaN(sheet))url+=`&gid=${sheet}`;else if(sheet)url+=`&range=${encodeURIComponent(sheet)}`;
+  const res=await fsFetch(url,{},12000);
+  if(!res.ok)throw new Error(`讀取失敗(${res.status}) — 請確認試算表已設為「知道連結者可檢視」`);
+  return res.text();
+}
+function parseSheetCSV(txt){
+  const lines=txt.trim().split('\n').map(l=>{
+    const r=[];let q=false,c='';
+    for(const ch of l){if(ch==='"')q=!q;else if(ch===','&&!q){r.push(c.trim());c='';}else c+=ch;}
+    r.push(c.trim());return r;
+  });
+  if(lines.length<2)return{headers:[],rows:[]};
+  const headers=lines[0].slice(1).filter(h=>h);
+  const rows=lines.slice(1).filter(l=>l.length>1&&l[0]).map(l=>({who:l[0],vals:l.slice(1,1+headers.length).map(v=>parseFloat(v.replace(/[^0-9.-]/g,''))||0)}));
+  return{headers,rows};
+}
+function renderStatsChart(canvasId,detailId,data,lbl){
+  dC(canvasId);const cv=document.getElementById(canvasId),dt=document.getElementById(detailId);
+  if(!cv||!data.rows.length){if(dt)dt.innerHTML='<div class="al ai">無資料</div>';return;}
+  const sorted=[...data.rows].sort((a,b)=>b.vals.reduce((x,y)=>x+y,0)-a.vals.reduce((x,y)=>x+y,0));
+  const C=['#00c9a7','#3b82f6','#f59e0b','#ef4444','#a855f7','#ec4899','#06b6d4','#84cc16','#f97316','#8b5cf6','#14b8a6','#6366f1','#f43f5e'];
+  const ds=data.headers.length<=1?[{label:lbl,data:sorted.map(r=>r.vals[0]||0),backgroundColor:sorted.map((_,i)=>C[i%C.length]),borderRadius:5,borderWidth:0}]:data.headers.map((h,i)=>({label:h,data:sorted.map(r=>r.vals[i]||0),backgroundColor:C[i%C.length],borderRadius:3,stack:'s',borderWidth:0}));
+  charts[canvasId]=new Chart(cv,{type:'bar',data:{labels:sorted.map(r=>r.who),datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:data.headers.length>1,labels:{color:'var(--t2)',font:{size:10}}}},scales:{x:{ticks:{color:'var(--t3)',font:{size:11}},grid:{color:'var(--border)'}},y:{ticks:{color:'var(--t3)'},grid:{color:'var(--border)'},beginAtZero:true}}}});
+  if(dt)dt.innerHTML='<div style="font-size:12px;color:var(--t3);margin-top:6px">'+sorted.map(r=>`<b>${r.who}</b> ${r.vals.reduce((a,b)=>a+b,0)}`).join('　')+'</div>';
+}
+async function fetchGStats(){
+  const vId=document.getElementById('gs-visit-id')?.value.trim(),vSh=document.getElementById('gs-visit-sheet')?.value.trim()||'';
+  const pId=document.getElementById('gs-proc-id')?.value.trim(),pSh=document.getElementById('gs-proc-sheet')?.value.trim()||'';
+  const st=document.getElementById('gs-status');if(st){st.textContent='📥 抓取中...';st.className='al ai';st.classList.remove('hidden');}
+  const msgs=[];
+  if(vId){try{const d=parseSheetCSV(await fetchSheetCSV(vId,vSh));renderStatsChart('ch-visits','visits-detail',d,'看診數');msgs.push(`✅ 看診數 ${d.rows.length}位`);}catch(e){msgs.push('❌ 看診數: '+e.message);}}else msgs.push('ℹ️ 看診數 ID 未填');
+  if(pId){try{const d=parseSheetCSV(await fetchSheetCSV(pId,pSh));renderStatsChart('ch-procs','procs-detail',d,'技術數');msgs.push(`✅ 技術 ${d.rows.length}位`);}catch(e){msgs.push('❌ 技術: '+e.message);}}else msgs.push('ℹ️ 技術 ID 未填');
+  if(st){st.innerHTML=msgs.join('<br>');st.className='al ai';}
+}
+// ══ RECENT ASSESSMENTS ══
+function renderRecentAssess(limit=15){
+  const el=document.getElementById('dash-recent');if(!el)return;
+  const recent=[...ASSESS].filter(a=>!currentAttId||a.attId===currentAttId).sort((a,b)=>b.date.localeCompare(a.date)||(b.id>a.id?1:-1)).slice(0,limit);
+  if(!recent.length){el.innerHTML='<div style="font-size:12px;color:var(--t3)">尚無評核紀錄</div>';return;}
+  el.innerHTML=recent.map(a=>{const res=getRes(a.resId),att=getAtt(a.attId);return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);flex-wrap:wrap"><span style="font-size:12px;font-family:'DM Mono',monospace;color:var(--a3);min-width:80px">${a.date}</span><span style="font-size:13px;font-weight:600;min-width:52px">${res?.n||'?'}</span><span style="font-size:12px;color:var(--t3);flex:1">${att?.n||''} ${(a.selEpa||[]).join(' ')} ${(a.selMs||[]).join(' ')}</span><button class="btn bs bxs" onclick="viewDet('${a.id}')">查看</button></div>`;}).join('');
+}
 function init(){
   // Each step wrapped individually: if one fails, the rest (including the
   // critical attending-selector screen) still runs instead of the whole
