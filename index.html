@@ -458,6 +458,7 @@ body{font-size:var(--base-font,17px)}
     <div class="ws" id="ws1">2. 選擇項目</div>
     <div class="ws" id="ws2">3. EPA 評分</div>
     <div class="ws" id="ws3">4. Milestone</div>
+    <div class="ws" id="ws4">5. 質性回饋</div>
   </div>
   <div class="wpane active" id="wp0">
     <div class="who-bar">
@@ -547,6 +548,26 @@ body{font-size:var(--base-font,17px)}
     </div>
     <div class="ifl mt4 wiz-nav" style="justify-content:space-between">
       <button class="btn bs bsm" onclick="goStep(2)">← 上一步</button>
+      <button class="btn bp bsm" onclick="goStep(4)">下一步：質性回饋 →</button>
+    </div>
+  </div>
+  <div class="wpane" id="wp4">
+    <div class="card mb4" style="border:1.5px solid var(--acc);background:rgba(0,201,167,.05)">
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <span style="font-size:22px;flex-shrink:0">💚</span>
+        <div style="font-size:13.5px;line-height:1.7;color:var(--t2)">
+          <b style="color:var(--acc)">溫馨提醒：</b>老師們的質性回饋是學生們進步的動力，請老師們盡量幫忙填寫具體建議。
+        </div>
+      </div>
+    </div>
+    <div class="card mb4">
+      <div class="ct"><span class="dot" style="background:var(--acc)"></span>整體質性回饋<span class="req" style="margin-left:4px">*</span></div>
+      <p style="font-size:12px;color:var(--t3);margin-bottom:8px">針對本次評核整體表現的具體觀察與建議，至少 10 字以上。</p>
+      <textarea id="f-overall-fb" class="mf" oninput="checkOverallFb(this)" placeholder="例如：這次處理胸痛病人時病史詢問完整，但鑑別診斷的優先順序可以再加強，建議下次..." style="width:100%;min-height:120px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:10px 12px;font-size:14px;font-family:inherit;outline:none;resize:vertical"></textarea>
+      <div id="f-overall-fb-cnt" style="font-size:11px;color:var(--t3);margin-top:5px;text-align:right">0 字</div>
+    </div>
+    <div class="ifl mt4 wiz-nav" style="justify-content:space-between">
+      <button class="btn bs bsm" onclick="goStep(3)">← 上一步</button>
       <button class="btn bp" onclick="saveAssess()">💾 儲存評核</button>
     </div>
   </div>
@@ -837,6 +858,10 @@ body{font-size:var(--base-font,17px)}
       <div class="ah">🎯 評核上限</div>
       <div class="fg"><label>每月每項 EPA 上限（0=不限）</label><div class="ifl"><input type="number" id="q-em" style="width:60px;text-align:center" min="0" max="50"></div></div>
       <div class="fg"><label>每月每項 MS 上限（0=不限）</label><div class="ifl"><input type="number" id="q-mm" style="width:60px;text-align:center" min="0" max="50"></div></div>
+      <div class="tw" style="margin-top:8px">
+        <div><div class="tl">Milestone 選擇免強制（PC/非PC 各2項）</div><div class="tsb">學員子項目全鎖定時可不選滿，儲存評核時放寬數量限制</div></div>
+        <label class="tog"><input type="checkbox" id="q-ms-relax" onchange="saveAdmin(true)"><span class="tsl"></span></label>
+      </div>
       <button class="btn bpu bsm" onclick="saveAdmin()">💾 儲存上限設定</button>
       <div id="admin-limit-ok" class="al aok hidden mt3" style="font-size:12px">✅ 上限已儲存</div>
       <div class="ah mt4">🛠 名單修復</div>
@@ -875,6 +900,7 @@ body{font-size:var(--base-font,17px)}
   <div class="card">
     <div class="ah">📝 自訂評核項目（EPA / Milestone）</div>
     <p style="font-size:12px;color:var(--t2);margin-bottom:10px">可自由新增、編輯、刪除 EPA 與 Milestone 項目內容，方便其他科別調整為自己的評核架構。修改後請記得「💾 儲存全部變更」並同步雲端。</p>
+    <p id="shiftcard-hint" style="font-size:12px;color:var(--a3);margin-bottom:10px"></p>
     <div class="tabs" id="item-editor-tabs">
       <div class="tab active" onclick="swItemTab('epa',this)">EPA 項目</div>
       <div class="tab" onclick="swItemTab('ms',this)">Milestone 項目</div>
@@ -1260,7 +1286,7 @@ let RES=JSON.parse(localStorage.getItem('em52_res')||'null');
 let ATT=JSON.parse(localStorage.getItem('em52_att')||'null');
 let ASSESS=JSON.parse(localStorage.getItem('em52_assess')||'[]');
 let SCHED=JSON.parse(localStorage.getItem('em52_sched')||'{}'); // {dateStr:[{attId,resId},...]}
-let CFG=JSON.parse(localStorage.getItem('em52_cfg')||'null')||{pw:'admin123',qEpaM:10,qMsM:8,enEpa:Object.fromEntries(EPA.map(e=>[e.id,true])),enMs:Object.fromEntries(MS.map(m=>[m.id,true]))};
+let CFG=JSON.parse(localStorage.getItem('em52_cfg')||'null')||{pw:'admin123',qEpaM:10,qMsM:8,msSelRelax:false,enEpa:Object.fromEntries(EPA.map(e=>[e.id,true])),enMs:Object.fromEntries(MS.map(m=>[m.id,true]))};
 if(!RES)RES=DEF_RES.map(r=>({...r}));
 if(!ATT)ATT=DEF_ATT.map(a=>({...a}));
 // ── Roster protection ──
@@ -1554,6 +1580,27 @@ async function autoSync(){
     if(ind){ind.style.opacity='1';setTimeout(()=>ind.style.opacity='0',1500);}
   }catch(e){setCst('err','⚠️ 同步失敗');console.warn('autoSync error:',e.message);}
 }
+// Debounced version: prevents race conditions when many rapid edits each
+// trigger autoSync (e.g. ticking multiple lock checkboxes quickly). Without
+// this, overlapping in-flight writes of the full RES array can resolve out
+// of order and a stale snapshot can overwrite a newer one in the cloud.
+let _autoSyncTimer=null,_autoSyncPending=false;
+function autoSyncDebounced(delay=900){
+  _autoSyncPending=true;
+  if(_autoSyncTimer)clearTimeout(_autoSyncTimer);
+  _autoSyncTimer=setTimeout(()=>{
+    _autoSyncTimer=null;
+    if(_autoSyncPending){_autoSyncPending=false;autoSync();}
+  },delay);
+}
+// Flush any pending debounced sync immediately if the user navigates away
+// or backgrounds the tab, so a lock toggle made right before closing isn't lost.
+function flushAutoSync(){
+  if(_autoSyncTimer){clearTimeout(_autoSyncTimer);_autoSyncTimer=null;}
+  if(_autoSyncPending){_autoSyncPending=false;autoSync();}
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushAutoSync();});
+window.addEventListener('beforeunload',flushAutoSync);
 
 // AUTH
 function toggleMode(){if(isAdmin){isAdmin=false;applyMode();}else{document.getElementById('pw-in').value='';document.getElementById('pw-err').classList.add('hidden');openM('m-pw');}}
@@ -1823,9 +1870,9 @@ function renderDashCharts(){
 }
 
 // ══════════════ ASSESS ══════════════
-function initAssess(){selEpa=[];selPcMs=[];selNpcMs=[];epaScores={};epaFb={};msScores={};embedImgType='';embedImgTab='req';embedImgStars={};embedImgSubCase='';document.getElementById('f-date').value=tod();document.getElementById('f-case').value='';const eib=document.getElementById('embed-img-enabled');if(eib){eib.checked=false;const inner=document.getElementById('embed-img-inner');if(inner)inner.style.display='none';}['ass-ok','ass-err'].forEach(id=>document.getElementById(id).classList.add('hidden'));populateSel('f-res',false);populateSel('f-att',true);if(currentAttId)document.getElementById('f-att').value=currentAttId;onAttChange();[0,1,2,3].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===0);document.getElementById('ws'+i).className='ws'+(i===0?' active':'');});syncMobBar(0);}
+function initAssess(){selEpa=[];selPcMs=[];selNpcMs=[];epaScores={};epaFb={};msScores={};embedImgType='';embedImgTab='req';embedImgStars={};embedImgSubCase='';document.getElementById('f-date').value=tod();document.getElementById('f-case').value='';const ofb=document.getElementById('f-overall-fb');if(ofb){ofb.value='';ofb.classList.remove('fil');ofb.classList.add('mf');}const ofbCnt=document.getElementById('f-overall-fb-cnt');if(ofbCnt){ofbCnt.textContent='0 字';ofbCnt.style.color='var(--t3)';}const eib=document.getElementById('embed-img-enabled');if(eib){eib.checked=true;const inner=document.getElementById('embed-img-inner');if(inner)inner.style.display='block';renderEmbedImgList();renderEmbedImgStars();renderEmbedPresets();}['ass-ok','ass-err'].forEach(id=>document.getElementById(id).classList.add('hidden'));populateSel('f-res',false);populateSel('f-att',true);if(currentAttId)document.getElementById('f-att').value=currentAttId;onAttChange();[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===0);document.getElementById('ws'+i).className='ws'+(i===0?' active':'');});syncMobBar(0);}
 function onAttChange(){const id=document.getElementById('f-att').value;const entries=(SCHED[tod()]||[]).filter(e=>e.attId===id);const si=document.getElementById('tshift');if(entries.length){const resNames=entries.map(e=>getRes(e.resId)?.n||'').filter(Boolean);si.textContent=resNames.length?`今日需評：${resNames.join('、')}`:'今日值班';}else si.textContent='';}
-function goStep(s){if(s===1&&!v0())return;if(s===2&&!v1())return;if(s===3&&!v2())return;[0,1,2,3].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===s);document.getElementById('ws'+i).className='ws'+(i===s?' active':i<s?' done':'');});window.scrollTo(0,0);if(s===1)renderSelStep();if(s===2)renderEpaStep();if(s===3)renderMsStep();syncMobBar(s);}
+function goStep(s){if(s===1&&!v0())return;if(s===2&&!v1())return;if(s===3&&!v2())return;[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===s);document.getElementById('ws'+i).className='ws'+(i===s?' active':i<s?' done':'');});window.scrollTo(0,0);if(s===1)renderSelStep();if(s===2)renderEpaStep();if(s===3)renderMsStep();syncMobBar(s);}
 function syncMobBar(s){
   const bar=document.getElementById('mob-bar');if(!bar)return;
   const isMobile=window.innerWidth<=768;
@@ -1834,11 +1881,23 @@ function syncMobBar(s){
   const prev=document.getElementById('mob-bar-prev');
   const next=document.getElementById('mob-bar-next');
   if(s===0){prev.style.visibility='hidden';}else{prev.style.visibility='visible';prev.onclick=()=>goStep(s-1);}
-  if(s<3){next.textContent='下一步 →';next.className='btn bp';next.onclick=()=>goStep(s+1);}
+  if(s<4){next.textContent='下一步 →';next.className='btn bp';next.onclick=()=>goStep(s+1);}
   else{next.textContent='💾 儲存評核';next.className='btn bp';next.onclick=()=>saveAssess();}
 }
 function v0(){if(!document.getElementById('f-res').value){alert('請選擇住院醫師');return false;}return true;}
-function v1(){if(selEpa.length!==1){alert(`請選擇 1 項 EPA（目前 ${selEpa.length}）`);return false;}if(selPcMs.length!==2){alert(`PC Milestone 請選擇 2 項（目前 ${selPcMs.length}）`);return false;}if(selNpcMs.length!==2){alert(`非PC Milestone 請選擇 2 項（目前 ${selNpcMs.length}）`);return false;}return true;}
+function v1(){
+  if(selEpa.length!==1){alert(`請選擇 1 項 EPA（目前 ${selEpa.length}）`);return false;}
+  if(CFG.msSelRelax){
+    // Relaxed mode: allow fewer than 2 (e.g. when a resident's sub-items are
+    // all CCC-locked at full mastery, there may be nothing left to pick).
+    if(selPcMs.length>2){alert(`PC Milestone 最多選擇 2 項（目前 ${selPcMs.length}）`);return false;}
+    if(selNpcMs.length>2){alert(`非PC Milestone 最多選擇 2 項（目前 ${selNpcMs.length}）`);return false;}
+    return true;
+  }
+  if(selPcMs.length!==2){alert(`PC Milestone 請選擇 2 項（目前 ${selPcMs.length}）`);return false;}
+  if(selNpcMs.length!==2){alert(`非PC Milestone 請選擇 2 項（目前 ${selNpcMs.length}）`);return false;}
+  return true;
+}
 function v2(){for(const id of selEpa){if(!epaScores[id]){alert(`EPA ${id} 尚未評分`);return false;}if(!epaFb[id]||epaFb[id].trim().length<5){alert(`EPA ${id} 的質性回饋為必填`);return false;}}return true;}
 function getMsUseCnt(resId,msId){if(!resId)return 0;return ASSESS.filter(a=>a.resId===resId&&a.type==='ms'&&a.selMs&&a.selMs.includes(msId)).length;}
 function getMsMonthCnt(resId,msId){
@@ -1913,7 +1972,7 @@ function togNpc(id){
   }
   updSelCnt();renderSelStep();
 }
-function updSelCnt(){document.getElementById('ec').textContent=selEpa.length;document.getElementById('pc-cnt').textContent=selPcMs.length+'/2';document.getElementById('npc-cnt').textContent=selNpcMs.length+'/2';}
+function updSelCnt(){document.getElementById('ec').textContent=selEpa.length;const relaxTag=CFG.msSelRelax?'（可不選）':'';document.getElementById('pc-cnt').textContent=selPcMs.length+'/2'+relaxTag;document.getElementById('npc-cnt').textContent=selNpcMs.length+'/2'+relaxTag;}
 function renderEpaStep(){
   const form=document.getElementById('epa-form');form.innerHTML='';
   const attId=document.getElementById('f-att').value;const att=getAtt(attId);
@@ -1934,18 +1993,24 @@ function renderEpaStep(){
 function setEpaS(id,val,btn){epaScores[id]=val;btn.closest('.rscale').querySelectorAll('.rb').forEach((b,i)=>{b.classList.remove('s');b.className=b.className.replace(/l\d/,'l'+(i+1));if(i+1===val)b.classList.add('s');});}
 function saveEpaFb(id,el){epaFb[id]=el.value;checkFb(el);}
 function checkFb(el){el.classList.toggle('fil',el.value.trim().length>=5);el.classList.toggle('mf',el.value.trim().length<5);}
+function checkOverallFb(el){const len=el.value.trim().length;el.classList.toggle('fil',len>=10);el.classList.toggle('mf',len<10);const cnt=document.getElementById('f-overall-fb-cnt');if(cnt){cnt.textContent=len+' 字'+(len<10?`（尚需 ${10-len} 字）`:'');cnt.style.color=len<10?'var(--danger)':'var(--acc)';}}
 function renderMsStep(){
   const form=document.getElementById('ms-form');form.innerHTML='';
   const resId=document.getElementById('f-res').value;const allMs=[...selPcMs,...selNpcMs];
+  const scActive=msShiftCardActive();
   allMs.forEach(msId=>{const ms=MS.find(m=>m.id===msId);if(!ms)return;
     let tbody='';let lastLv=0;
-    ms.items.filter(i=>i.lv<=4).forEach(item=>{
+    const visibleItems=ms.items.filter(i=>i.lv<=4&&(!scActive||i.shiftCard));
+    visibleItems.forEach(item=>{
       const selClass=msScores[item.id]?` style="background:rgba(0,201,167,.06)"`:'';
 
       if(item.lv!==lastLv){tbody+=`<tr class="lvsep"><td colspan="4"><span class="lvtag lv${item.lv}">Level ${item.lv}</span></td></tr>`;lastLv=item.lv;}
       const cur=msScores[item.id]||'';const lkd=isItemLkd(resId,item.id);
-      tbody+=`<tr${lkd?' class="lkd-row"':selClass}>
-        <td style="font-size:14px;line-height:1.6">${item.t}${lkd?' <span style="font-size:10px;color:var(--a3)">🔒</span>':''}</td>
+      // Color-code shiftcard items differently so they're visually distinct
+      // from regular items when the admin has any shiftcard items flagged.
+      const scStyle=scActive&&item.shiftCard?' style="background:rgba(245,158,11,.08);border-left:3px solid var(--a3)"':'';
+      tbody+=`<tr${lkd?' class="lkd-row"':(scStyle||selClass)}>
+        <td style="font-size:14px;line-height:1.6">${scActive&&item.shiftCard?'<span style="font-size:9.5px;color:var(--a3);font-weight:700;margin-right:5px">⚡SC</span>':''}${item.t}${lkd?' <span style="font-size:10px;color:var(--a3)">🔒</span>':''}</td>
         <td style="padding:8px 4px"><label class="ropt" style="cursor:pointer"><input type="radio" name="ms-${item.id}" value="unstable" ${cur==='unstable'?'checked':''} onchange="setMsItem('${item.id}','unstable')" ${lkd?'disabled':''}></label></td>
         <td style="padding:8px 4px"><label class="ropt" style="cursor:pointer"><input type="radio" name="ms-${item.id}" value="notobserved" ${cur==='notobserved'?'checked':''} onchange="setMsItem('${item.id}','notobserved')" ${lkd?'disabled':''}></label></td>
         <td style="padding:8px 4px"><label class="ropt" style="cursor:pointer"><input type="radio" name="ms-${item.id}" value="stable" ${cur==='stable'?'checked':''} onchange="setMsItem('${item.id}','stable')" ${lkd?'disabled':''}></label></td>
@@ -1964,8 +2029,8 @@ function renderMsStep(){
         <span style="font-size:12px;color:var(--acc);font-family:'DM Mono',monospace;background:rgba(0,201,167,.1);padding:3px 10px;border-radius:14px;white-space:nowrap">已評 ${useCnt} 次</span>
       </div>
       <div class="ms-sec-desc">${ms.d}</div>
-      <div style="overflow-x:auto"><table class="ms-tbl"><thead><tr><th>細項描述</th><th>未穩定呈現</th><th>未觀察</th><th>可穩定呈現</th></tr></thead>
-      <tbody>${tbody}</tbody></table></div>
+      ${visibleItems.length?`<div style="overflow-x:auto"><table class="ms-tbl"><thead><tr><th>細項描述</th><th>未穩定呈現</th><th>未觀察</th><th>可穩定呈現</th></tr></thead>
+      <tbody>${tbody}</tbody></table></div>`:`<div style="padding:14px;text-align:center;color:var(--t3);font-size:12.5px">此類別目前沒有符合 shiftcard 篩選條件的細項</div>`}
       <div style="padding:9px 14px 12px;background:rgba(0,201,167,.03);border-top:1px solid var(--border)">
         <div style="font-size:12px;color:var(--t2);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:7px;flex-wrap:wrap">💬 質性回饋（選填）</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">${msPreHtml}</div>
@@ -2001,6 +2066,8 @@ function navToPending(){
 }
 function saveAssess(){
   const resId=document.getElementById('f-res').value;if(!resId){alert('請選擇住院醫師');return;}
+  const overallFb=(document.getElementById('f-overall-fb')?.value||'').trim();
+  if(overallFb.length<10){alert(`整體質性回饋為必填，請至少填寫 10 字（目前 ${overallFb.length} 字）`);return;}
   const res=getRes(resId);const attId=document.getElementById('f-att').value;const att=getAtt(attId);
   const allMs=[...selPcMs,...selNpcMs];const ev=selEpa.map(id=>epaScores[id]).filter(Boolean);
   let tot=0,stb=0;allMs.forEach(msId=>{const ms=MS.find(m=>m.id===msId);ms?.items.filter(i=>i.lv<=4).forEach(i=>{const v=msScores[i.id];if(v){tot++;if(v==='stable')stb++;}});});
@@ -2009,7 +2076,7 @@ function saveAssess(){
   const msFbData={};selMs.forEach(msId=>{const el=document.getElementById('msfb_'+msId.replace(/\W/g,'_'));if(el?.value?.trim())msFbData[msId]=el.value.trim();});
   // Get embedded imaging data
   const embedImgResult=getEmbedImgData();if(embedImgResult===false)return;// user saw alert
-  const rec={id:Date.now(),type:'ms',date:document.getElementById('f-date').value,resId,resName:res?.n||'',resYear:res?.y||'',attId:attId||null,attName:att?.n||'',caseDesc:document.getElementById('f-case').value,selEpa,selPcMs,selNpcMs,selMs,epaScores:{...epaScores},epaFb:{...epaFb},msItems:{...msScores},msFb:msFbData,imgData:embedImgResult||null,epaAvg:ev.length?(ev.reduce((a,b)=>a+b,0)/ev.length).toFixed(2):null,msPresRate:pct};
+  const rec={id:Date.now(),type:'ms',date:document.getElementById('f-date').value,resId,resName:res?.n||'',resYear:res?.y||'',attId:attId||null,attName:att?.n||'',caseDesc:document.getElementById('f-case').value,selEpa,selPcMs,selNpcMs,selMs,epaScores:{...epaScores},epaFb:{...epaFb},msItems:{...msScores},msFb:msFbData,overallFb,imgData:embedImgResult||null,epaAvg:ev.length?(ev.reduce((a,b)=>a+b,0)/ev.length).toFixed(2):null,msPresRate:pct};
   ASSESS.unshift(rec);save();autoSync();updateRmBadge();
   lastSavedAttId=attId;nav('thankyou');
 }
@@ -2051,6 +2118,16 @@ function isMsLkd(resId,msId){
   return false; // removed auto-lock at 80% - that was causing confusion
 }
 function isItemLkd(resId,itemId){const r=getRes(resId);return r?.itemLocks?.[itemId]===true;}
+// Shiftcard filter: if the admin has flagged at least one EPA / MS category as
+// "學會 shiftcard 評核項目", the assessment form shows ONLY flagged items of
+// that kind. If none are flagged, nothing is filtered (all enabled items show,
+// same as before this feature existed).
+// Shiftcard filter (Milestone only — EPA is not affected). Granularity is
+// per sub-item (L1-L4), not per MS category. If the admin has flagged at
+// least one sub-item across all Milestone categories as "學會 shiftcard 評核
+// 項目", the assessment form's Milestone step shows ONLY flagged items. If
+// none are flagged, nothing is filtered (same as before this feature).
+function msShiftCardActive(){return MS.some(m=>m.items&&m.items.some(i=>i.shiftCard));}
 function isMsAllItemsLocked(resId,msId){
   // Returns true if ALL sub-items of this MS are locked → block selection
   const ms=MS.find(m=>m.id===msId);if(!ms||!ms.items||ms.items.length===0)return false;
@@ -2267,7 +2344,7 @@ function swItemTab(tab,el){
   document.getElementById('item-editor-ms').classList.toggle('hidden',tab!=='ms');
   if(tab==='epa')renderEpaEditor();else renderMsEditor();
 }
-function renderItemEditor(){renderEpaEditor();renderMsEditor();}
+function renderItemEditor(){renderEpaEditor();renderMsEditor();const hint=document.getElementById('shiftcard-hint');if(hint){const on=msShiftCardActive();hint.textContent=on?'⚡ 已啟用 shiftcard 篩選：評核表的 Milestone 將僅顯示已勾選「shiftcard」的細項。':'目前未勾選任何 shiftcard 細項，評核表會顯示全部已啟用 Milestone 細項（未篩選）。';}}
 
 // ── EPA editor ──
 function renderEpaEditor(){
@@ -2308,13 +2385,14 @@ function renderMsEditor(){
       </div>
       <div class="fg" style="margin-bottom:6px"><label style="font-size:11px">類別名稱</label><input value="${ms.n}" oninput="updateMsCatField(${ci},'n',this.value)"></div>
       <div class="fg" style="margin-bottom:8px"><label style="font-size:11px">類別說明</label><textarea oninput="updateMsCatField(${ci},'d',this.value)" style="min-height:44px;font-size:12px">${ms.d||''}</textarea></div>
-      <div style="font-size:11px;color:var(--t2);font-weight:600;margin-bottom:5px">細項（Level 1-5，L5預設不評分）</div>
+      <div style="font-size:11px;color:var(--t2);font-weight:600;margin-bottom:5px">細項（Level 1-5，L5預設不評分；L1-L4 可勾選是否為學會 shiftcard 評核項目）</div>
       ${ms.items.map((item,ii)=>`
         <div class="ifl" style="gap:6px;margin-bottom:5px;align-items:flex-start">
           <select onchange="updateMsItemField(${ci},${ii},'lv',parseInt(this.value))" style="width:64px;flex-shrink:0;font-size:12px">
             ${[1,2,3,4,5].map(l=>`<option value="${l}" ${item.lv===l?'selected':''}>L${l}</option>`).join('')}
           </select>
           <input value="${item.t}" oninput="updateMsItemField(${ci},${ii},'t',this.value)" style="flex:1;font-size:12px">
+          ${item.lv<=4?`<label class="ifl" style="gap:3px;flex-shrink:0;font-size:10px;color:var(--a3);cursor:pointer;align-items:center" title="學會 shiftcard 評核項目"><input type="checkbox" ${item.shiftCard?'checked':''} onchange="updateMsItemField(${ci},${ii},'shiftCard',this.checked)" style="width:auto">shiftcard</label>`:''}
           <button class="btn bxs bd" style="flex-shrink:0" onclick="deleteMsItem(${ci},${ii})">✕</button>
         </div>
       `).join('')}
@@ -2328,10 +2406,17 @@ function renderMsEditor(){
   wrap.innerHTML=html;
 }
 function updateMsCatField(ci,field,val){if(MS[ci])MS[ci][field]=val;}
-function updateMsItemField(ci,ii,field,val){if(MS[ci]&&MS[ci].items[ii])MS[ci].items[ii][field]=val;}
+function updateMsItemField(ci,ii,field,val){if(MS[ci]&&MS[ci].items[ii])MS[ci].items[ii][field]=val;if(field==='shiftCard'){const hint=document.getElementById('shiftcard-hint');if(hint){const on=msShiftCardActive();hint.textContent=on?'⚡ 已啟用 shiftcard 篩選：評核表的 Milestone 將僅顯示已勾選「shiftcard」的細項。':'目前未勾選任何 shiftcard 細項，評核表會顯示全部已啟用 Milestone 細項（未篩選）。';}}}
 function addMsItem(ci){
   const ms=MS[ci];if(!ms)return;
-  const n=ms.items.length+1;
+  // Generate a collision-safe id: a naive counter based on items.length can
+  // collide with an existing item's id after items were reordered or
+  // deleted, which would silently make the new item inherit an old item's
+  // CCC lock (since locks are keyed purely by item id). Find the next
+  // unused suffix instead.
+  let n=ms.items.length+1;
+  const existingIds=new Set(ms.items.map(i=>i.id));
+  while(existingIds.has(ms.id+'-NEW'+n))n++;
   ms.items.push({id:ms.id+'-NEW'+n,lv:1,t:'新細項描述'});
   renderMsEditor();
 }
@@ -2340,7 +2425,12 @@ function deleteMsItem(ci,ii){
   renderMsEditor();
 }
 function addMsCategory(){
-  const n=MS.length+1;
+  // Same collision-safety concern as addMsItem: a naive counter can collide
+  // with an existing category id after deletions, which would corrupt that
+  // category's existing CCC locks. Find the next unused "NEW#" suffix.
+  let n=MS.length+1;
+  const existingIds=new Set(MS.map(m=>m.id));
+  while(existingIds.has('NEW'+n))n++;
   MS.push({id:'NEW'+n,cat:'PC',n:'新類別'+n,d:'',items:[{id:'NEW'+n+'-L1-1',lv:1,t:'請編輯此細項描述'}]});
   renderMsEditor();
 }
@@ -2369,7 +2459,7 @@ function restoreDefaultItems(){
   renderAdmToggles();
   alert('✅ 已還原為系統預設的 EPA / Milestone 內容');
 }
-function initAdmin(){const qem=document.getElementById('q-em');const qmm=document.getElementById('q-mm');if(qem)qem.value=CFG.qEpaM||0;if(qmm)qmm.value=CFG.qMsM||0;populateSel('ccc-res',false);populateSel('ward-res',false);renderAdmToggles();renderItemEditor();}
+function initAdmin(){const qem=document.getElementById('q-em');const qmm=document.getElementById('q-mm');const qrelax=document.getElementById('q-ms-relax');if(qem)qem.value=CFG.qEpaM||0;if(qmm)qmm.value=CFG.qMsM||0;if(qrelax)qrelax.checked=!!CFG.msSelRelax;populateSel('ccc-res',false);populateSel('ward-res',false);renderAdmToggles();renderItemEditor();}
 function renderCCCPanel(){
   const resId=document.getElementById('ccc-res').value;const panel=document.getElementById('ccc-panel');if(!resId){panel.innerHTML='';return;}
   const r=getRes(resId);
@@ -2389,13 +2479,13 @@ function renderCCCPanel(){
       const allLkd=ms.items.filter(i=>i.lv<=4).every(i=>r?.itemLocks?.[i.id]===true)&&ms.items.filter(i=>i.lv<=4).length>0;
       const curLim=r?.msMonthLimits?.[ms.id]!=null?r.msMonthLimits[ms.id]:'';
       let msHtml=`<div style="font-size:10.5px;color:var(--a3);font-weight:600;padding:4px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${ms.id} ${ms.n}${allLkd?'<span style="font-size:9px;background:var(--a3);color:#fff;padding:1px 5px;border-radius:4px">全項鎖定</span>':''}<label style="font-size:9.5px;color:var(--t2);font-weight:400;margin-left:auto;display:flex;align-items:center;gap:4px">月上限<input type="number" min="0" max="50" style="width:44px;font-size:11px;text-align:center;padding:1px 3px" value="${curLim}" placeholder="—" onchange="setMsMonthLimit('${resId}','${ms.id}',this.value)"><span style="font-size:9px;color:var(--t3)">0=不限</span></label></div>`;
-      msHtml+=ms.items.filter(i=>i.lv<=4).map(item=>{const lkd=r?.itemLocks?.[item.id]===true;return`<div class="tw"><div><div class="tl" style="font-size:11px"><span class="lvtag lv${item.lv}" style="font-size:8.5px;margin-right:3px">L${item.lv}</span>${item.t.slice(0,30)}…</div></div><label class="tog"><input type="checkbox" ${lkd?'checked':''} onchange="setItemLk('${resId}','${item.id}',this.checked)"><span class="tsl"></span></label></div>`;}).join('');
+      msHtml+=ms.items.filter(i=>i.lv<=4).map(item=>{const lkd=r?.itemLocks?.[item.id]===true;const scBg=item.shiftCard?'background:rgba(245,158,11,.08);border-left:3px solid var(--a3)':'';return`<div class="tw" style="${scBg}"><div><div class="tl" style="font-size:11px">${item.shiftCard?'<span style="font-size:9px;color:var(--a3);font-weight:700;margin-right:3px">⚡SC</span>':''}<span class="lvtag lv${item.lv}" style="font-size:8.5px;margin-right:3px">L${item.lv}</span>${item.t.slice(0,30)}…</div></div><label class="tog"><input type="checkbox" ${lkd?'checked':''} onchange="setItemLk('${resId}','${item.id}',this.checked)"><span class="tsl"></span></label></div>`;}).join('');
       return msHtml;
     }).join('')}</div>
   </div>`;
   panel.innerHTML=html;
 }
-function setCCCLv(resId,id,val){const r=getRes(resId);if(!r)return;if(!r.cccLevels)r.cccLevels={};r.cccLevels[id]=val;save();autoSync();}
+function setCCCLv(resId,id,val){const r=getRes(resId);if(!r)return;if(!r.cccLevels)r.cccLevels={};r.cccLevels[id]=val;save();autoSyncDebounced();}
 function saveCCCSnapshot(resId){
   const r=getRes(resId);if(!r)return;
   if(!r.cccHistory)r.cccHistory=[];
@@ -2405,8 +2495,26 @@ function saveCCCSnapshot(resId){
   alert('CCC 快照已儲存！（共 '+r.cccHistory.length+' 次）\nSHHER 矩陣下拉選單可選擇查看前幾次的 CCC 資料。');
   renderCCCPanel();
 }
-function setItemLk(resId,id,val){const r=getRes(resId);if(!r)return;if(!r.itemLocks)r.itemLocks={};r.itemLocks[id]=val;save();autoSync();renderCCCPanel();}
-function setMsMonthLimit(resId,msId,val){const r=getRes(resId);if(!r)return;if(!r.msMonthLimits)r.msMonthLimits={};const v=val===''?null:parseInt(val);if(v===null)delete r.msMonthLimits[msId];else r.msMonthLimits[msId]=v;save();autoSync();}
+function setItemLk(resId,id,val){
+  const r=getRes(resId);if(!r)return;if(!r.itemLocks)r.itemLocks={};
+  r.itemLocks[id]=val;
+  // Cascading lock: ticking a higher-level item (e.g. PC2 L3) auto-locks all
+  // lower-level items in the same MS category (L1, L2) too, since reaching a
+  // higher milestone implies the lower ones are already mastered. This is a
+  // convenience default only — the admin can still manually un-tick any
+  // individual item afterward; we don't force them to stay locked.
+  if(val===true){
+    const ms=MS.find(m=>m.items&&m.items.some(i=>i.id===id));
+    if(ms){
+      const target=ms.items.find(i=>i.id===id);
+      if(target){
+        ms.items.filter(i=>i.lv<target.lv).forEach(i=>{r.itemLocks[i.id]=true;});
+      }
+    }
+  }
+  save();autoSyncDebounced();renderCCCPanel();
+}
+function setMsMonthLimit(resId,msId,val){const r=getRes(resId);if(!r)return;if(!r.msMonthLimits)r.msMonthLimits={};const v=val===''?null:parseInt(val);if(v===null)delete r.msMonthLimits[msId];else r.msMonthLimits[msId]=v;save();autoSyncDebounced();}
 function renderWardPanel(){
   const resId=document.getElementById('ward-res').value;const panel=document.getElementById('ward-panel');if(!resId){panel.innerHTML='';return;}
   const r=getRes(resId);const ward=r?.ward||{ind:'',obs:'',er:''};
@@ -2434,7 +2542,7 @@ async function repairRoster(){
     if(el){el.textContent='⚠️ 本機名單已修復，但寫回雲端失敗：'+e.message+'（請稍後點「⬆ 上傳資料」重試）';el.className='al ae';}
   }
 }
-function saveAdmin(silent=false){const _em=document.getElementById('q-em');const _mm=document.getElementById('q-mm');if(_em&&_em.value!=='')CFG.qEpaM=parseInt(_em.value)||0;if(_mm&&_mm.value!=='')CFG.qMsM=parseInt(_mm.value)||0;save();fsSetDoc('config','cfg',CFG).catch(()=>{});if(!silent){['admin-ok','admin-limit-ok'].forEach(id=>{const el=document.getElementById(id);if(el){el.classList.remove('hidden');setTimeout(()=>el.classList.add('hidden'),2500);}});}}
+function saveAdmin(silent=false){const _em=document.getElementById('q-em');const _mm=document.getElementById('q-mm');const _relax=document.getElementById('q-ms-relax');if(_em&&_em.value!=='')CFG.qEpaM=parseInt(_em.value)||0;if(_mm&&_mm.value!=='')CFG.qMsM=parseInt(_mm.value)||0;if(_relax)CFG.msSelRelax=_relax.checked;save();fsSetDoc('config','cfg',CFG).catch(()=>{});if(!silent){['admin-ok','admin-limit-ok'].forEach(id=>{const el=document.getElementById(id);if(el){el.classList.remove('hidden');setTimeout(()=>el.classList.add('hidden'),2500);}});}}
 
 
 // ══════════════ DETAIL ══════════════
@@ -2449,6 +2557,7 @@ function viewDet(id){
   }else{
     if(a.selEpa?.length){html+=`<div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;margin-bottom:7px">EPA（均分 ${a.epaAvg}）</div>`;a.selEpa.forEach(id=>{const epa=EPA.find(e=>e.id===id);const s=a.epaScores?.[id];if(!epa||!s)return;html+=`<div style="padding:5px 0;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between"><span style="font-size:12px"><span style="color:var(--a2);font-size:9.5px">${epa.id}</span> ${epa.n}</span><span class="pill p${s}">Level ${s}</span></div>${a.epaFb?.[id]?`<div style="font-size:10.5px;color:var(--t2);margin-top:2px">💬 ${a.epaFb[id]}</div>`:''}</div>`;});}
     if(a.selMs?.length&&a.msItems){html+=`<div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;margin:11px 0 7px">MILESTONE（可呈現率 ${a.msPresRate??'—'}%）</div>`;a.selMs.forEach(msId=>{const ms=MS.find(m=>m.id===msId);if(!ms)return;html+=`<div style="margin-bottom:9px"><div style="font-size:10.5px;color:var(--a3);margin-bottom:4px">${ms.id} ${ms.n}</div>`;ms.items.filter(i=>i.lv<=4).forEach(item=>{const v=a.msItems[item.id];if(!v)return;const col=v==='stable'?'var(--acc)':v==='unstable'?'var(--danger)':'var(--t3)';html+=`<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(30,45,69,.4);font-size:11.5px"><span style="color:var(--t2)">${item.t}</span><span style="color:${col};font-size:10.5px;white-space:nowrap;margin-left:8px">${v==='stable'?'✅ 可穩定':v==='unstable'?'❌ 未穩定':'⬜ 未觀察'}</span></div>`;});html+=`</div>`;});}
+    if(a.overallFb)html+=`<div style="margin-top:11px;padding:10px;background:rgba(0,201,167,.06);border:1px solid var(--acc);border-radius:7px"><div style="font-size:10.5px;color:var(--acc);font-weight:700;margin-bottom:4px">💚 整體質性回饋</div><div style="font-size:12px;color:var(--t2);white-space:pre-wrap">${a.overallFb}</div></div>`;
   }
   document.getElementById('m-det-b').innerHTML=html;openM('m-detail');
 }
@@ -2469,6 +2578,7 @@ function exportCSV(){
     ...EPA.map(x=>x.id+'質性回饋'),
     ...MS.flatMap(m=>m.items.map(i=>i.id)),
     ...MS.map(m=>m.id+'質性回饋'),
+    '整體質性回饋',
     '影像種類','影像案例','影像評核意見'
   ];
   const rows=data.map(a=>{
@@ -2480,6 +2590,7 @@ function exportCSV(){
       ...EPA.map(x=>(a.epaFb?.[x.id]||'').replace(/\n/g,' ')),
       ...MS.flatMap(m=>m.items.map(i=>{const v=a.msItems?.[i.id]||'';return v==='stable'?'可穩定呈現':v==='unstable'?'未穩定呈現':v==='notobserved'?'未觀察':''})),
       ...MS.map(m=>(a.msFb?.[m.id]||'').replace(/\n/g,' ')),
+      (a.overallFb||'').replace(/\n/g,' '),
       a.imgData?.imgType||'',a.imgData?.caseChosen||'',(a.imgData?.comment||'').replace(/\n/g,' ')
     ];
   });
