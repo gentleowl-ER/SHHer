@@ -79,6 +79,17 @@ textarea{resize:vertical;min-height:68px}
 .fil{border-color:rgba(0,201,167,.35)!important}
 /* MS TABLE */
 .ms-section{margin-bottom:20px}
+.ms-lv-sep{padding:6px 14px 3px;font-size:10.5px}
+.ms-item-card{padding:10px 14px;border-bottom:1px solid rgba(30,45,69,.35);transition:background .15s}
+.ms-item-desc{font-size:13.5px;line-height:1.55;color:var(--text);margin-bottom:8px}
+.ms-btn-group{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.ms-opt-btn{border:2px solid var(--border);border-radius:10px;background:var(--bg3);color:var(--t2);cursor:pointer;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:3px;transition:all .15s;min-height:54px;touch-action:manipulation}
+.ms-opt-btn:active{transform:scale(.96)}
+.ms-opt-icon{font-size:16px;font-weight:700;line-height:1}
+.ms-opt-label{font-size:10px;font-weight:600;line-height:1.2;text-align:center}
+.ms-unstable{border-color:#fca5a5}.ms-unstable.active{background:#ef4444;border-color:#ef4444;color:#fff}
+.ms-unobs{border-color:var(--border)}.ms-unobs.active{background:#64748b;border-color:#64748b;color:#fff}
+.ms-stable{border-color:#86efac}.ms-stable.active{background:#22c55e;border-color:#22c55e;color:#fff}
 .ms-sec-hd{font-size:13px;font-weight:700;padding:7px 0 5px;border-bottom:2px solid var(--border);margin-bottom:2px;display:flex;align-items:center;gap:8px}
 .ms-sec-desc{font-size:11px;color:var(--t3);margin-bottom:9px;padding:5px 9px;background:rgba(59,130,246,.05);border-left:3px solid var(--a2);border-radius:0 5px 5px 0;line-height:1.5}
 .ms-tbl{width:100%;border-collapse:collapse}
@@ -306,6 +317,9 @@ body{font-size:var(--base-font,17px)}
   /* Larger radio/checkbox tap zones */
   .ropt{min-width:48px;min-height:48px}
   .ropt input[type=radio]{width:24px;height:24px}
+  .ms-opt-btn{min-height:62px;padding:10px 4px}
+  .ms-opt-icon{font-size:18px}
+  .ms-opt-label{font-size:11px}
 
   /* Cards: more breathing room, rounder corners (native feel) */
   .card{border-radius:16px;padding:14px}
@@ -522,27 +536,9 @@ body{font-size:var(--base-font,17px)}
             </div>
           </div>
         </div>
-        <div class="tabs" id="embed-img-tabs">
-          <div class="tab active" onclick="swEmbedImgTab('req',this)">必要案例</div>
-          <div class="tab" onclick="swEmbedImgTab('sel',this)">選擇案例</div>
-        </div>
-        <p style="font-size:12px;color:var(--t3);margin-bottom:7px">如當日無適合個案，請點選「其他」。</p>
-        <div class="img-scroll mb4" id="embed-img-case-list"></div>
-        <div id="embed-img-sub-wrap" class="hidden mb4">
-          <div style="font-size:13px;font-weight:600;color:var(--t2);margin-bottom:6px">選擇案例（進一步分類）</div>
-          <div class="img-scroll" id="embed-img-sub-list"></div>
-        </div>
-        <div style="font-size:13px;font-weight:600;color:var(--t2);margin-bottom:8px">評核項目（1=非常不滿意 5=非常滿意）</div>
-        <div id="embed-img-stars"></div>
-        <div class="fg mt4">
-          <label>影像評核意見（若啟用則必填）<span class="req">*</span></label>
-          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:10px;margin-top:4px">
-            <div style="font-size:12px;color:var(--t2);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px">💬 評核意見
-              
-            </div>
-            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px" id="eimg-pre-tools"></div>
-            <textarea id="eimg-comment" class="mf" oninput="checkFb(this)" placeholder="請具體描述評核意見..." style="width:100%;min-height:70px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;outline:none;resize:vertical"></textarea>
-          </div>
+        <div class="fg">
+          <label>影像評核意見（選填）</label>
+          <textarea id="eimg-comment" oninput="checkFb(this)" placeholder="請簡要說明以便後續整理" style="width:100%;min-height:70px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;outline:none;resize:vertical"></textarea>
         </div>
       </div>
     </div>
@@ -678,7 +674,10 @@ body{font-size:var(--base-font,17px)}
     <div class="card"><div class="ct"><span class="dot" style="background:var(--a2)"></span>MS 各面向可呈現率</div><div class="cw"><canvas id="ch-ms-r"></canvas></div></div>
   </div>
   <div class="card mb4"><div class="ct"><span class="dot" style="background:var(--a3)"></span>EPA 各項平均</div><div id="epa-prog"></div></div>
-  <div class="card"><div class="ct"><span class="dot" style="background:var(--purple)"></span>Milestone 細項可呈現率</div><div id="ms-detail-stats"></div></div>
+  <div class="card mb4"><div class="ct"><span class="dot" style="background:var(--purple)"></span>Milestone 細項可呈現率</div><div id="ms-detail-stats"></div></div>
+  <div class="card"><div class="ct"><span class="dot" style="background:var(--purple)"></span>🩻 影像醫學評核紀錄
+    <button class="btn bs bxs" style="margin-left:auto;font-size:11px" onclick="exportImgCsv()">📥 匯出CSV</button>
+  </div><div id="img-stats-list"></div></div>
 </div>
 
 <!-- ═══ SHHER ═══ -->
@@ -858,10 +857,6 @@ body{font-size:var(--base-font,17px)}
       <div class="ah">🎯 評核上限</div>
       <div class="fg"><label>每月每項 EPA 上限（0=不限）</label><div class="ifl"><input type="number" id="q-em" style="width:60px;text-align:center" min="0" max="50"></div></div>
       <div class="fg"><label>每月每項 MS 上限（0=不限）</label><div class="ifl"><input type="number" id="q-mm" style="width:60px;text-align:center" min="0" max="50"></div></div>
-      <div class="tw" style="margin-top:8px">
-        <div><div class="tl">Milestone 選擇免強制（PC/非PC 各2項）</div><div class="tsb">學員子項目全鎖定時可不選滿，儲存評核時放寬數量限制</div></div>
-        <label class="tog"><input type="checkbox" id="q-ms-relax" onchange="saveAdmin(true)"><span class="tsl"></span></label>
-      </div>
       <button class="btn bpu bsm" onclick="saveAdmin()">💾 儲存上限設定</button>
       <div id="admin-limit-ok" class="al aok hidden mt3" style="font-size:12px">✅ 上限已儲存</div>
       <div class="ah mt4">🛠 名單修復</div>
@@ -1043,6 +1038,10 @@ body{font-size:var(--base-font,17px)}
     <div class="g2">
       <div class="fg"><label>PC Milestone<br><span style="font-size:11px;color:var(--t3)">空白=套用全域，0=不限</span></label><input type="number" id="r-qpc" min="0" max="99" placeholder="空白"></div>
       <div class="fg"><label>非PC Milestone<br><span style="font-size:11px;color:var(--t3)">空白=套用全域，0=不限</span></label><input type="number" id="r-qnpc" min="0" max="99" placeholder="空白"></div>
+    </div>
+    <div class="tw" style="margin-top:10px">
+      <div><div class="tl" style="font-size:12px">Milestone 選擇免強制</div><div class="tsb">子項目全鎖定時可不選滿 PC/非PC 各2項</div></div>
+      <label class="tog"><input type="checkbox" id="r-ms-relax"><span class="tsl"></span></label>
     </div>
   </div>
   <div class="ifl fe mt3"><button class="btn bs bsm" onclick="closeM('m-res')">取消</button><button class="btn bp bsm" onclick="saveRes()">儲存</button></div>
@@ -1297,7 +1296,7 @@ if(!ATT)ATT=DEF_ATT.map(a=>({...a}));
 // 'no'/'n'/'y' are EDITABLE by admins (代號/姓名/年級), so cloud edits to them
 // must persist — but we still always iterate over the fixed DEFAULT id list,
 // so corrupt/incomplete cloud data can never make people disappear entirely.
-const RES_MUTABLE_FIELDS=['no','n','y','grad','ward','cccLevels','cccHistory','itemLocks','qPcOverride','qNpcOverride','msMonthLimits'];
+const RES_MUTABLE_FIELDS=['no','n','y','grad','ward','cccLevels','cccHistory','itemLocks','qPcOverride','qNpcOverride','msMonthLimits','msSelRelax'];
 const ATT_MUTABLE_FIELDS=['no','n','email','line','presets'];
 function mergeRosterWithCloud(defaults,cloudList,mutableFields){
   const cloudById={};
@@ -1568,9 +1567,19 @@ async function syncDown(silent=false){
 async function saveCloud(rec){
   try{await fsSetDoc('assessments',rec.id,rec);}catch(e){console.warn('saveCloud failed:',e.message);}
 }
-async function autoSync(){
+async function deleteCloud(collection,docId){
   try{
-    await fsWriteMany('assessments',ASSESS,a=>a.id);
+    const url=`${FS_BASE}/${collection}/${fsSafeId(String(docId))}?key=${FS_KEY}`;
+    const res=await fsFetch(url,{method:'DELETE'});
+    if(!res.ok){const t=await res.text().catch(()=>'');console.warn('deleteCloud failed:',fsHumanError(res.status,t));}
+  }catch(e){console.warn('deleteCloud error:',e.message);}
+}
+async function autoSync(){
+  // IMPORTANT: ASSESS is NOT written here. Each assessment is written
+  // individually via saveCloud() at the moment it is created or deleted.
+  // Writing all assessments on every sync was the main cause of hitting
+  // the Firestore free-tier 20,000 write/day limit.
+  try{
     await fsWriteMany('residents',RES,r=>r.id);
     await fsWriteMany('attendings',ATT,a=>a.id);
     await fsSetDoc('config','schedule',{data:SCHED});
@@ -1777,7 +1786,7 @@ function parsePaste(){
     ok++;
   });
 
-  save();autoSync();renderSched();updateRmBadge();
+  save();autoSyncDebounced();renderSched();updateRmBadge();
 
   const preview=Object.entries(resColMap).slice(0,5).map(([col,rid])=>{
     const r=getRes(rid);return r?`欄${col}→${r.no}${r.n[0]}`:'';
@@ -1852,7 +1861,11 @@ function getPendingDates(attId){
   Object.entries(SCHED).forEach(([date,entries])=>{
     if(date>today)return;
     const myEntries=entries.filter(e=>e.attId===attId);if(!myEntries.length)return;
-    const pendingRes=myEntries.filter(e=>{return ASSESS.filter(a=>a.date===date&&a.attId===attId&&a.resId===e.resId).length===0;}).map(e=>e.resId);
+    const pendingRes=myEntries.filter(e=>{
+      // Skip graduated residents — they no longer need assessments
+      const res=getRes(e.resId);if(!res||res.grad)return false;
+      return ASSESS.filter(a=>a.date===date&&a.attId===attId&&a.resId===e.resId).length===0;
+    }).map(e=>e.resId);
     if(pendingRes.length)result.push({date,resIds:pendingRes});
   });
   return result.sort((a,b)=>b.date.localeCompare(a.date));
@@ -1870,7 +1883,7 @@ function renderDashCharts(){
 }
 
 // ══════════════ ASSESS ══════════════
-function initAssess(){selEpa=[];selPcMs=[];selNpcMs=[];epaScores={};epaFb={};msScores={};embedImgType='';embedImgTab='req';embedImgStars={};embedImgSubCase='';document.getElementById('f-date').value=tod();document.getElementById('f-case').value='';const ofb=document.getElementById('f-overall-fb');if(ofb){ofb.value='';ofb.classList.remove('fil');ofb.classList.add('mf');}const ofbCnt=document.getElementById('f-overall-fb-cnt');if(ofbCnt){ofbCnt.textContent='0 字';ofbCnt.style.color='var(--t3)';}const eib=document.getElementById('embed-img-enabled');if(eib){eib.checked=true;const inner=document.getElementById('embed-img-inner');if(inner)inner.style.display='block';renderEmbedImgList();renderEmbedImgStars();renderEmbedPresets();}['ass-ok','ass-err'].forEach(id=>document.getElementById(id).classList.add('hidden'));populateSel('f-res',false);populateSel('f-att',true);if(currentAttId)document.getElementById('f-att').value=currentAttId;onAttChange();[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===0);document.getElementById('ws'+i).className='ws'+(i===0?' active':'');});syncMobBar(0);}
+function initAssess(){selEpa=[];selPcMs=[];selNpcMs=[];epaScores={};epaFb={};msScores={};embedImgType='';embedImgTab='req';embedImgStars={};embedImgSubCase='';document.getElementById('f-date').value=tod();document.getElementById('f-case').value='';const ofb=document.getElementById('f-overall-fb');if(ofb){ofb.value='';ofb.classList.remove('fil');ofb.classList.add('mf');}const ofbCnt=document.getElementById('f-overall-fb-cnt');if(ofbCnt){ofbCnt.textContent='0 字';ofbCnt.style.color='var(--t3)';}const eib=document.getElementById('embed-img-enabled');if(eib){eib.checked=true;const inner=document.getElementById('embed-img-inner');if(inner)inner.style.display='block';}['ass-ok','ass-err'].forEach(id=>document.getElementById(id).classList.add('hidden'));populateSel('f-res',false);populateSel('f-att',true);if(currentAttId)document.getElementById('f-att').value=currentAttId;onAttChange();[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===0);document.getElementById('ws'+i).className='ws'+(i===0?' active':'');});syncMobBar(0);}
 function onAttChange(){const id=document.getElementById('f-att').value;const entries=(SCHED[tod()]||[]).filter(e=>e.attId===id);const si=document.getElementById('tshift');if(entries.length){const resNames=entries.map(e=>getRes(e.resId)?.n||'').filter(Boolean);si.textContent=resNames.length?`今日需評：${resNames.join('、')}`:'今日值班';}else si.textContent='';}
 function goStep(s){if(s===1&&!v0())return;if(s===2&&!v1())return;if(s===3&&!v2())return;[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===s);document.getElementById('ws'+i).className='ws'+(i===s?' active':i<s?' done':'');});window.scrollTo(0,0);if(s===1)renderSelStep();if(s===2)renderEpaStep();if(s===3)renderMsStep();syncMobBar(s);}
 function syncMobBar(s){
@@ -1887,9 +1900,10 @@ function syncMobBar(s){
 function v0(){if(!document.getElementById('f-res').value){alert('請選擇住院醫師');return false;}return true;}
 function v1(){
   if(selEpa.length!==1){alert(`請選擇 1 項 EPA（目前 ${selEpa.length}）`);return false;}
-  if(CFG.msSelRelax){
-    // Relaxed mode: allow fewer than 2 (e.g. when a resident's sub-items are
-    // all CCC-locked at full mastery, there may be nothing left to pick).
+  const resId=document.getElementById('f-res').value;
+  const res=getRes(resId);
+  const relax=res?.msSelRelax||false;
+  if(relax){
     if(selPcMs.length>2){alert(`PC Milestone 最多選擇 2 項（目前 ${selPcMs.length}）`);return false;}
     if(selNpcMs.length>2){alert(`非PC Milestone 最多選擇 2 項（目前 ${selNpcMs.length}）`);return false;}
     return true;
@@ -1898,7 +1912,7 @@ function v1(){
   if(selNpcMs.length!==2){alert(`非PC Milestone 請選擇 2 項（目前 ${selNpcMs.length}）`);return false;}
   return true;
 }
-function v2(){for(const id of selEpa){if(!epaScores[id]){alert(`EPA ${id} 尚未評分`);return false;}if(!epaFb[id]||epaFb[id].trim().length<5){alert(`EPA ${id} 的質性回饋為必填`);return false;}}return true;}
+function v2(){for(const id of selEpa){if(!epaScores[id]){alert(`EPA ${id} 尚未評分`);return false;}}return true;}
 function getMsUseCnt(resId,msId){if(!resId)return 0;return ASSESS.filter(a=>a.resId===resId&&a.type==='ms'&&a.selMs&&a.selMs.includes(msId)).length;}
 function getMsMonthCnt(resId,msId){
   if(!resId)return 0;
@@ -1972,7 +1986,7 @@ function togNpc(id){
   }
   updSelCnt();renderSelStep();
 }
-function updSelCnt(){document.getElementById('ec').textContent=selEpa.length;const relaxTag=CFG.msSelRelax?'（可不選）':'';document.getElementById('pc-cnt').textContent=selPcMs.length+'/2'+relaxTag;document.getElementById('npc-cnt').textContent=selNpcMs.length+'/2'+relaxTag;}
+function updSelCnt(){document.getElementById('ec').textContent=selEpa.length;const resId=document.getElementById('f-res')?.value;const res=getRes(resId);const relaxTag=(res?.msSelRelax)?'（可不選）':'';document.getElementById('pc-cnt').textContent=selPcMs.length+'/2'+relaxTag;document.getElementById('npc-cnt').textContent=selNpcMs.length+'/2'+relaxTag;}
 function renderEpaStep(){
   const form=document.getElementById('epa-form');form.innerHTML='';
   const attId=document.getElementById('f-att').value;const att=getAtt(attId);
@@ -1999,22 +2013,27 @@ function renderMsStep(){
   const resId=document.getElementById('f-res').value;const allMs=[...selPcMs,...selNpcMs];
   const scActive=msShiftCardActive();
   allMs.forEach(msId=>{const ms=MS.find(m=>m.id===msId);if(!ms)return;
-    let tbody='';let lastLv=0;
-    const visibleItems=ms.items.filter(i=>i.lv<=4&&(!scActive||i.shiftCard));
+    const visibleItems=ms.items.filter(i=>i.lv<=4&&(!scActive||i.shiftCard)&&!isItemLkd(resId,i.id));
+    let itemsHtml='';let lastLv=0;
     visibleItems.forEach(item=>{
-      const selClass=msScores[item.id]?` style="background:rgba(0,201,167,.06)"`:'';
-
-      if(item.lv!==lastLv){tbody+=`<tr class="lvsep"><td colspan="4"><span class="lvtag lv${item.lv}">Level ${item.lv}</span></td></tr>`;lastLv=item.lv;}
-      const cur=msScores[item.id]||'';const lkd=isItemLkd(resId,item.id);
-      // Color-code shiftcard items differently so they're visually distinct
-      // from regular items when the admin has any shiftcard items flagged.
-      const scStyle=scActive&&item.shiftCard?' style="background:rgba(245,158,11,.08);border-left:3px solid var(--a3)"':'';
-      tbody+=`<tr${lkd?' class="lkd-row"':(scStyle||selClass)}>
-        <td style="font-size:14px;line-height:1.6">${scActive&&item.shiftCard?'<span style="font-size:9.5px;color:var(--a3);font-weight:700;margin-right:5px">⚡SC</span>':''}${item.t}${lkd?' <span style="font-size:10px;color:var(--a3)">🔒</span>':''}</td>
-        <td style="padding:8px 4px"><label class="ropt" style="cursor:pointer"><input type="radio" name="ms-${item.id}" value="unstable" ${cur==='unstable'?'checked':''} onchange="setMsItem('${item.id}','unstable')" ${lkd?'disabled':''}></label></td>
-        <td style="padding:8px 4px"><label class="ropt" style="cursor:pointer"><input type="radio" name="ms-${item.id}" value="notobserved" ${cur==='notobserved'?'checked':''} onchange="setMsItem('${item.id}','notobserved')" ${lkd?'disabled':''}></label></td>
-        <td style="padding:8px 4px"><label class="ropt" style="cursor:pointer"><input type="radio" name="ms-${item.id}" value="stable" ${cur==='stable'?'checked':''} onchange="setMsItem('${item.id}','stable')" ${lkd?'disabled':''}></label></td>
-      </tr>`;
+      const cur=msScores[item.id]||'';
+      if(item.lv!==lastLv){itemsHtml+=`<div class="ms-lv-sep"><span class="lvtag lv${item.lv}">Level ${item.lv}</span></div>`;lastLv=item.lv;}
+      const scTag=scActive&&item.shiftCard?'<span style="font-size:9px;color:var(--a3);font-weight:700;margin-right:4px;vertical-align:middle">⚡SC</span>':'';
+      const rowBg=cur?'background:rgba(0,201,167,.05)':'';
+      itemsHtml+=`<div class="ms-item-card" style="${rowBg}">
+        <div class="ms-item-desc">${scTag}${item.t}</div>
+        <div class="ms-btn-group">
+          <button class="ms-opt-btn ms-unstable${cur==='unstable'?' active':''}" onclick="setMsItem('${item.id}','unstable',this.parentElement)">
+            <span class="ms-opt-icon">✗</span><span class="ms-opt-label">未穩定呈現</span>
+          </button>
+          <button class="ms-opt-btn ms-unobs${cur==='notobserved'?' active':''}" onclick="setMsItem('${item.id}','notobserved',this.parentElement)">
+            <span class="ms-opt-icon">—</span><span class="ms-opt-label">未觀察</span>
+          </button>
+          <button class="ms-opt-btn ms-stable${cur==='stable'?' active':''}" onclick="setMsItem('${item.id}','stable',this.parentElement)">
+            <span class="ms-opt-icon">✓</span><span class="ms-opt-label">可穩定呈現</span>
+          </button>
+        </div>
+      </div>`;
     });
     const useCnt=getMsUseCnt(resId,msId);
     const msFbId='msfb_'+msId.replace(/\W/g,'_');
@@ -2029,10 +2048,9 @@ function renderMsStep(){
         <span style="font-size:12px;color:var(--acc);font-family:'DM Mono',monospace;background:rgba(0,201,167,.1);padding:3px 10px;border-radius:14px;white-space:nowrap">已評 ${useCnt} 次</span>
       </div>
       <div class="ms-sec-desc">${ms.d}</div>
-      ${visibleItems.length?`<div style="overflow-x:auto"><table class="ms-tbl"><thead><tr><th>細項描述</th><th>未穩定呈現</th><th>未觀察</th><th>可穩定呈現</th></tr></thead>
-      <tbody>${tbody}</tbody></table></div>`:`<div style="padding:14px;text-align:center;color:var(--t3);font-size:12.5px">此類別目前沒有符合 shiftcard 篩選條件的細項</div>`}
+      ${visibleItems.length?itemsHtml:`<div style="padding:14px;text-align:center;color:var(--t3);font-size:12.5px">此類別目前沒有符合 shiftcard 篩選條件的細項</div>`}
       <div style="padding:9px 14px 12px;background:rgba(0,201,167,.03);border-top:1px solid var(--border)">
-        <div style="font-size:12px;color:var(--t2);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:7px;flex-wrap:wrap">💬 質性回饋（選填）</div>
+        <div style="font-size:12px;color:var(--t2);font-weight:600;margin-bottom:6px">💬 質性回饋（選填）</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">${msPreHtml}</div>
         <textarea id="${msFbId}" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:10px 12px;font-size:14px;font-family:inherit;outline:none;resize:vertical;min-height:72px" placeholder="針對「${ms.n}」的具體觀察或建議..."></textarea>
       </div></div>`;
@@ -2040,7 +2058,17 @@ function renderMsStep(){
 }
 
 function insertFb(taId,content){const ta=document.getElementById(taId);if(!ta)return;ta.value=ta.value?(ta.value+'\n\n'+content):content;}
-function setMsItem(id,val){msScores[id]=val;}
+function setMsItem(id,val,grp){
+  msScores[id]=val;
+  if(grp){
+    grp.querySelectorAll('.ms-opt-btn').forEach(b=>b.classList.remove('active'));
+    // find the clicked button by matching data or value in onclick
+    const clicked=grp.querySelector(`.ms-${val==='unstable'?'unstable':val==='stable'?'stable':'unobs'}`);
+    if(clicked)clicked.classList.add('active');
+    // update card background
+    const card=grp.closest('.ms-item-card');if(card)card.style.background='rgba(0,201,167,.05)';
+  }
+}
 function navToPending(){
   if(!lastSavedAttId){nav('dashboard');return;}
   // Find pending dates for this attending
@@ -2077,7 +2105,7 @@ function saveAssess(){
   // Get embedded imaging data
   const embedImgResult=getEmbedImgData();if(embedImgResult===false)return;// user saw alert
   const rec={id:Date.now(),type:'ms',date:document.getElementById('f-date').value,resId,resName:res?.n||'',resYear:res?.y||'',attId:attId||null,attName:att?.n||'',caseDesc:document.getElementById('f-case').value,selEpa,selPcMs,selNpcMs,selMs,epaScores:{...epaScores},epaFb:{...epaFb},msItems:{...msScores},msFb:msFbData,overallFb,imgData:embedImgResult||null,epaAvg:ev.length?(ev.reduce((a,b)=>a+b,0)/ev.length).toFixed(2):null,msPresRate:pct};
-  ASSESS.unshift(rec);save();autoSync();updateRmBadge();
+  ASSESS.unshift(rec);save();saveCloud(rec);autoSyncDebounced();updateRmBadge();
   lastSavedAttId=attId;nav('thankyou');
 }
 
@@ -2097,7 +2125,7 @@ function saveImg(){
   const comment=document.getElementById('im-comment').value.trim();if(!comment){showErr('img-err','⚠ 請填寫評核意見');return;}
   const attId=document.getElementById('im-att').value;const res=getRes(resId);const att=getAtt(attId);
   const rec={id:Date.now(),type:'imaging',date:document.getElementById('im-date').value,resId,resName:res?.n||'',resYear:res?.y||'',attId:attId||null,attName:att?.n||'',pid:document.getElementById('im-pid').value,imgType,caseTab:imgTab,caseChosen:chosen,caseSubChosen:imgSubCase,stars:{...imgStars},comment};
-  ASSESS.unshift(rec);save();autoSync();updateRmBadge();nav('thankyou');
+  ASSESS.unshift(rec);save();saveCloud(rec);autoSyncDebounced();updateRmBadge();nav('thankyou');
 }
 function clearImg(){initImg();}
 function showErr(id,msg){const el=document.getElementById(id);el.textContent=msg;el.classList.remove('hidden');}
@@ -2129,10 +2157,15 @@ function isItemLkd(resId,itemId){const r=getRes(resId);return r?.itemLocks?.[ite
 // none are flagged, nothing is filtered (same as before this feature).
 function msShiftCardActive(){return MS.some(m=>m.items&&m.items.some(i=>i.shiftCard));}
 function isMsAllItemsLocked(resId,msId){
-  // Returns true if ALL sub-items of this MS are locked → block selection
   const ms=MS.find(m=>m.id===msId);if(!ms||!ms.items||ms.items.length===0)return false;
   const r=getRes(resId);if(!r)return false;
-  return ms.items.every(i=>r?.itemLocks?.[i.id]===true);
+  const items=ms.items.filter(i=>i.lv<=4);
+  // Traditional: every item explicitly locked
+  if(items.length>0&&items.every(i=>r?.itemLocks?.[i.id]===true))return true;
+  // SC-triggered: ALL shiftCard items in this MS are locked
+  const scItems=items.filter(i=>i.shiftCard);
+  if(scItems.length>0&&scItems.every(i=>r?.itemLocks?.[i.id]===true))return true;
+  return false;
 }
 
 // ══════════════ HISTORY ══════════════
@@ -2160,6 +2193,39 @@ function renderAnalytics(){
   const ctx1=document.getElementById('ch-ms-r').getContext('2d');charts['ch-ms-r']=new Chart(ctx1,{type:'radar',data:{labels:MS_CATS.map(c=>MS_CAT_LBL[c]),datasets:[{label:'可穩定呈現%',data:cpct,backgroundColor:'rgba(0,201,167,.15)',borderColor:'#00c9a7',pointBackgroundColor:'#00c9a7'}]},options:{...cOpt('radar',100),scales:{r:{min:0,max:100,ticks:{color:'#475569',stepSize:25,callback:v=>v+'%'},grid:{color:'#1e2d45'},pointLabels:{color:'#94a3b8',font:{size:11,weight:'bold'}}}}}});
   const ep=document.getElementById('epa-prog');ep.innerHTML='';EPA.forEach(epa=>{const vs=msD.filter(a=>a.epaScores?.[epa.id]).map(a=>a.epaScores[epa.id]);const avg=vs.length?vs.reduce((a,b)=>a+b,0)/vs.length:0;const col=avg>=4?'var(--acc)':avg>=3?'var(--a2)':avg>=2?'var(--a3)':'var(--danger)';ep.innerHTML+=`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="font-size:12px"><span style="color:var(--a2);font-size:9.5px;font-family:'DM Mono'">${epa.id}</span> ${epa.n}</span><span style="font-family:'DM Mono';font-size:12px;color:${col}">${vs.length?avg.toFixed(1):'—'}</span></div><div class="prog-wrap"><div class="prog-bar" style="width:${(avg/5)*100}%;background:${col}"></div></div></div>`;});
   const mds=document.getElementById('ms-detail-stats');mds.innerHTML='';MS_CATS.forEach(cat=>{let html=`<div style="margin-bottom:13px"><div style="font-size:11px;color:var(--a2);font-weight:600;margin-bottom:5px">${cat}</div>`;MS.filter(m=>m.cat===cat).forEach(ms=>{let t=0,s=0;msD.forEach(a=>{ms.items.forEach(i=>{const v=a.msItems?.[i.id];if(v){t++;if(v==='stable')s++;}});});if(!t)return;const pct=Math.round(s/t*100);const col=pct>=80?'var(--acc)':pct>=60?'var(--a3)':'var(--danger)';html+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:3px"><span style="font-size:11px;min-width:65px;font-family:'DM Mono';color:var(--a2)">${ms.id}</span><span style="font-size:11.5px;min-width:100px;color:var(--t2)">${ms.n}</span><div class="prog-wrap" style="flex:1"><div class="prog-bar" style="width:${pct}%;background:${col}"></div></div><span style="font-size:10.5px;color:${col};font-family:'DM Mono';min-width:35px;text-align:right">${pct}%</span></div>`;});mds.innerHTML+=html+'</div>';});
+  // Imaging stats list
+  const imgData=(fR?ASSESS.filter(a=>a.resId===fR):ASSESS).filter(a=>a.imgData&&a.imgData.imgType);
+  const imgList=document.getElementById('img-stats-list');
+  if(!imgList)return;
+  if(!imgData.length){imgList.innerHTML='<div style="text-align:center;color:var(--t3);padding:14px;font-size:12px">尚無影像醫學評核紀錄</div>';return;}
+  imgList.innerHTML=`<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse">
+    <thead><tr style="border-bottom:2px solid var(--border)">
+      <th style="text-align:left;padding:6px 8px">日期</th>
+      <th style="text-align:left;padding:6px 8px">住院醫師</th>
+      <th style="text-align:left;padding:6px 8px">主治醫師</th>
+      <th style="text-align:left;padding:6px 8px">病歷號</th>
+      <th style="text-align:left;padding:6px 8px">影像種類</th>
+      <th style="text-align:left;padding:6px 8px">評核意見</th>
+    </tr></thead>
+    <tbody>${imgData.map(a=>`<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:5px 8px;color:var(--t2)">${a.date}</td>
+      <td style="padding:5px 8px">${a.resName}</td>
+      <td style="padding:5px 8px;font-size:11px;color:var(--t3)">${a.attName||'—'}</td>
+      <td style="padding:5px 8px;font-family:'DM Mono';font-size:11px">${a.imgData.pid||'—'}</td>
+      <td style="padding:5px 8px"><span class="pill p3" style="font-size:10px">${a.imgData.imgType}</span></td>
+      <td style="padding:5px 8px;color:var(--t2);max-width:220px;white-space:pre-wrap">${a.imgData.comment||'—'}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+function exportImgCsv(){
+  const fR=document.getElementById('ana-r')?.value||'';
+  const data=(fR?ASSESS.filter(a=>a.resId===fR):ASSESS).filter(a=>a.imgData&&a.imgData.imgType);
+  if(!data.length){alert('尚無影像醫學評核紀錄可匯出');return;}
+  const hdrs=['日期','住院醫師','年級','主治醫師','病歷號','影像種類','評核意見'];
+  const rows=data.map(a=>[a.date,a.resName,a.resYear||'',a.attName||'',a.imgData.pid||'',a.imgData.imgType,(a.imgData.comment||'').replace(/\n/g,' ')]);
+  const bom='\uFEFF';
+  const csv=bom+[hdrs,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=`影像醫學評核_${tod()}.csv`;a.click();
 }
 
 // ══════════════ SHHER MATRIX ══════════════
@@ -2222,17 +2288,21 @@ function buildShherSection(title,rows,activeRes,getScore){
 
 // ══════════════ RESIDENTS ══════════════
 function renderRes(){const tb=document.getElementById('res-tbody');const active=RES.filter(r=>!r.grad);if(!active.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:16px">尚無資料</td></tr>';return;}tb.innerHTML=active.map(r=>{const as=ASSESS.filter(a=>a.resId===r.id&&a.type==='ms');const pcts=as.filter(a=>a.msPresRate!=null).map(a=>a.msPresRate);const msPct=pcts.length?(pcts.reduce((a,b)=>a+b,0)/pcts.length).toFixed(0)+'%':'—';const ev=as.filter(a=>a.epaAvg).map(a=>parseFloat(a.epaAvg));const epaAvg=ev.length?(ev.reduce((a,b)=>a+b,0)/ev.length).toFixed(1):'—';return`<tr><td style="font-family:'DM Mono';font-size:10.5px;color:var(--t3)">${r.no||'—'}</td><td>${r.n}</td><td style="color:var(--a2)">${r.y}</td><td>${as.length}</td><td>${msPct!=='—'?`<span class="pill ${parseInt(msPct)>=80?'p4':parseInt(msPct)>=60?'p3':'p1'}">${msPct}</span>`:'—'}</td><td>${epaAvg!=='—'?`<span class="pill p${Math.round(epaAvg)}">${epaAvg}</span>`:'—'}</td><td class="ifl" style="gap:4px"><button class="btn bs bxs" onclick="editRes('${r.id}')">編輯</button><button class="btn bxs bd" onclick="delRes('${r.id}')">刪除</button></td></tr>`;}).join('');}
-function openResM(){document.getElementById('r-id').value='';['r-no','r-n','r-qpc','r-qnpc'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('r-y').value='R1';document.getElementById('r-grad').checked=false;document.getElementById('m-res-t').textContent='新增住院醫師';openM('m-res');}
-function editRes(id){const r=getRes(id);if(!r)return;document.getElementById('r-id').value=id;document.getElementById('r-no').value=r.no||'';document.getElementById('r-n').value=r.n;document.getElementById('r-y').value=r.y;document.getElementById('r-grad').checked=r.grad||false;
+function openResM(){document.getElementById('r-id').value='';['r-no','r-n','r-qpc','r-qnpc'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('r-y').value='R1';document.getElementById('r-grad').checked=false;document.getElementById('r-ms-relax').checked=false;document.getElementById('m-res-t').textContent='新增住院醫師';openM('m-res');}
+function editRes(id){const r=getRes(id);if(!r)return;document.getElementById('r-id').value=id;document.getElementById('r-no').value=r.no||'';document.getElementById('r-n').value=r.n;document.getElementById('r-y').value=r.y;document.getElementById('r-grad').checked=r.grad||false;document.getElementById('r-ms-relax').checked=r.msSelRelax||false;
   const rqpc=document.getElementById('r-qpc');const rqnpc=document.getElementById('r-qnpc');
   if(rqpc)rqpc.value=r.qPcOverride!=null?r.qPcOverride:'';
   if(rqnpc)rqnpc.value=r.qNpcOverride!=null?r.qNpcOverride:'';document.getElementById('m-res-t').textContent='編輯住院醫師';openM('m-res');}
 function saveRes(){const n=document.getElementById('r-n').value.trim();if(!n)return alert('請輸入姓名');const eid=document.getElementById('r-id').value;if(eid){const r=getRes(eid);if(r){r.n=n;r.y=document.getElementById('r-y').value;r.no=document.getElementById('r-no').value;const newGrad=document.getElementById('r-grad').checked;if(newGrad&&!r.grad){if(!confirm('確定將「'+r.n+'」標記為已畢業？\n已畢業後將不出現在一般評核列表中，可隨時在住院醫師管理取消。'))return;}r.grad=newGrad;
+    // Auto-clear the resident code when graduating so the code slot (A, B…)
+    // is freed up for the incoming new resident to reuse.
+    if(newGrad)r.no='';
     const qpc=document.getElementById('r-qpc')?.value;
     const qnpc=document.getElementById('r-qnpc')?.value;
     r.qPcOverride=(!qpc||qpc==='')?null:parseInt(qpc);
     r.qNpcOverride=(!qnpc||qnpc==='')?null:parseInt(qnpc);
-  }}else RES.push({id:Date.now().toString(),no:document.getElementById('r-no').value,n,y:document.getElementById('r-y').value,grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}});save();autoSync();closeM('m-res');renderRes();}
+    r.msSelRelax=document.getElementById('r-ms-relax')?.checked||false;
+  }}else RES.push({id:Date.now().toString(),no:document.getElementById('r-no').value,n,y:document.getElementById('r-y').value,grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}});save();autoSyncDebounced();closeM('m-res');renderRes();}
 function delRes(id){if(!confirm('確定刪除此住院醫師的所有資料？\n此操作無法復原。'))return;RES=RES.filter(r=>r.id!==id);save();renderRes();}
 
 // ══════════════ ATTENDINGS ══════════════
@@ -2245,7 +2315,7 @@ function editAtt(id){editAttId=id;const a=getAtt(id);if(!a)return;document.getEl
 function renderAttPreWrap(att){document.getElementById('att-pre-wrap').innerHTML=(att?.presets||[]).map((p,i)=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid rgba(30,45,69,.4)"><span style="font-size:11px;color:var(--acc)">${p.n}</span><span style="font-size:10px;color:var(--t3);flex:1">${p.c.slice(0,30)}…</span><button class="btn bxs bd" onclick="delAttPre(${i})">✕</button></div>`).join('')||'<div style="font-size:10.5px;color:var(--t3);padding:3px 0">尚無個人套餐</div>';}
 function addAttPre(){const n=document.getElementById('atp-n').value.trim(),c=document.getElementById('atp-c').value.trim();if(!n||!c)return alert('請填寫套餐名稱和內容');const id=editAttId||document.getElementById('a-id').value;const att=getAtt(id);if(!att)return;if(!att.presets)att.presets=[];att.presets.push({n,c});save();renderAttPreWrap(att);document.getElementById('atp-n').value='';document.getElementById('atp-c').value='';}
 function delAttPre(idx){const id=editAttId||document.getElementById('a-id').value;const att=getAtt(id);if(!att)return;att.presets.splice(idx,1);save();renderAttPreWrap(att);}
-function saveAtt(){const n=document.getElementById('a-n').value.trim();if(!n)return alert('請輸入姓名');const eid=document.getElementById('a-id').value;const d={n,email:document.getElementById('a-e').value,line:document.getElementById('a-l').value,no:document.getElementById('a-no').value};if(eid){const a=getAtt(eid);if(a)Object.assign(a,d);}else ATT.push({id:Date.now().toString(),...d,presets:[]});save();autoSync();closeM('m-att');renderAtt();}
+function saveAtt(){const n=document.getElementById('a-n').value.trim();if(!n)return alert('請輸入姓名');const eid=document.getElementById('a-id').value;const d={n,email:document.getElementById('a-e').value,line:document.getElementById('a-l').value,no:document.getElementById('a-no').value};if(eid){const a=getAtt(eid);if(a)Object.assign(a,d);}else ATT.push({id:Date.now().toString(),...d,presets:[]});save();autoSyncDebounced();closeM('m-att');renderAtt();}
 function delAtt(id){if(!confirm('確定刪除？'))return;ATT=ATT.filter(a=>a.id!==id);save();renderAtt();}
 
 // ══════════════ SCHEDULE ══════════════
@@ -2255,20 +2325,20 @@ function clearSchedMonth(){
   if(!keys.length){alert('本月無班表資料');return;}
   if(!confirm(`確定清除 ${schedY}年${schedMo+1}月 全部班表（${keys.length}天）？`))return;
   keys.forEach(k=>delete SCHED[k]);
-  save();autoSync();renderSched();updateRmBadge();
+  save();autoSyncDebounced();renderSched();updateRmBadge();
 }
 function clearSchedAll(){
   const total=Object.keys(SCHED).length;
   if(!total){alert('目前無班表資料');return;}
   if(!confirm(`確定清除全部班表資料（共${total}天）？此動作無法復原。`))return;
-  SCHED={};save();autoSync();renderSched();updateRmBadge();
+  SCHED={};save();autoSyncDebounced();renderSched();updateRmBadge();
 }
 function delSchedDay(dateStr){
   const entries=SCHED[dateStr]||[];
   if(!entries.length)return;
   if(!confirm(`確定刪除 ${dateStr} 當天的班表（共${entries.length}筆）？`))return;
   delete SCHED[dateStr];
-  save();autoSync();renderSched();updateRmBadge();
+  save();autoSyncDebounced();renderSched();updateRmBadge();
 }
 function schedMon(d){schedMo+=d;if(schedMo>11){schedMo=0;schedY++;}else if(schedMo<0){schedMo=11;schedY--;}renderSched();}
 function renderSched(){
@@ -2309,16 +2379,20 @@ function closeGrad(){document.getElementById('grad-detail').classList.add('hidde
 function restoreRes(id){
   const r=getRes(id);if(!r)return;
   if(!confirm('確定將「'+r.n+'」恢復為現役住院醫師？'))return;
-  r.grad=false;save();autoSync();renderGrad();
+  r.grad=false;save();autoSyncDebounced();renderGrad();
   alert('✅ 已將「'+r.n+'」恢復為現役，現在可以再次為其新增評核。');
 }
 
 // ══════════════ REMIND ══════════════
-function updateRmBadge(){const t=tod();const sched=getTodayDocs(t);const miss=sched.filter(e=>{const cnt=ASSESS.filter(a=>a.date===t&&a.attId===e.attId&&a.resId===e.resId).length;return cnt===0;});const b=document.getElementById('rbadge');if(isAdmin&&miss.length>0){b.textContent=miss.length;b.classList.remove('hidden');}else b.classList.add('hidden');}
+function updateRmBadge(){const t=tod();const sched=getTodayDocs(t);const miss=sched.filter(e=>{const res=getRes(e.resId);if(!res||res.grad)return false;const cnt=ASSESS.filter(a=>a.date===t&&a.attId===e.attId&&a.resId===e.resId).length;return cnt===0;});const b=document.getElementById('rbadge');if(isAdmin&&miss.length>0){b.textContent=miss.length;b.classList.remove('hidden');}else b.classList.add('hidden');}
 function renderRemind(){
   const ds=document.getElementById('rmd-date').value||tod();
   const entries=SCHED[ds]||[];const attGroups={};
-  entries.forEach(e=>{if(!attGroups[e.attId])attGroups[e.attId]=[];attGroups[e.attId].push(e.resId);});
+  entries.forEach(e=>{
+    // Skip graduated residents — no longer active, ignore their schedule entries
+    const res=getRes(e.resId);if(!res||res.grad)return;
+    if(!attGroups[e.attId])attGroups[e.attId]=[];attGroups[e.attId].push(e.resId);
+  });
   let total=0,miss=0,ok=0;const rows=[];
   Object.entries(attGroups).forEach(([attId,resIds])=>{const att=getAtt(attId);if(!att)return;resIds.forEach(resId=>{const res=getRes(resId);if(!res)return;total++;const cnt=ASSESS.filter(a=>a.date===ds&&a.attId===attId&&a.resId===resId).length;if(cnt===0)miss++;else ok++;rows.push({att,res,cnt});});});
   document.getElementById('rs-t').textContent=total;document.getElementById('rs-m').textContent=miss;document.getElementById('rs-o').textContent=ok;
@@ -2328,7 +2402,7 @@ function renderRemind(){
     <span class="pill ${cnt>0?'p4':'p1'}">${cnt>0?'已評核':'未評核'}</span>
   </div>`).join('');
 }
-function buildBatch(ds){const entries=SCHED[ds]||[];const attGroups={};entries.forEach(e=>{if(!attGroups[e.attId])attGroups[e.attId]=[];attGroups[e.attId].push(e.resId);});const miss=[];Object.entries(attGroups).forEach(([attId,resIds])=>{const att=getAtt(attId);if(!att)return;const missing=resIds.filter(rid=>{const cnt=ASSESS.filter(a=>a.date===ds&&a.attId===attId&&a.resId===rid).length;return cnt===0;});if(missing.length){const resNames=missing.map(rid=>getRes(rid)?.n||'?').join('、');miss.push(`• ${att.n}（尚未評核：${resNames}）`);}});return miss.length?`【急診住院醫師評核提醒】\n\n以下主治醫師於 ${ds} 尚未完成評核：\n\n${miss.join('\n')}\n\n請於輪班結束前完成評核，謝謝！`:'無需提醒';}
+function buildBatch(ds){const entries=SCHED[ds]||[];const attGroups={};entries.forEach(e=>{const res=getRes(e.resId);if(!res||res.grad)return;if(!attGroups[e.attId])attGroups[e.attId]=[];attGroups[e.attId].push(e.resId);});const miss=[];Object.entries(attGroups).forEach(([attId,resIds])=>{const att=getAtt(attId);if(!att)return;const missing=resIds.filter(rid=>{const cnt=ASSESS.filter(a=>a.date===ds&&a.attId===attId&&a.resId===rid).length;return cnt===0;});if(missing.length){const resNames=missing.map(rid=>getRes(rid)?.n||'?').join('、');miss.push(`• ${att.n}（尚未評核：${resNames}）`);}});return miss.length?`【急診住院醫師評核提醒】\n\n以下主治醫師於 ${ds} 尚未完成評核：\n\n${miss.join('\n')}\n\n請於輪班結束前完成評核，謝謝！`:'無需提醒';}
 function batchEmail(){const ds=document.getElementById('rmd-date').value||tod();const entries=SCHED[ds]||[];const emails=[...new Set(entries.map(e=>getAtt(e.attId)?.email).filter(Boolean))].join(',');if(!emails)return alert('無 Email 可發送');window.open(`mailto:${emails}?subject=${encodeURIComponent('評核提醒 '+ds)}&body=${encodeURIComponent(buildBatch(ds))}`);}
 function batchLine(){const ds=document.getElementById('rmd-date').value||tod();document.getElementById('line-txt').textContent=buildBatch(ds);openM('m-line');}
 function copyBatch(){navigator.clipboard.writeText(document.getElementById('batch-txt').textContent).then(()=>alert('已複製！'));}
@@ -2444,7 +2518,7 @@ function commitItemEdits(){
   EPA.forEach(e=>{if(!(e.id in CFG.enEpa))CFG.enEpa[e.id]=true;});
   MS.forEach(m=>{if(!(m.id in CFG.enMs))CFG.enMs[m.id]=true;});
   saveCustomItems();
-  autoSync();
+  autoSyncDebounced();
   renderAdmToggles(); // refresh the enable/disable toggle lists too
   const el=document.getElementById('item-editor-ok');
   el.classList.remove('hidden');setTimeout(()=>el.classList.add('hidden'),3000);
@@ -2459,7 +2533,7 @@ function restoreDefaultItems(){
   renderAdmToggles();
   alert('✅ 已還原為系統預設的 EPA / Milestone 內容');
 }
-function initAdmin(){const qem=document.getElementById('q-em');const qmm=document.getElementById('q-mm');const qrelax=document.getElementById('q-ms-relax');if(qem)qem.value=CFG.qEpaM||0;if(qmm)qmm.value=CFG.qMsM||0;if(qrelax)qrelax.checked=!!CFG.msSelRelax;populateSel('ccc-res',false);populateSel('ward-res',false);renderAdmToggles();renderItemEditor();}
+function initAdmin(){const qem=document.getElementById('q-em');const qmm=document.getElementById('q-mm');if(qem)qem.value=CFG.qEpaM||0;if(qmm)qmm.value=CFG.qMsM||0;populateSel('ccc-res',false);populateSel('ward-res',false);renderAdmToggles();renderItemEditor();}
 function renderCCCPanel(){
   const resId=document.getElementById('ccc-res').value;const panel=document.getElementById('ccc-panel');if(!resId){panel.innerHTML='';return;}
   const r=getRes(resId);
@@ -2476,10 +2550,23 @@ function renderCCCPanel(){
     </div>
     <div><div style="font-size:11px;color:var(--t2);font-weight:600;margin-bottom:6px">Milestone 子項目鎖定</div>
     ${MS.map(ms=>{
-      const allLkd=ms.items.filter(i=>i.lv<=4).every(i=>r?.itemLocks?.[i.id]===true)&&ms.items.filter(i=>i.lv<=4).length>0;
+      const allItems=ms.items.filter(i=>i.lv<=4);
+      const scItems=allItems.filter(i=>i.shiftCard);
+      // SC-triggered full lock: only when ALL SC items are locked
+      const scAllLocked=scItems.length>0&&scItems.every(i=>r?.itemLocks?.[i.id]===true);
+      // Traditional full lock: every item locked
+      const allLkd=allItems.length>0&&allItems.every(i=>r?.itemLocks?.[i.id]===true);
+      const effectiveFullLock=allLkd||scAllLocked;
       const curLim=r?.msMonthLimits?.[ms.id]!=null?r.msMonthLimits[ms.id]:'';
-      let msHtml=`<div style="font-size:10.5px;color:var(--a3);font-weight:600;padding:4px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${ms.id} ${ms.n}${allLkd?'<span style="font-size:9px;background:var(--a3);color:#fff;padding:1px 5px;border-radius:4px">全項鎖定</span>':''}<label style="font-size:9.5px;color:var(--t2);font-weight:400;margin-left:auto;display:flex;align-items:center;gap:4px">月上限<input type="number" min="0" max="50" style="width:44px;font-size:11px;text-align:center;padding:1px 3px" value="${curLim}" placeholder="—" onchange="setMsMonthLimit('${resId}','${ms.id}',this.value)"><span style="font-size:9px;color:var(--t3)">0=不限</span></label></div>`;
-      msHtml+=ms.items.filter(i=>i.lv<=4).map(item=>{const lkd=r?.itemLocks?.[item.id]===true;const scBg=item.shiftCard?'background:rgba(245,158,11,.08);border-left:3px solid var(--a3)':'';return`<div class="tw" style="${scBg}"><div><div class="tl" style="font-size:11px">${item.shiftCard?'<span style="font-size:9px;color:var(--a3);font-weight:700;margin-right:3px">⚡SC</span>':''}<span class="lvtag lv${item.lv}" style="font-size:8.5px;margin-right:3px">L${item.lv}</span>${item.t.slice(0,30)}…</div></div><label class="tog"><input type="checkbox" ${lkd?'checked':''} onchange="setItemLk('${resId}','${item.id}',this.checked)"><span class="tsl"></span></label></div>`;}).join('');
+      let msHtml=`<div style="font-size:10.5px;color:var(--a3);font-weight:600;padding:4px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${ms.id} ${ms.n}${effectiveFullLock?'<span style="font-size:9px;background:#22c55e;color:#fff;padding:1px 5px;border-radius:4px">✓ 全項鎖定</span>':''}<label style="font-size:9.5px;color:var(--t2);font-weight:400;margin-left:auto;display:flex;align-items:center;gap:4px">月上限<input type="number" min="0" max="50" style="width:44px;font-size:11px;text-align:center;padding:1px 3px" value="${curLim}" placeholder="—" onchange="setMsMonthLimit('${resId}','${ms.id}',this.value)"><span style="font-size:9px;color:var(--t3)">0=不限</span></label></div>`;
+      msHtml+=allItems.map(item=>{
+        const lkd=r?.itemLocks?.[item.id]===true;
+        // Color: locked=green, unlocked=red (regardless of SC status)
+        const rowBg=lkd
+          ?'background:rgba(34,197,94,.13);border-left:3px solid #22c55e'
+          :'background:rgba(239,68,68,.08);border-left:3px solid #ef4444';
+        return`<div class="tw" style="${rowBg}"><div><div class="tl" style="font-size:11px">${item.shiftCard?'<span style="font-size:9px;color:var(--a3);font-weight:700;margin-right:3px">⚡SC</span>':''}<span class="lvtag lv${item.lv}" style="font-size:8.5px;margin-right:3px">L${item.lv}</span>${item.t.slice(0,30)}…</div></div><label class="tog"><input type="checkbox" ${lkd?'checked':''} onchange="setItemLk('${resId}','${item.id}',this.checked)"><span class="tsl"></span></label></div>`;
+      }).join('');
       return msHtml;
     }).join('')}</div>
   </div>`;
@@ -2520,7 +2607,7 @@ function renderWardPanel(){
   const r=getRes(resId);const ward=r?.ward||{ind:'',obs:'',er:''};
   panel.innerHTML=`<div class="g3 mt3">${[['ind','獨立診'],['obs','留觀'],['er','九診']].map(([k,label])=>`<div class="fg"><label>${label}</label><select onchange="setWard('${resId}','${k}',this.value)"><option value="">—（自動）</option>${['可','特','否'].map(v=>`<option ${ward[k]===v?'selected':''} value="${v}">${v==='可'?'可執行':v==='特'?'特定狀況':'不可執行'}</option>`).join('')}</select></div>`).join('')}</div>`;
 }
-function setWard(resId,key,val){const r=getRes(resId);if(!r)return;if(!r.ward)r.ward={};r.ward[key]=val;save();autoSync();}
+function setWard(resId,key,val){const r=getRes(resId);if(!r)return;if(!r.ward)r.ward={};r.ward[key]=val;save();autoSyncDebounced();}
 function renderAdmToggles(){document.getElementById('adm-ep').innerHTML=EPA.map(e=>`<div class="tw"><div class="tl">${e.id} ${e.n}</div><label class="tog"><input type="checkbox" ${CFG.enEpa[e.id]?'checked':''} onchange="togEn('epa','${e.id}',this.checked)"><span class="tsl"></span></label></div>`).join('');document.getElementById('adm-ms').innerHTML=MS_CATS.map(cat=>`<div style="margin-bottom:5px"><div style="font-size:9.5px;color:var(--a2);padding:4px 0;font-weight:600">${cat}</div>${MS.filter(m=>m.cat===cat).map(m=>`<div class="tw"><div class="tl" style="font-size:11px">${m.id} ${m.n}</div><label class="tog"><input type="checkbox" ${CFG.enMs[m.id]?'checked':''} onchange="togEn('ms','${m.id}',this.checked)"><span class="tsl"></span></label></div>`).join('')}</div>`).join('');}
 function togEn(t,id,val){if(t==='epa')CFG.enEpa[id]=val;else CFG.enMs[id]=val;saveAdmin(true);}
 async function repairRoster(){
@@ -2542,7 +2629,7 @@ async function repairRoster(){
     if(el){el.textContent='⚠️ 本機名單已修復，但寫回雲端失敗：'+e.message+'（請稍後點「⬆ 上傳資料」重試）';el.className='al ae';}
   }
 }
-function saveAdmin(silent=false){const _em=document.getElementById('q-em');const _mm=document.getElementById('q-mm');const _relax=document.getElementById('q-ms-relax');if(_em&&_em.value!=='')CFG.qEpaM=parseInt(_em.value)||0;if(_mm&&_mm.value!=='')CFG.qMsM=parseInt(_mm.value)||0;if(_relax)CFG.msSelRelax=_relax.checked;save();fsSetDoc('config','cfg',CFG).catch(()=>{});if(!silent){['admin-ok','admin-limit-ok'].forEach(id=>{const el=document.getElementById(id);if(el){el.classList.remove('hidden');setTimeout(()=>el.classList.add('hidden'),2500);}});}}
+function saveAdmin(silent=false){const _em=document.getElementById('q-em');const _mm=document.getElementById('q-mm');if(_em&&_em.value!=='')CFG.qEpaM=parseInt(_em.value)||0;if(_mm&&_mm.value!=='')CFG.qMsM=parseInt(_mm.value)||0;save();fsSetDoc('config','cfg',CFG).catch(()=>{});if(!silent){['admin-ok','admin-limit-ok'].forEach(id=>{const el=document.getElementById(id);if(el){el.classList.remove('hidden');setTimeout(()=>el.classList.add('hidden'),2500);}});}}
 
 
 // ══════════════ DETAIL ══════════════
@@ -2561,7 +2648,7 @@ function viewDet(id){
   }
   document.getElementById('m-det-b').innerHTML=html;openM('m-detail');
 }
-function delA(id){if(!confirm('確定刪除？'))return;ASSESS=ASSESS.filter(a=>a.id!==id);save();autoSync();updateRmBadge();renderDash();if(document.getElementById('page-history').classList.contains('active'))renderHistory();}
+function delA(id){if(!confirm('確定刪除？'))return;ASSESS=ASSESS.filter(a=>a.id!==id);save();deleteCloud('assessments',id);autoSyncDebounced();updateRmBadge();renderDash();if(document.getElementById('page-history').classList.contains('active'))renderHistory();}
 
 // EXPORT
 function exportCSV(){
@@ -2629,7 +2716,7 @@ function importJSON(){
         entries.forEach(e=>{if(!SCHED[date].find(x=>x.attId===e.attId&&x.resId===e.resId))SCHED[date].push(e);});
       });
     }
-    save();autoSync();
+    save();autoSyncDebounced();
     el.textContent='✅ 匯入成功！新增評核 '+addedA+' 筆、住院醫師 '+addedR+' 位、主治醫師 '+addedAt+' 位。';
     el.className='al aok';el.classList.remove('hidden');
     renderDash();
@@ -2665,22 +2752,14 @@ let embedImgType='',embedImgTab='req',embedImgStars={},embedImgSubCase='';
 function toggleEmbedImg(){
   const show=document.getElementById('embed-img-enabled').checked;
   document.getElementById('embed-img-inner').style.display=show?'block':'none';
-  if(show){renderEmbedImgList();renderEmbedImgStars();renderEmbedPresets();}
 }
 function selEmbedIT(t,btn){embedImgType=t;btn.closest('div').querySelectorAll('.itbtn').forEach(b=>b.classList.remove('sel'));btn.classList.add('sel');}
-function swEmbedImgTab(tab,el){embedImgTab=tab;document.querySelectorAll('#embed-img-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');embedImgSubCase='';document.getElementById('embed-img-sub-wrap').classList.add('hidden');renderEmbedImgList();}
-function renderEmbedImgList(){const cases=embedImgTab==='req'?IMG_REQ:IMG_SEL;const el=document.getElementById('embed-img-case-list');if(!el)return;el.innerHTML=cases.map((c,i)=>`<div class="img-item"><input type="radio" name="embedimgcase" id="eic-${i}" value="${c}" onchange="onEmbedImgCase('${c.replace(/'/g,"\\'")}')"><label for="eic-${i}">${c}</label></div>`).join('');}
-function onEmbedImgCase(v){embedImgSubCase='';const sub=document.getElementById('embed-img-sub-wrap');if(v==='其他'&&embedImgTab==='req'){sub.classList.remove('hidden');document.getElementById('embed-img-sub-list').innerHTML=IMG_SEL.map((c,i)=>`<div class="img-item"><input type="radio" name="embedimgsub" id="eics-${i}" value="${c}" onchange="embedImgSubCase='${c.replace(/'/g,"\\'")}';"><label for="eics-${i}">${c}</label></div>`).join('');}else sub.classList.add('hidden');}
-function renderEmbedImgStars(){const el=document.getElementById('embed-img-stars');if(!el)return;el.innerHTML=IMG_CR.map(c=>`<div class="star-row"><div style="font-size:13px">${c}</div><div style="display:flex;gap:4px">${[1,2,3,4,5].map(n=>`<button class="starbtn ${(embedImgStars[c]||0)>=n?'on':''}" onclick="setEmbedStar('${c}',${n},this.parentElement)">★</button>`).join('')}</div></div>`).join('');}
-function setEmbedStar(c,n,grp){embedImgStars[c]=n;grp.querySelectorAll('.starbtn').forEach((b,i)=>b.classList.toggle('on',i<n));}
-function renderEmbedPresets(){const att=getAtt(document.getElementById('f-att')?.value);const el=document.getElementById('eimg-pre-tools');if(el)el.innerHTML=(att?.presets||[]).map(p=>`<button class="pre-btn" onclick="insertFb('eimg-comment','${p.c.replace(/'/g,"\\'")}')">＋${p.n}</button>`).join('');}
 function getEmbedImgData(){
   if(!document.getElementById('embed-img-enabled')?.checked)return null;
-  const r=document.querySelector('input[name="embedimgcase"]:checked');if(!r)return null;
-  const comment=(document.getElementById('eimg-comment')?.value||'').trim();
-  if(!comment){alert('已啟用影像評核，請填寫評核意見');return false;}
   if(!embedImgType){alert('請選擇影像種類');return false;}
-  return{imgType:embedImgType,caseTab:embedImgTab,caseChosen:r.value,caseSubChosen:embedImgSubCase,pid:(document.getElementById('eipid')?.value||''),stars:{...embedImgStars},comment};
+  const comment=(document.getElementById('eimg-comment')?.value||'').trim();
+  const pid=(document.getElementById('eipid')?.value||'').trim();
+  return{imgType:embedImgType,pid,comment};
 }
 function applyFontSize(px){
   // Inject/update a dynamic style tag - this overrides ALL other CSS
