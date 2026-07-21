@@ -371,6 +371,7 @@ body{font-size:var(--base-font,17px)}
     <div class="ns">工具</div>
     <div class="ni" onclick="nav('graduated',this)"><span class="ic">🎓</span>已畢業學員</div>
     <div class="ni" onclick="nav('export',this)"><span class="ic">⬇️</span>匯出報告</div>
+    <div class="ni" id="ni-missing" onclick="nav('missing',this)"><span class="ic">📋</span>未填答名單</div>
     <div class="ni admin-only hidden" id="ni-remind" onclick="nav('remind',this)">
       <span class="ic">🔔</span>提醒未填答<span class="nb hidden" id="rbadge">0</span>
     </div>
@@ -423,7 +424,8 @@ body{font-size:var(--base-font,17px)}
 <div class="page active" id="page-dashboard">
   <div class="sh mb4">
     <div><div class="st">總覽儀表板</div><div class="ss2" id="dash-sub">今日評核進度與整體概況</div></div>
-    <div class="ifl">
+    <div class="ifl" style="flex-wrap:wrap;gap:7px">
+      <button class="btn bs bsm" id="dash-resel-btn" onclick="reselAtt()" style="display:none">↩ 重新選擇身份</button>
       <button class="btn bp bsm" onclick="nav('assess')">＋ 新增評核</button>
     </div>
   </div>
@@ -475,6 +477,12 @@ body{font-size:var(--base-font,17px)}
     <div class="ws" id="ws4">5. 質性回饋</div>
   </div>
   <div class="wpane active" id="wp0">
+    <!-- Non-admin: pending dates, shown before the form so people can jump
+         straight to an unfinished date/resident without leaving this page -->
+    <div id="assess-pending-card" class="card mb4 hidden">
+      <div class="ct"><span class="dot" style="background:var(--danger)"></span>尚未填寫評核的日期</div>
+      <div id="assess-pending-list"></div>
+    </div>
     <div class="who-bar">
       <span style="font-size:11.5px;color:var(--t2);font-weight:600">📌 填答主治醫師：</span>
       <select id="f-att" style="max-width:210px" onchange="onAttChange()"><option value="">— 請選擇 —</option></select>
@@ -537,7 +545,7 @@ body{font-size:var(--base-font,17px)}
           </div>
         </div>
         <div class="fg">
-          <label>影像評核意見（選填）</label>
+          <label>影像說明（選填）</label>
           <textarea id="eimg-comment" oninput="checkFb(this)" placeholder="請簡要說明以便後續整理" style="width:100%;min-height:70px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;outline:none;resize:vertical"></textarea>
         </div>
       </div>
@@ -640,7 +648,7 @@ body{font-size:var(--base-font,17px)}
     <div class="ty-sub">您的評核已成功儲存。感謝您對住院醫師訓練品質的貢獻！</div>
     <div class="ifl" style="flex-wrap:wrap;justify-content:center;gap:10px">
       <button class="btn bp" onclick="nav('assess')">＋ 再新增一筆評核</button>
-      <button class="btn bpu" onclick="navToPending()">🔔 前往該主治醫師未填答</button>
+      <button class="btn bpu" onclick="navToPending()">🔔 回到尚未填寫清單</button>
       <button class="btn bs" onclick="nav('dashboard')">回儀表板</button>
     </div>
   </div>
@@ -685,18 +693,49 @@ body{font-size:var(--base-font,17px)}
   <div class="sh mb4">
     <div><div class="st">🏥 SHHER EPA 執業矩陣</div><div class="ss2">未畢業住院醫師 EPA/MS 等級與執業門檻</div></div>
     <div class="ifl" style="flex-wrap:wrap;gap:7px">
-      <div style="display:flex;align-items:center;gap:5px">
-        <span style="font-size:12px;color:var(--t2)">CCC：</span>
-        <select id="shher-ccc" style="width:95px" onchange="renderShher()">
-          <option value="0">最新一次</option>
-          <option value="1">前一次</option>
-          <option value="2">前兩次</option>
-        </select>
-      </div>
       <select id="shher-yr" style="width:100px" onchange="renderShher()"><option value="">所有年級</option><option>R1</option><option>R2</option><option>R3</option><option>R4</option></select>
     </div>
   </div>
-  <div id="shher-table"></div>
+  <div class="tabs mb4" id="shher-tabs">
+    <div class="tab active" onclick="swShherTab('matrix',this)">執業矩陣</div>
+    <div class="tab" onclick="swShherTab('growth',this)">CCC 成長曲線</div>
+    <div class="tab" onclick="swShherTab('paste',this)">📋 貼上 CCC 資料</div>
+  </div>
+  <div id="shher-matrix-wrap">
+    <div id="shher-table"></div>
+  </div>
+  <div id="shher-growth-wrap" class="hidden">
+    <div class="card mb4">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+        <div class="fg" style="margin:0;flex:1;min-width:130px"><label style="font-size:11px">住院醫師</label>
+          <select id="growth-res" style="width:100%" onchange="renderGrowthChart()"><option value="">— 選擇 —</option></select></div>
+        <div class="fg" style="margin:0;flex:1;min-width:110px"><label style="font-size:11px">類別</label>
+          <select id="growth-cat" style="width:100%" onchange="renderGrowthChart()">
+            <option value="epa">EPA 等級</option>
+            <option value="ms">Milestone 平均</option>
+          </select></div>
+      </div>
+      <div class="cw" style="min-height:260px"><canvas id="ch-growth"></canvas></div>
+    </div>
+    <div id="growth-detail"></div>
+  </div>
+  <div id="shher-paste-wrap" class="hidden">
+    <div class="card mb4">
+      <div class="ah">📋 貼上 CCC 評核結果</div>
+      <p style="font-size:12px;color:var(--t2);margin-bottom:8px">將每次 CCC 結束後的評分資料貼入下方欄位，格式為「序號\t姓名\t年級\t日期(YYYY/MM)\tEPA或MS項目\t分數」，每行一筆，按下「解析並匯入」即可自動更新所有住院醫師的 CCC 紀錄。「分數」欄位可填數字（如 2.5）或 CCC 等級（如 3a、3b），「年級」欄位（如 R2）會自動換算成「R2上半/下半」（依日期月份，1-6月=上半，7-12月=下半），匯入後可個別編輯。</p>
+      <p style="font-size:11px;color:var(--a3);margin-bottom:10px">⚡ 相同姓名、相同日期的資料會自動歸為同一次 CCC，不同日期視為不同次 CCC。</p>
+      <textarea id="ccc-paste-area" style="width:100%;min-height:200px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:10px 12px;font-size:12px;font-family:'DM Mono',monospace;outline:none;resize:vertical" placeholder="55&#9;李宜蒼&#9;R2&#9;2025/06&#9;PC1&#9;2.5&#10;56&#9;李宜蒼&#9;R2&#9;2025/06&#9;PC2&#9;2&#10;..."></textarea>
+      <div class="ifl" style="gap:8px;margin-top:10px">
+        <button class="btn bpu" onclick="parseCCCPaste()">✅ 解析並匯入</button>
+        <button class="btn bs bsm" onclick="document.getElementById('ccc-paste-area').value=''">🗑 清空</button>
+      </div>
+      <div id="ccc-paste-result" class="al hidden mt3"></div>
+    </div>
+    <div class="card">
+      <div class="ah">📊 已匯入的 CCC 紀錄</div>
+      <div id="ccc-history-list" style="font-size:12px"></div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ RESIDENTS ═══ -->
@@ -828,13 +867,39 @@ body{font-size:var(--base-font,17px)}
 </div>
 
 <!-- ═══ REMIND ═══ -->
+<!-- ═══ MISSING LIST ═══ -->
+<div class="page" id="page-missing">
+  <div class="sh mb4">
+    <div><div class="st">📋 未填答名單</div><div class="ss2">班表中尚未完成評核的紀錄</div></div>
+  </div>
+  <div class="card mb4">
+    <div class="ifl" style="flex-wrap:wrap;gap:8px;align-items:flex-end">
+      <div class="fg" style="margin:0"><label style="font-size:11px">起始日期</label><input type="date" id="miss-from" style="width:140px"></div>
+      <div class="fg" style="margin:0"><label style="font-size:11px">結束日期</label><input type="date" id="miss-to" style="width:140px"></div>
+      <button class="btn bpu bsm" onclick="renderMissing()">查詢</button>
+      <button class="btn bs bsm" onclick="setMissingWeek()">本週</button>
+    </div>
+  </div>
+  <div class="g3 mb4">
+    <div class="stat sb"><div class="sl">應評核</div><div class="sv" id="miss-total">0</div></div>
+    <div class="stat sr"><div class="sl">未填答</div><div class="sv" id="miss-miss">0</div></div>
+    <div class="stat sg"><div class="sl">已完成</div><div class="sv" id="miss-ok">0</div></div>
+  </div>
+  <div class="card"><div class="ct"><span class="dot" style="background:var(--danger)"></span>未填答明細</div><div id="miss-list"></div></div>
+</div>
+
+<!-- ═══ REMIND ═══ -->
 <div class="page" id="page-remind">
   <div class="sh mb4">
     <div><div class="st">🔔 提醒未填答</div></div>
-    <div class="ifl"><input type="date" id="rmd-date" style="width:140px" onchange="renderRemind()"><button class="btn bpu bsm" onclick="renderRemind()">查詢</button></div>
+    <div class="ifl" style="flex-wrap:wrap;gap:8px;align-items:flex-end">
+      <div class="fg" style="margin:0"><label style="font-size:11px">起始日期</label><input type="date" id="rmd-from" style="width:140px" onchange="renderRemind()"></div>
+      <div class="fg" style="margin:0"><label style="font-size:11px">結束日期</label><input type="date" id="rmd-to" style="width:140px" onchange="renderRemind()"></div>
+      <button class="btn bpu bsm" onclick="renderRemind()">查詢</button>
+    </div>
   </div>
   <div class="g3 mb4">
-    <div class="stat sb"><div class="sl">今日值班</div><div class="sv" id="rs-t">0</div></div>
+    <div class="stat sb"><div class="sl">應評核</div><div class="sv" id="rs-t">0</div></div>
     <div class="stat sr"><div class="sl">尚未評核</div><div class="sv" id="rs-m">0</div></div>
     <div class="stat sg"><div class="sl">已有評核</div><div class="sv" id="rs-o">0</div></div>
   </div>
@@ -1068,7 +1133,19 @@ body{font-size:var(--base-font,17px)}
 <div class="ov" id="m-line"><div class="modal" style="max-width:440px">
   <div class="mh"><div class="mt2">💬 LINE 訊息</div><button class="mc" onclick="closeM('m-line')">✕</button></div>
   <div id="line-txt" style="background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:10px;font-size:11px;color:var(--t2);white-space:pre-wrap;max-height:180px;overflow-y:auto;font-family:'DM Mono',monospace"></div>
-  <div class="ifl mt3 fe"><button class="btn bs bsm" onclick="copyEl('line-txt')">複製</button><button class="btn bln bsm" onclick="window.open('https://line.me/R/nv/chat','_blank')">開啟 LINE</button></div>
+  <div class="ifl mt3 fe"><button class="btn bs bsm" onclick="copyEl('line-txt')">複製</button><button class="btn bln bsm" onclick="openLineShare(document.getElementById('line-txt').textContent)">💬 用 LINE 傳送</button></div>
+</div></div>
+
+<div class="ov" id="m-ccc-edit"><div class="modal" style="max-width:480px">
+  <div class="mh"><div class="mt2">✏️ 編輯 CCC 紀錄 — <span id="ccc-edit-name"></span></div><button class="mc" onclick="closeM('m-ccc-edit')">✕</button></div>
+  <input type="hidden" id="ccc-edit-resid"><input type="hidden" id="ccc-edit-idx">
+  <div class="g2 mb3">
+    <div class="fg"><label>日期 (YYYY/MM)</label><input type="text" id="ccc-edit-date" placeholder="2026/06"></div>
+    <div class="fg"><label>年級階段（可編輯）</label><input type="text" id="ccc-edit-half" placeholder="例：R2上半"></div>
+  </div>
+  <div style="font-size:12px;color:var(--t2);font-weight:600;margin-bottom:6px">各項目分數</div>
+  <div id="ccc-edit-items" style="max-height:280px;overflow-y:auto"></div>
+  <div class="ifl mt3 fe"><button class="btn bs bsm" onclick="closeM('m-ccc-edit')">取消</button><button class="btn bpu bsm" onclick="saveCCCEdit()">💾 儲存</button></div>
 </div></div>
 
 <script>
@@ -1665,7 +1742,7 @@ function getAttByNo(no){return ATT.find(a=>String(a.no)===String(no));}
 function getResByNo(no){return RES.find(r=>r.no===no);}
 
 // NAV
-const PT={dashboard:'儀表板',assess:'新增評核',thankyou:'謝謝填寫',history:'評核紀錄',analytics:'統計分析',shher:'SHHER 執業矩陣',residents:'住院醫師管理',attendings:'主治醫師管理',schedule:'班表管理',graduated:'已畢業學員',export:'匯出 / 匯入資料',remind:'提醒未填答',admin:'系統管理員',firebase:'雲端設定'};
+const PT={dashboard:'儀表板',assess:'新增評核',thankyou:'謝謝填寫',history:'評核紀錄',analytics:'統計分析',shher:'SHHER 執業矩陣',residents:'住院醫師管理',attendings:'主治醫師管理',schedule:'班表管理',graduated:'已畢業學員',export:'匯出 / 匯入資料',missing:'未填答名單',remind:'提醒未填答',admin:'系統管理員',firebase:'雲端設定'};
 function nav(page,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
@@ -1678,13 +1755,14 @@ function nav(page,el){
   if(page==='imaging')initImg();
   if(page==='history')renderHistory();
   if(page==='analytics')renderAnalytics();
-  if(page==='shher')renderShher();
+  if(page==='shher'){renderShher();populateSel('growth-res',false);}
   if(page==='residents')renderRes();
   if(page==='attendings')renderAtt();
   if(page==='schedule')renderSched();
   if(page==='graduated')renderGrad();
   if(page==='export'){populateSel('exp-r');populateSel('prt-r');}
-  if(page==='remind'){document.getElementById('rmd-date').value=tod();renderRemind();}
+  if(page==='missing'){initMissingPage();renderMissing();}
+  if(page==='remind'){initRemindRange();renderRemind();}
   if(page==='admin')initAdmin();
   if(page==='firebase'){loadFBCfg();
     // Always fill inputs from stored config
@@ -1809,6 +1887,8 @@ function renderDash(){
   const sub=document.getElementById('dash-sub');
   if(!isAdmin&&currentAttId){const att=getAtt(currentAttId);sub.textContent=`${att?.n||''}醫師 — 我的評核紀錄`;}
   else sub.textContent='今日評核進度與整體概況';
+  const reselBtn=document.getElementById('dash-resel-btn');
+  if(reselBtn)reselBtn.style.display=(!isAdmin&&currentAttId)?'':'none';
   const admCharts=document.getElementById('admin-dash-charts');
   if(isAdmin){admCharts.classList.remove('hidden');renderDashCharts();}
   else admCharts.classList.add('hidden');
@@ -1883,7 +1963,25 @@ function renderDashCharts(){
 }
 
 // ══════════════ ASSESS ══════════════
-function initAssess(){selEpa=[];selPcMs=[];selNpcMs=[];epaScores={};epaFb={};msScores={};embedImgType='';embedImgTab='req';embedImgStars={};embedImgSubCase='';document.getElementById('f-date').value=tod();document.getElementById('f-case').value='';const ofb=document.getElementById('f-overall-fb');if(ofb){ofb.value='';ofb.classList.remove('fil');ofb.classList.add('mf');}const ofbCnt=document.getElementById('f-overall-fb-cnt');if(ofbCnt){ofbCnt.textContent='0 字';ofbCnt.style.color='var(--t3)';}const eib=document.getElementById('embed-img-enabled');if(eib){eib.checked=true;const inner=document.getElementById('embed-img-inner');if(inner)inner.style.display='block';}['ass-ok','ass-err'].forEach(id=>document.getElementById(id).classList.add('hidden'));populateSel('f-res',false);populateSel('f-att',true);if(currentAttId)document.getElementById('f-att').value=currentAttId;onAttChange();[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===0);document.getElementById('ws'+i).className='ws'+(i===0?' active':'');});syncMobBar(0);}
+function renderAssessPendingCard(){
+  const card=document.getElementById('assess-pending-card');if(!card)return;
+  if(!isAdmin&&currentAttId){
+    const pending=getPendingDates(currentAttId);
+    if(pending.length){
+      card.classList.remove('hidden');
+      document.getElementById('assess-pending-list').innerHTML=pending.map(({date,resIds})=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(30,45,69,.5);flex-wrap:wrap">
+        <span style="font-family:'DM Mono';font-size:13px;color:var(--a3);min-width:90px">${date}</span>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">${resIds.map(id=>{const r=getRes(id);return r?`<button class="btn bp bxs" onclick="quickAssessOnDate('${currentAttId}','${id}','${date}')">${r.n}</button>`:''}).join('')}</div>
+      </div>`).join('');
+    }else{
+      card.classList.remove('hidden');
+      document.getElementById('assess-pending-list').innerHTML='<div style="text-align:center;color:var(--acc);padding:10px">✅ 沒有未填寫的評核！</div>';
+    }
+  }else{
+    card.classList.add('hidden');
+  }
+}
+function initAssess(){selEpa=[];selPcMs=[];selNpcMs=[];epaScores={};epaFb={};msScores={};embedImgType='';embedImgTab='req';embedImgStars={};embedImgSubCase='';document.getElementById('f-date').value=tod();document.getElementById('f-case').value='';const ofb=document.getElementById('f-overall-fb');if(ofb){ofb.value='';ofb.classList.remove('fil');ofb.classList.add('mf');}const ofbCnt=document.getElementById('f-overall-fb-cnt');if(ofbCnt){ofbCnt.textContent='0 字';ofbCnt.style.color='var(--t3)';}const eib=document.getElementById('embed-img-enabled');if(eib){eib.checked=true;const inner=document.getElementById('embed-img-inner');if(inner)inner.style.display='block';}['ass-ok','ass-err'].forEach(id=>document.getElementById(id).classList.add('hidden'));populateSel('f-res',false);populateSel('f-att',true);if(currentAttId)document.getElementById('f-att').value=currentAttId;onAttChange();renderAssessPendingCard();[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===0);document.getElementById('ws'+i).className='ws'+(i===0?' active':'');});syncMobBar(0);}
 function onAttChange(){const id=document.getElementById('f-att').value;const entries=(SCHED[tod()]||[]).filter(e=>e.attId===id);const si=document.getElementById('tshift');if(entries.length){const resNames=entries.map(e=>getRes(e.resId)?.n||'').filter(Boolean);si.textContent=resNames.length?`今日需評：${resNames.join('、')}`:'今日值班';}else si.textContent='';}
 function goStep(s){if(s===1&&!v0())return;if(s===2&&!v1())return;if(s===3&&!v2())return;[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===s);document.getElementById('ws'+i).className='ws'+(i===s?' active':i<s?' done':'');});window.scrollTo(0,0);if(s===1)renderSelStep();if(s===2)renderEpaStep();if(s===3)renderMsStep();syncMobBar(s);}
 function syncMobBar(s){
@@ -2071,26 +2169,26 @@ function setMsItem(id,val,grp){
 }
 function navToPending(){
   if(!lastSavedAttId){nav('dashboard');return;}
-  // Find pending dates for this attending
-  const pending=[];
-  Object.entries(SCHED).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([date,pairs])=>{
-    const myPairs=pairs.filter(p=>p.attId===lastSavedAttId);
-    const unfinished=myPairs.filter(p=>!ASSESS.some(a=>a.date===date&&a.attId===lastSavedAttId&&a.resId===p.resId));
-    if(unfinished.length)pending.push({date,pairs:unfinished});
-  });
-  if(pending.length){
-    // Pre-fill the assess form with first pending
-    const {date,pairs}=pending[0];
-    nav('assess');
-    setTimeout(()=>{
-      document.getElementById('f-att').value=lastSavedAttId;
-      document.getElementById('f-date').value=date;
-      document.getElementById('f-res').value=pairs[0].resId;
-      onAttChange();
-    },100);
-  }else{
-    alert('✅ 所有排班日期均已填寫評核！');nav('dashboard');
+  // Find pending dates for this attending (excludes graduated residents, uses
+  // the same logic as the dashboard's pending card / missing-list page).
+  const pending=getPendingDates(lastSavedAttId);
+  if(!pending.length){
+    alert('✅ 所有排班日期均已填寫評核！');
+    nav('dashboard');
+    return;
   }
+  // Take a range covering all pending dates for this attending, then open
+  // the missing-list page so the person can see and pick from the full list
+  // rather than being dropped straight into a single form.
+  const dates=pending.map(p=>p.date).sort();
+  nav('missing');
+  setTimeout(()=>{
+    const fromEl=document.getElementById('miss-from');
+    const toEl=document.getElementById('miss-to');
+    if(fromEl)fromEl.value=dates[0];
+    if(toEl)toEl.value=dates[dates.length-1];
+    renderMissing();
+  },100);
 }
 function saveAssess(){
   const resId=document.getElementById('f-res').value;if(!resId){alert('請選擇住院醫師');return;}
@@ -2230,7 +2328,6 @@ function exportImgCsv(){
 
 // ══════════════ SHHER MATRIX ══════════════
 function getCCCScore(res, epaId, nthBack){
-  // Get CCC level for EPA from history (nthBack: 0=latest, 1=prev, 2=prev2)
   const hist=(res.cccHistory||[]);
   let levels={};
   if(hist.length>0){
@@ -2240,43 +2337,48 @@ function getCCCScore(res, epaId, nthBack){
     levels=res.cccLevels||{};
   }
   const lv=levels[epaId]||'';
-  // Convert CCC level string to numeric
   const map={'1':1,'2a':2,'2b':2,'3a':3,'3b':3,'3c':3,'4':4,'5':5};
   return map[lv]||getLatestEpaScore(res.id,epaId);
 }
+function swShherTab(tab,el){
+  document.querySelectorAll('#shher-tabs .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  ['matrix','growth','paste'].forEach(t=>{
+    const w=document.getElementById('shher-'+t+'-wrap');if(w)w.classList.toggle('hidden',t!==tab);
+  });
+  if(tab==='growth'){populateSel('growth-res',false);renderGrowthChart();}
+  if(tab==='paste'){renderCCCHistoryList();}
+}
 function renderShher(){
   const yr=document.getElementById('shher-yr')?.value||'';
-  const cccNth=parseInt(document.getElementById('shher-ccc')?.value||'0');
-  // Only ungraduated residents
+  // Use latest CCC for matrix
   const activeRes=RES.filter(r=>!r.grad&&(yr?r.y===yr:true));
   if(!activeRes.length){document.getElementById('shher-table').innerHTML='<div class="al ai">目前無未畢業住院醫師資料</div>';return;}
   let html='';
-  // ─ EPA section ─
-  html+=buildShherSection('EPA',SHHER_EPA,activeRes,(res,id)=>getCCCScore(res,id,cccNth));
-  // ─ MS section ─
+  html+=buildShherSection('EPA',SHHER_EPA,activeRes,(res,id)=>getCCCScore(res,id,0));
   html+=buildShherSection('Milestone',SHHER_MS,activeRes,(res,id)=>getMsPct(res.id,id)/25);
   document.getElementById('shher-table').innerHTML=html;
 }
 function buildShherSection(title,rows,activeRes,getScore){
-  const expHdrs=['R1早','R1晚','R2早','R2晚','R3早','R3晚','R4早','R4晚'];
-  // Build header: item col + 8 exp cols + 3 threshold cols + one col per resident
+  // No early/late columns — just threshold + resident current score
   let html=`<div class="card mb4"><div class="ct"><span class="dot"></span>${title}</div><div style="overflow-x:auto"><table class="shher-tbl"><thead>
   <tr>
     <th style="text-align:left;min-width:110px">項目</th>
-    ${expHdrs.map(h=>`<th>${h}</th>`).join('')}
     <th>獨立診<br><small>門檻</small></th><th>留觀<br><small>門檻</small></th><th>九診<br><small>門檻</small></th>
     ${activeRes.map(r=>`<th>${r.no||r.n[0]}<br><small style="font-weight:400">${r.n.slice(0,2)}</small><br><small style="color:var(--t3)">${r.y}</small></th>`).join('')}
   </tr></thead><tbody>`;
   rows.forEach(row=>{
-    const[id,name,...rest]=row;const expCols=rest.slice(0,8);const thrCols=rest.slice(8,11);
+    const[id,name,...rest]=row;const thrCols=rest.slice(8,11);
+    // Threshold columns for matrix: ind, obs, er
     html+=`<tr>
       <td style="text-align:left;font-weight:600;font-size:13px"><span class="lvtag lv1" style="font-size:10px;margin-right:4px">${id}</span>${name}</td>
-      ${expCols.map(v=>`<td style="font-size:11px;color:var(--a2)">${v}</td>`).join('')}
       ${thrCols.map(v=>`<td style="font-weight:700;color:var(--a3)">${v}</td>`).join('')}
       ${activeRes.map(res=>{
         const score=getScore(res,id);
+        // Use year-based expectation from R1h1 position (rest[0]=R1早, [1]=R1晚 etc)
+        const expCols=rest.slice(0,8);
         const yrI={'R1':0,'R2':2,'R3':4,'R4':6}[res.y]??0;
-        const expScore=expCols[yrI]||expCols[0]; // use early-year expectation
+        const expScore=expCols[yrI]||expCols[0];
         const pass=score>=expScore;
         return`<td class="${pass?'cell-pass':'cell-fail'}" style="font-size:12px">${score.toFixed(1)}<br><small style="opacity:.65">/${expScore}</small></td>`;
       }).join('')}
@@ -2284,6 +2386,233 @@ function buildShherSection(title,rows,activeRes,getScore){
   });
   html+=`</tbody></table></div></div>`;
   return html;
+}
+
+// ── CCC PASTE IMPORT ──
+function parseCCCPaste(){
+  const raw=document.getElementById('ccc-paste-area').value.trim();
+  if(!raw){alert('請先貼上資料');return;}
+  const lines=raw.split('\n').map(l=>l.trim()).filter(Boolean);
+  // Group by (name, date) → {levels:{msId->score}, date, resName, year}
+  const groups={};
+  let ok=0,skip=0;
+  lines.forEach(line=>{
+    const parts=line.split('\t');
+    if(parts.length<6)return;
+    const[,name,yr,date,itemId,scoreStr]=parts;
+    // Support both numeric scores (e.g. "2.5") and CCC level strings (e.g. "3a")
+    const isLevelStr=/^[1-5][ab]?$/i.test(scoreStr.trim());
+    const scoreVal=isLevelStr?scoreStr.trim():parseFloat(scoreStr);
+    if(!name||!date||!itemId||(typeof scoreVal==='number'&&isNaN(scoreVal))||scoreVal===''){skip++;return;}
+    const key=name+'|'+date;
+    if(!groups[key])groups[key]={resName:name,date,yr:yr||'',levels:{}};
+    groups[key].levels[itemId]=scoreVal;
+    ok++;
+  });
+  if(!ok){
+    const r=document.getElementById('ccc-paste-result');
+    r.textContent='⚠ 無法解析任何資料，請確認格式正確（Tab分隔）';
+    r.className='al ai';r.classList.remove('hidden');return;
+  }
+  // Match names to RES (including graduated, so historical data is preserved)
+  let matched=0,unmatched=[];
+  Object.values(groups).forEach(g=>{
+    const res=RES.find(r=>r.n===g.resName);
+    if(!res){unmatched.push(g.resName);return;}
+    if(!res.cccHistory)res.cccHistory=[];
+    // Auto-derive half-year label (e.g. "R2上半") from month if not overridden later
+    const half=deriveHalfYearLabel(g.yr,g.date);
+    // Check if this date already exists → update, else append
+    const existing=res.cccHistory.find(h=>h.date===g.date);
+    if(existing){existing.levels={...existing.levels,...g.levels};if(!existing.half)existing.half=half;}
+    else{res.cccHistory.push({date:g.date,half,levels:g.levels});}
+    // Sort history by date
+    res.cccHistory.sort((a,b)=>a.date.localeCompare(b.date));
+    matched++;
+  });
+  save();autoSyncDebounced();
+  const r=document.getElementById('ccc-paste-result');
+  const unmatchedMsg=unmatched.length?`（找不到：${[...new Set(unmatched)].join('、')}）`:'';
+  r.innerHTML=`✅ 解析完成！共 ${ok} 筆，匯入 ${matched} 位住院醫師的 CCC 資料。${skip?`⚠ ${skip} 行跳過。`:''} ${unmatchedMsg}`;
+  r.className='al aok';r.classList.remove('hidden');
+  renderCCCHistoryList();
+}
+// Derive a "R2上半"/"R2下半" style label from the resident's year-at-time-of-CCC
+// and the CCC month. Convention: months 1-6 = 上半 (H1), 7-12 = 下半 (H2).
+function deriveHalfYearLabel(yr,date){
+  if(!yr)return'';
+  const m=parseInt((date||'').split('/')[1]||(date||'').split('-')[1]||'0');
+  if(!m)return yr;
+  return yr+(m<=6?'上半':'下半');
+}
+function renderCCCHistoryList(){
+  const el=document.getElementById('ccc-history-list');if(!el)return;
+  const allRes=[...RES].sort((a,b)=>a.n.localeCompare(b.n,'zh'));
+  const withHistory=allRes.filter(r=>(r.cccHistory||[]).length>0);
+  if(!withHistory.length){el.innerHTML='<div style="color:var(--t3);padding:10px">尚無 CCC 紀錄</div>';return;}
+  el.innerHTML=withHistory.map(r=>`
+    <div style="margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:12px">
+      <div style="font-weight:600;font-size:13px;margin-bottom:6px">${r.n} <span style="font-size:11px;color:var(--t3)">${r.y}${r.grad?'（已畢業）':''}</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${(r.cccHistory||[]).map((h,i)=>`
+          <div style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:11px;position:relative">
+            <div style="color:var(--acc);font-weight:600">${h.date}${h.half?` <span style="color:var(--a3);font-weight:700">・${h.half}</span>`:''}</div>
+            <div style="color:var(--t3)">${Object.keys(h.levels).length} 項</div>
+            <div class="ifl" style="gap:4px;margin-top:4px">
+              <button class="btn bs bxs" style="font-size:9.5px;padding:2px 6px" onclick="editCCCEntry('${r.id}',${i})">✏️編輯</button>
+              <button class="btn bxs bd" style="font-size:9.5px;padding:2px 6px" onclick="deleteCCCEntry('${r.id}',${i})">🗑刪除</button>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+function deleteCCCEntry(resId,idx){
+  const r=getRes(resId);if(!r||!r.cccHistory)return;
+  const entry=r.cccHistory[idx];if(!entry)return;
+  if(!confirm(`確定刪除 ${r.n} 的 ${entry.date}${entry.half?'（'+entry.half+'）':''} 這筆 CCC 紀錄？此操作無法復原。`))return;
+  r.cccHistory.splice(idx,1);
+  save();autoSyncDebounced();
+  renderCCCHistoryList();
+  renderGrowthChart();
+}
+function editCCCEntry(resId,idx){
+  const r=getRes(resId);if(!r||!r.cccHistory)return;
+  const entry=r.cccHistory[idx];if(!entry)return;
+  document.getElementById('ccc-edit-resid').value=resId;
+  document.getElementById('ccc-edit-idx').value=idx;
+  document.getElementById('ccc-edit-name').textContent=r.n;
+  document.getElementById('ccc-edit-date').value=entry.date;
+  document.getElementById('ccc-edit-half').value=entry.half||'';
+  // Build editable score table for all items in this snapshot
+  const allKeys=Object.keys(entry.levels).sort();
+  const wrap=document.getElementById('ccc-edit-items');
+  wrap.innerHTML=allKeys.map(k=>{
+    const label=(EPA.find(e=>e.id===k)?.n)||(MS.find(m=>m.id===k)?.n)||k;
+    return`<div class="ifl" style="gap:8px;margin-bottom:5px;align-items:center">
+      <span style="font-size:11px;min-width:50px;font-family:'DM Mono';color:var(--a2)">${k}</span>
+      <span style="font-size:11px;flex:1;color:var(--t2)">${label.slice(0,18)}</span>
+      <input type="number" step="0.5" min="1" max="5" value="${entry.levels[k]}" style="width:60px;text-align:center" data-key="${k}">
+    </div>`;
+  }).join('');
+  openM('m-ccc-edit');
+}
+function saveCCCEdit(){
+  const resId=document.getElementById('ccc-edit-resid').value;
+  const idx=parseInt(document.getElementById('ccc-edit-idx').value);
+  const r=getRes(resId);if(!r||!r.cccHistory||!r.cccHistory[idx])return;
+  const entry=r.cccHistory[idx];
+  entry.date=document.getElementById('ccc-edit-date').value;
+  entry.half=document.getElementById('ccc-edit-half').value;
+  document.querySelectorAll('#ccc-edit-items input[data-key]').forEach(inp=>{
+    const key=inp.dataset.key;const val=parseFloat(inp.value);
+    if(!isNaN(val))entry.levels[key]=val;
+  });
+  r.cccHistory.sort((a,b)=>a.date.localeCompare(b.date));
+  save();autoSyncDebounced();
+  closeM('m-ccc-edit');
+  renderCCCHistoryList();
+  renderGrowthChart();
+}
+
+// Milestone level scale per requested axis: 1,2,3a,3b,3c,4,5 as 7 EVENLY
+// SPACED ticks (slots 1-7). 2a/2b (if present in data) fold into slot 2
+// alongside plain "2", since only 7 labels are shown on the axis.
+const CCC_LEVEL_ORDER=['1','2','2a','2b','3a','3b','3c','4','5'];
+const CCC_SLOT_MAP={'1':1,'2':2,'2a':2,'2b':2,'3a':4,'3b':5,'3c':6,'4':7,'5':8};
+// Wait — re-derive per exact spec: 3a is slot 4, 3b is slot 5. That means
+// slot 3 is reserved (2a/2b region) and slots run 1,2,3,4,5,6,7,8 for
+// 1,2,(2a/2b@3),3a,3b,3c,4,5. We keep this 8-slot internal scale but only
+// label slots 1,2,4,5,6,7,8 on the visible axis (7 labels total).
+function cccLevelToY(val){
+  if(typeof val==='string'&&CCC_SLOT_MAP[val]!=null)return CCC_SLOT_MAP[val];
+  const n=parseFloat(val);
+  if(isNaN(n))return null;
+  // Legacy numeric scores (1-5, .5 steps) map onto the same 8-slot axis
+  const map={1:1,1.5:1.5,2:2,2.5:3,3:5,3.5:5.5,4:7,4.5:7.5,5:8};
+  return map[n]!=null?map[n]:Math.max(1,Math.min(8,n*1.6-0.6));
+}
+function renderGrowthChart(){
+  const resId=document.getElementById('growth-res')?.value;
+  const cat=document.getElementById('growth-cat')?.value||'epa';
+  const detail=document.getElementById('growth-detail');
+  if(!resId){if(detail)detail.innerHTML='';dC('ch-growth');return;}
+  const res=getRes(resId);if(!res){return;}
+  const hist=(res.cccHistory||[]);
+  if(!hist.length){
+    if(detail)detail.innerHTML='<div class="al ai" style="margin-top:10px">此學員尚無 CCC 歷史資料</div>';
+    dC('ch-growth');return;
+  }
+  const labels=hist.map(h=>h.half?`${h.date}\n${h.half}`:h.date);
+  let datasets=[];
+  if(cat==='epa'){
+    // One line per EPA item
+    const epaIds=[...SHHER_EPA.map(e=>e[0]),...EPA.filter(e=>!SHHER_EPA.find(s=>s[0]===e.id)).map(e=>e.id)];
+    const colors=['#00c9a7','#3b82f6','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6'];
+    datasets=epaIds.map((id,i)=>{
+      const epaObj=EPA.find(e=>e.id===id)||SHHER_EPA.find(s=>s[0]===id);
+      const label=id+(epaObj?(epaObj.n||epaObj[1]?` ${(epaObj.n||epaObj[1]).slice(0,6)}…`:''):'');
+      return{label,data:hist.map(h=>cccLevelToY(h.levels[id])),borderColor:colors[i%colors.length],backgroundColor:'transparent',tension:.35,pointRadius:4,spanGaps:false};
+    }).filter(d=>d.data.some(v=>v!==null));
+  }else{
+    // One line per MS category (average slot position of its items in that CCC)
+    const colors=['#00c9a7','#3b82f6','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#06b6d4','#84cc16'];
+    const msIds=[...new Set(SHHER_MS.map(m=>m[0])),...MS.filter(m=>!SHHER_MS.find(s=>s[0]===m.id)).map(m=>m.id)].slice(0,10);
+    datasets=msIds.map((id,i)=>{
+      const msObj=MS.find(m=>m.id===id)||SHHER_MS.find(s=>s[0]===id);
+      const name=msObj?(msObj.n||msObj[1]||id).slice(0,6)+'…':id;
+      return{label:id+' '+name,data:hist.map(h=>{
+        const relevant=Object.entries(h.levels).filter(([k])=>k.startsWith(id+'-')||k===id);
+        const vals=(relevant.length?relevant.map(([,v])=>v):[h.levels[id]]).filter(v=>v!=null).map(cccLevelToY).filter(v=>v!=null);
+        return vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length):null;
+      }),borderColor:colors[i%colors.length],backgroundColor:'transparent',tension:.35,pointRadius:4,spanGaps:false};
+    }).filter(d=>d.data.some(v=>v!==null));
+  }
+  dC('ch-growth');
+  const ctx=document.getElementById('ch-growth').getContext('2d');
+  charts['ch-growth']=new Chart(ctx,{type:'line',data:{labels,datasets},options:{
+    responsive:true,maintainAspectRatio:true,
+    plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10},color:'#94a3b8'}}},
+    scales:{
+      y:{min:0.5,max:8.5,
+        ticks:{
+          stepSize:1,
+          color:'#94a3b8',
+          callback:function(value){
+            // Map slot positions back to CCC level labels (7 visible labels).
+            // Slot 3 (2a/2b region) intentionally has no separate label.
+            const slotLabel={1:'1',2:'2',4:'3a',5:'3b',6:'3c',7:'4',8:'5'};
+            return slotLabel[value]||'';
+          }
+        },
+        grid:{color:'rgba(148,163,184,.15)'}
+      },
+      x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(148,163,184,.08)'}}
+    }
+  }});
+  // Detail table below chart
+  if(detail){
+    const prevH=hist.length>1?hist[hist.length-2]:null;
+    const items=cat==='epa'?EPA.map(e=>({id:e.id,n:e.n})):MS.map(m=>({id:m.id,n:m.n}));
+    detail.innerHTML=`<div class="card"><div class="ct"><span class="dot"></span>各項目 CCC 分數變化</div><div style="overflow-x:auto"><table style="width:100%;font-size:11.5px;border-collapse:collapse">
+      <thead><tr style="border-bottom:2px solid var(--border)">
+        <th style="text-align:left;padding:5px 8px">項目</th>
+        ${hist.map(h=>`<th style="padding:5px 8px;text-align:center">${h.date}${h.half?`<br><span style="font-weight:400;color:var(--a3);font-size:10px">${h.half}</span>`:''}</th>`).join('')}
+        ${prevH?'<th style="padding:5px 8px;text-align:center;color:var(--a3)">進步</th>':''}
+      </tr></thead><tbody>
+      ${items.map(item=>{
+        const vals=hist.map(h=>h.levels[item.id]??null);
+        if(vals.every(v=>v===null))return'';
+        const latest=vals[vals.length-1];const prev=hist.length>1?vals[hist.length-2]:null;
+        const latestY=cccLevelToY(latest),prevY=cccLevelToY(prev);
+        const diff=latestY!=null&&prevY!=null?latestY-prevY:null;
+        return`<tr style="border-bottom:1px solid rgba(30,45,69,.35)">
+          <td style="padding:5px 8px;font-weight:600"><span style="font-size:9.5px;color:var(--a2);font-family:'DM Mono'">${item.id}</span> ${item.n.slice(0,14)}</td>
+          ${vals.map(v=>v!=null?`<td style="padding:5px 8px;text-align:center;color:${v>=4?'#22c55e':v>=3?'var(--a3)':v>=2?'var(--a2)':'var(--danger)'};font-weight:600">${v}</td>`:'<td style="padding:5px 8px;text-align:center;color:var(--t3)">—</td>').join('')}
+          ${prevH?`<td style="padding:5px 8px;text-align:center;font-weight:700;color:${diff===null?'var(--t3)':diff>0?'#22c55e':diff<0?'var(--danger)':'var(--t3)'}">${diff===null?'—':diff>0?'▲進步':diff<0?'▼退步':'→'}</td>`:''}
+        </tr>`;
+      }).join('')}
+      </tbody></table></div></div>`;
+  }
 }
 
 // ══════════════ RESIDENTS ══════════════
@@ -2385,26 +2714,132 @@ function restoreRes(id){
 
 // ══════════════ REMIND ══════════════
 function updateRmBadge(){const t=tod();const sched=getTodayDocs(t);const miss=sched.filter(e=>{const res=getRes(e.resId);if(!res||res.grad)return false;const cnt=ASSESS.filter(a=>a.date===t&&a.attId===e.attId&&a.resId===e.resId).length;return cnt===0;});const b=document.getElementById('rbadge');if(isAdmin&&miss.length>0){b.textContent=miss.length;b.classList.remove('hidden');}else b.classList.add('hidden');}
-function renderRemind(){
-  const ds=document.getElementById('rmd-date').value||tod();
-  const entries=SCHED[ds]||[];const attGroups={};
-  entries.forEach(e=>{
-    // Skip graduated residents — no longer active, ignore their schedule entries
-    const res=getRes(e.resId);if(!res||res.grad)return;
-    if(!attGroups[e.attId])attGroups[e.attId]=[];attGroups[e.attId].push(e.resId);
+function initRemindRange(){
+  const to=tod();const from=dateOffset(to,-6);
+  document.getElementById('rmd-from').value=from;
+  document.getElementById('rmd-to').value=to;
+}
+function initMissingPage(){
+  const to=tod();const from=dateOffset(to,-6);
+  document.getElementById('miss-from').value=from;
+  document.getElementById('miss-to').value=to;
+}
+function setMissingWeek(){
+  const to=tod();const from=dateOffset(to,-6);
+  document.getElementById('miss-from').value=from;
+  document.getElementById('miss-to').value=to;
+  renderMissing();
+}
+function dateOffset(base,days){
+  const d=new Date(base);d.setDate(d.getDate()+days);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function getDateRange(fromId,toId){
+  const from=document.getElementById(fromId)?.value||tod();
+  const to=document.getElementById(toId)?.value||tod();
+  return{from:from<=to?from:to,to:from<=to?to:from};
+}
+// Get all pending entries within a date range
+function getPendingInRange(from,to){
+  // Returns [{date, attId, attName, resId, resName}]
+  const result=[];
+  Object.entries(SCHED).forEach(([date,entries])=>{
+    if(date<from||date>to)return;
+    entries.forEach(e=>{
+      const res=getRes(e.resId);if(!res||res.grad)return;
+      const att=getAtt(e.attId);
+      const filled=ASSESS.some(a=>a.date===date&&a.attId===e.attId&&a.resId===e.resId);
+      result.push({date,attId:e.attId,attName:att?.n||'—',resId:e.resId,resName:res.n,resYear:res.y,filled});
+    });
   });
-  let total=0,miss=0,ok=0;const rows=[];
-  Object.entries(attGroups).forEach(([attId,resIds])=>{const att=getAtt(attId);if(!att)return;resIds.forEach(resId=>{const res=getRes(resId);if(!res)return;total++;const cnt=ASSESS.filter(a=>a.date===ds&&a.attId===attId&&a.resId===resId).length;if(cnt===0)miss++;else ok++;rows.push({att,res,cnt});});});
-  document.getElementById('rs-t').textContent=total;document.getElementById('rs-m').textContent=miss;document.getElementById('rs-o').textContent=ok;
-  const list=document.getElementById('rmd-list');if(!rows.length){list.innerHTML='<div style="text-align:center;color:var(--t3);padding:14px">此日期無排班資料</div>';return;}
-  list.innerHTML=rows.map(({att,res,cnt})=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(30,45,69,.5);flex-wrap:wrap;gap:6px">
-    <div style="display:flex;align-items:center;gap:8px"><div class="dav">${att.n[0]}</div><div><div style="font-weight:600;font-size:12.5px">${att.n} <span style="font-size:10px;color:var(--t3)">→</span> ${res.n}</div><div style="font-size:10.5px;color:var(--t3)">已填 ${cnt} 份</div></div></div>
-    <span class="pill ${cnt>0?'p4':'p1'}">${cnt>0?'已評核':'未評核'}</span>
-  </div>`).join('');
+  return result.sort((a,b)=>a.date.localeCompare(b.date)||a.attName.localeCompare(b.attName,'zh'));
+}
+function renderMissing(){
+  const {from,to}=getDateRange('miss-from','miss-to');
+  let all=getPendingInRange(from,to);
+  // Non-admin attendings only see their own schedule, same as the dashboard
+  // pending card and the assess-page pending card.
+  if(!isAdmin&&currentAttId)all=all.filter(e=>e.attId===currentAttId);
+  const missing=all.filter(e=>!e.filled);
+  const done=all.filter(e=>e.filled);
+  document.getElementById('miss-total').textContent=all.length;
+  document.getElementById('miss-miss').textContent=missing.length;
+  document.getElementById('miss-ok').textContent=done.length;
+  const list=document.getElementById('miss-list');
+  if(!missing.length){list.innerHTML='<div style="text-align:center;color:var(--t3);padding:16px;font-size:12px">🎉 此區間所有評核均已完成！</div>';return;}
+  // Group by date
+  const byDate={};missing.forEach(e=>{if(!byDate[e.date])byDate[e.date]=[];byDate[e.date].push(e);});
+  list.innerHTML=Object.entries(byDate).map(([date,entries])=>`
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;color:var(--a3);font-weight:700;padding:5px 0;border-bottom:1px solid var(--border);margin-bottom:7px">${date}</div>
+      ${entries.map(e=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 2px;border-bottom:1px solid rgba(30,45,69,.25);flex-wrap:wrap;gap:6px">
+          <div style="font-size:12.5px">
+            <span style="font-weight:600">${e.attName}</span>
+            <span style="color:var(--t3);margin:0 5px">→</span>
+            <span>${e.resName}</span>
+            <span style="font-size:10px;color:var(--t3);margin-left:4px">${e.resYear}</span>
+          </div>
+          <button class="btn bp bxs" style="font-size:11px" onclick="navToAssess('${e.attId}','${e.resId}','${date}')">📝 填寫</button>
+        </div>`).join('')}
+    </div>`).join('');
+}
+function navToAssess(attId,resId,date){
+  nav('assess');
+  setTimeout(()=>{
+    const fa=document.getElementById('f-att');const fr=document.getElementById('f-res');const fd=document.getElementById('f-date');
+    if(fa)fa.value=attId;if(fr)fr.value=resId;if(fd)fd.value=date;
+    onAttChange();
+  },120);
+}
+function renderRemind(){
+  const {from,to}=getDateRange('rmd-from','rmd-to');
+  const all=getPendingInRange(from,to);
+  const missing=all.filter(e=>!e.filled);
+  const done=all.filter(e=>e.filled);
+  document.getElementById('rs-t').textContent=all.length;
+  document.getElementById('rs-m').textContent=missing.length;
+  document.getElementById('rs-o').textContent=done.length;
+  const list=document.getElementById('rmd-list');
+  if(!all.length){list.innerHTML='<div style="text-align:center;color:var(--t3);padding:16px;font-size:12px">此區間無排班資料</div>';return;}
+  // Group by att
+  const byAtt={};all.forEach(e=>{if(!byAtt[e.attId])byAtt[e.attId]={attName:e.attName,entries:[]};byAtt[e.attId].entries.push(e);});
+  list.innerHTML=Object.entries(byAtt).map(([attId,{attName,entries}])=>{
+    const miss=entries.filter(e=>!e.filled);
+    const att=getAtt(attId);
+    const lineBtn=miss.length?`<button class="btn bln bxs" style="font-size:10.5px" onclick="quickLine('${attId}','${from}','${to}')">💬 提醒</button>`:'';
+    return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(30,45,69,.5);flex-wrap:wrap;gap:6px">
+      <div style="display:flex;align-items:center;gap:8px"><div class="dav">${attName[0]}</div>
+        <div><div style="font-weight:600;font-size:12.5px">${attName}</div>
+        <div style="font-size:10.5px;color:var(--t3)">共 ${entries.length} 筆，未填 ${miss.length} 筆</div></div></div>
+      <div class="ifl" style="gap:6px"><span class="pill ${miss.length===0?'p4':'p1'}">${miss.length===0?'已完成':'未完成 '+miss.length+' 筆'}</span>${lineBtn}</div>
+    </div>`;
+  }).join('');
+}
+// Open LINE with pre-filled message text using LINE's official share URL scheme.
+// On mobile this opens the LINE app directly to a "choose contact" screen with
+// the message already typed in — the person just picks who to send it to.
+function openLineShare(text){
+  const url='https://line.me/R/share?text='+encodeURIComponent(text);
+  window.open(url,'_blank');
+}
+// Quick single-attending reminder: builds a message for just this attending's
+// missing assessments in the given date range, then opens LINE share directly.
+function quickLine(attId,from,to){
+  const att=getAtt(attId);if(!att)return;
+  const missing=getPendingInRange(from,to).filter(e=>!e.filled&&e.attId===attId);
+  if(!missing.length){alert('此主治醫師在此區間已無未填答項目');return;}
+  const pairs=missing.map(e=>`${e.date} ${e.resName}`).join('\n');
+  const txt=`【急診住院醫師評核提醒】\n\n${att.n} 醫師您好，\n以下評核於 ${from}~${to} 尚未完成：\n\n${pairs}\n\n請於近期完成評核，謝謝！`;
+  openLineShare(txt);
 }
 function buildBatch(ds){const entries=SCHED[ds]||[];const attGroups={};entries.forEach(e=>{const res=getRes(e.resId);if(!res||res.grad)return;if(!attGroups[e.attId])attGroups[e.attId]=[];attGroups[e.attId].push(e.resId);});const miss=[];Object.entries(attGroups).forEach(([attId,resIds])=>{const att=getAtt(attId);if(!att)return;const missing=resIds.filter(rid=>{const cnt=ASSESS.filter(a=>a.date===ds&&a.attId===attId&&a.resId===rid).length;return cnt===0;});if(missing.length){const resNames=missing.map(rid=>getRes(rid)?.n||'?').join('、');miss.push(`• ${att.n}（尚未評核：${resNames}）`);}});return miss.length?`【急診住院醫師評核提醒】\n\n以下主治醫師於 ${ds} 尚未完成評核：\n\n${miss.join('\n')}\n\n請於輪班結束前完成評核，謝謝！`:'無需提醒';}
-function batchEmail(){const ds=document.getElementById('rmd-date').value||tod();const entries=SCHED[ds]||[];const emails=[...new Set(entries.map(e=>getAtt(e.attId)?.email).filter(Boolean))].join(',');if(!emails)return alert('無 Email 可發送');window.open(`mailto:${emails}?subject=${encodeURIComponent('評核提醒 '+ds)}&body=${encodeURIComponent(buildBatch(ds))}`);}
-function batchLine(){const ds=document.getElementById('rmd-date').value||tod();document.getElementById('line-txt').textContent=buildBatch(ds);openM('m-line');}
+function batchEmail(){const {from,to}=getDateRange('rmd-from','rmd-to');const txt=buildBatchRange(from,to);const entries=getPendingInRange(from,to).filter(e=>!e.filled);const emails=[...new Set(entries.map(e=>getAtt(e.attId)?.email).filter(Boolean))].join(',');if(!emails)return alert('無 Email 可發送');window.open(`mailto:${emails}?subject=${encodeURIComponent('評核提醒 '+from+' ~ '+to)}&body=${encodeURIComponent(txt)}`);}
+function batchLine(){const {from,to}=getDateRange('rmd-from','rmd-to');document.getElementById('line-txt').textContent=buildBatchRange(from,to);openM('m-line');}
+// Note: the "用 LINE 傳送" button inside the m-line modal (see HTML) calls
+// openLineShare() directly with this text, opening LINE's contact picker
+// with the message pre-filled — no manual copy/paste needed on mobile.
+function buildBatchRange(from,to){const missing=getPendingInRange(from,to).filter(e=>!e.filled);if(!missing.length)return'無需提醒';const byAtt={};missing.forEach(e=>{if(!byAtt[e.attId])byAtt[e.attId]={attName:e.attName,pairs:[]};byAtt[e.attId].pairs.push(e.date+' '+e.resName);});const lines=Object.values(byAtt).map(({attName,pairs})=>`• ${attName}（${pairs.join('、')}）`).join('\n');return`【急診住院醫師評核提醒】\n\n以下主治醫師於 ${from}~${to} 尚有評核未完成：\n\n${lines}\n\n請於近期完成評核，謝謝！`;}
 function copyBatch(){navigator.clipboard.writeText(document.getElementById('batch-txt').textContent).then(()=>alert('已複製！'));}
 
 // ══════════════ ADMIN ══════════════
