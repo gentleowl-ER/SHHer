@@ -170,7 +170,7 @@ textarea{resize:vertical;min-height:68px}
 .bs{background:transparent;border:1px solid var(--border);color:var(--t2)}.bs:hover{border-color:var(--acc);color:var(--acc)}
 .bd{background:var(--danger);color:#fff}.bpu{background:var(--purple);color:#fff}
 .bsm{padding:5px 10px;font-size:11px}.bxs{padding:3px 7px;font-size:10.5px}
-.bln{background:#06C755;color:#fff}.bem{background:var(--a2);color:#fff}
+.bln{background:#06C755;color:#fff}.bem{background:var(--a2);color:#fff}.bfb{background:#0084FF;color:#fff}
 /* TABLE */
 table{width:100%;border-collapse:collapse}
 th{text-align:left;padding:7px 9px;font-size:9.5px;color:var(--t3);font-weight:600;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid var(--border)}
@@ -359,24 +359,25 @@ body{font-size:var(--base-font,17px)}
     <div class="ns">主要功能</div>
     <div class="ni active" onclick="nav('dashboard',this)"><span class="ic">📊</span>儀表板</div>
     <div class="ni" onclick="nav('assess',this)"><span class="ic">✏️</span>新增評核（MS+EPA）</div>
-    
+
     <div class="ns">紀錄與分析</div>
-    <div class="ni" onclick="nav('history',this)"><span class="ic">📋</span>評核紀錄</div>
-    <div class="ni" onclick="nav('analytics',this)"><span class="ic">📈</span>統計分析</div>
-    <div class="ni" onclick="nav('shher',this)"><span class="ic">🏥</span>SHHER 執業矩陣</div>
+    <div class="ni" onclick="nav('imglib',this)"><span class="ic">🩻</span>影像資料庫</div>
+    <div class="ni admin-only hidden" onclick="nav('history',this)"><span class="ic">📋</span>評核紀錄</div>
+    <div class="ni admin-only hidden" onclick="nav('analytics',this)"><span class="ic">📈</span>統計分析</div>
+    <div class="ni admin-only hidden" onclick="nav('shher',this)"><span class="ic">🏥</span>SHHER 執業矩陣</div>
     <div class="ns">人員與排班</div>
-    <div class="ni" onclick="nav('residents',this)"><span class="ic">👩‍⚕️</span>住院醫師</div>
-    <div class="ni" onclick="nav('attendings',this)"><span class="ic">🩺</span>主治醫師</div>
     <div class="ni" onclick="nav('schedule',this)"><span class="ic">📅</span>班表</div>
+    <div class="ni admin-only hidden" onclick="nav('residents',this)"><span class="ic">👩‍⚕️</span>住院醫師</div>
+    <div class="ni admin-only hidden" onclick="nav('attendings',this)"><span class="ic">🩺</span>主治醫師</div>
     <div class="ns">工具</div>
-    <div class="ni" onclick="nav('graduated',this)"><span class="ic">🎓</span>已畢業學員</div>
-    <div class="ni" onclick="nav('export',this)"><span class="ic">⬇️</span>匯出報告</div>
     <div class="ni" id="ni-missing" onclick="nav('missing',this)"><span class="ic">📋</span>未填答名單</div>
+    <div class="ni admin-only hidden" onclick="nav('graduated',this)"><span class="ic">🎓</span>已畢業學員</div>
+    <div class="ni admin-only hidden" onclick="nav('export',this)"><span class="ic">⬇️</span>匯出報告</div>
     <div class="ni admin-only hidden" id="ni-remind" onclick="nav('remind',this)">
       <span class="ic">🔔</span>提醒未填答<span class="nb hidden" id="rbadge">0</span>
     </div>
     <div class="ni admin-only hidden" onclick="nav('admin',this)"><span class="ic">⚙️</span>系統管理員</div>
-    <div class="ni" onclick="nav('firebase',this)"><span class="ic">☁️</span>雲端設定</div>
+    <div class="ni admin-only hidden" onclick="nav('firebase',this)"><span class="ic">☁️</span>雲端設定</div>
   </nav>
   <div class="sb-foot">
     <div style="position:relative"><div class="cst" id="cst">☁️ 未連線</div><div id="sync-ind" style="position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:var(--acc);opacity:0;transition:opacity .3s"></div></div>
@@ -682,8 +683,16 @@ body{font-size:var(--base-font,17px)}
     <div class="card"><div class="ct"><span class="dot" style="background:var(--a2)"></span>MS 各面向可呈現率</div><div class="cw"><canvas id="ch-ms-r"></canvas></div></div>
   </div>
   <div class="card mb4"><div class="ct"><span class="dot" style="background:var(--a3)"></span>EPA 各項平均</div><div id="epa-prog"></div></div>
-  <div class="card mb4"><div class="ct"><span class="dot" style="background:var(--purple)"></span>Milestone 細項可呈現率</div><div id="ms-detail-stats"></div></div>
-  <div class="card"><div class="ct"><span class="dot" style="background:var(--purple)"></span>🩻 影像醫學評核紀錄
+  <div class="card"><div class="ct"><span class="dot" style="background:var(--purple)"></span>Milestone 細項可呈現率</div><div id="ms-detail-stats"></div></div>
+</div>
+
+<!-- ═══ IMAGING REGISTRY (general access) ═══ -->
+<div class="page" id="page-imglib">
+  <div class="sh mb4">
+    <div><div class="st">🩻 影像資料庫</div><div class="ss2">影像醫學判讀評核紀錄</div></div>
+    <select id="imglib-r" style="width:170px" onchange="renderImgLib()"><option value="">所有住院醫師</option></select>
+  </div>
+  <div class="card"><div class="ct"><span class="dot" style="background:var(--purple)"></span>影像評核紀錄
     <button class="btn bs bxs" style="margin-left:auto;font-size:11px" onclick="exportImgCsv()">📥 匯出CSV</button>
   </div><div id="img-stats-list"></div></div>
 </div>
@@ -741,7 +750,7 @@ body{font-size:var(--base-font,17px)}
 <!-- ═══ RESIDENTS ═══ -->
 <div class="page" id="page-residents">
   <div class="sh mb4"><div><div class="st">住院醫師管理</div></div>
-    <div class="ifl"><button class="btn bs bsm" onclick="nav('graduated')">🎓 已畢業</button><button class="btn bp bsm" onclick="openResM()">＋ 新增</button></div>
+    <div class="ifl"><button class="btn bs bsm" onclick="manualSaveAll()" title="強制儲存全部資料到本機並嘗試同步雲端">🛟 手動儲存</button><button class="btn bs bsm" onclick="nav('graduated')">🎓 已畢業</button><button class="btn bp bsm" onclick="openResM()">＋ 新增</button></div>
   </div>
   <div class="card" style="overflow-x:auto">
     <table><thead><tr><th>代號</th><th>姓名</th><th>年級</th><th>評核次數</th><th>MS%</th><th>EPA均</th><th>操作</th></tr></thead>
@@ -877,7 +886,7 @@ body{font-size:var(--base-font,17px)}
       <div class="fg" style="margin:0"><label style="font-size:11px">起始日期</label><input type="date" id="miss-from" style="width:140px"></div>
       <div class="fg" style="margin:0"><label style="font-size:11px">結束日期</label><input type="date" id="miss-to" style="width:140px"></div>
       <button class="btn bpu bsm" onclick="renderMissing()">查詢</button>
-      <button class="btn bs bsm" onclick="setMissingWeek()">本週</button>
+      <button class="btn bs bsm" onclick="setMissingWeek()">本月</button>
     </div>
   </div>
   <div class="g3 mb4">
@@ -907,6 +916,7 @@ body{font-size:var(--base-font,17px)}
     <div class="ifl" style="flex-wrap:wrap;gap:6px;margin-bottom:10px">
       <button class="btn bem bsm" onclick="batchEmail()">📧 Email 提醒</button>
       <button class="btn bln bsm" onclick="batchLine()">💬 LINE 提醒</button>
+      <button class="btn bfb bsm" onclick="batchMessenger()">📘 Messenger 提醒</button>
     </div>
     <div id="batch-area" class="hidden"><div class="ca" id="batch-txt" style="background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:10px;font-size:11px;color:var(--t2);white-space:pre-wrap;max-height:160px;overflow-y:auto;font-family:'DM Mono',monospace"></div>
     <div class="ifl mt3"><button class="btn bs bsm" onclick="copyBatch()">複製</button><button class="btn bs bsm" onclick="document.getElementById('batch-area').classList.add('hidden')">關閉</button></div></div>
@@ -1109,7 +1119,7 @@ body{font-size:var(--base-font,17px)}
       <label class="tog"><input type="checkbox" id="r-ms-relax"><span class="tsl"></span></label>
     </div>
   </div>
-  <div class="ifl fe mt3"><button class="btn bs bsm" onclick="closeM('m-res')">取消</button><button class="btn bp bsm" onclick="saveRes()">儲存</button></div>
+  <div class="ifl fe mt3" style="flex-wrap:wrap;gap:6px"><button class="btn bs bsm" onclick="closeM('m-res')">取消</button><button class="btn bs bxs" onclick="manualSaveAll()" title="若儲存按鈕沒反應，可點此手動強制儲存全部資料">🛟 手動儲存</button><button class="btn bp bsm" onclick="saveRes()">儲存</button></div>
 </div></div>
 <div class="ov" id="m-att"><div class="modal" style="max-width:480px">
   <div class="mh"><div class="mt2" id="m-att-t">主治醫師</div><button class="mc" onclick="closeM('m-att')">✕</button></div>
@@ -1126,14 +1136,17 @@ body{font-size:var(--base-font,17px)}
 <div class="ov" id="m-pw"><div class="modal" style="max-width:320px">
   <div class="mh"><div class="mt2">🔐 管理員登入</div><button class="mc" onclick="closeM('m-pw')">✕</button></div>
   <div class="fg"><label>密碼</label><input type="password" id="pw-in" onkeydown="if(event.key==='Enter')checkPw()"></div>
-  <p style="font-size:10.5px;color:var(--t3);margin-bottom:8px">預設密碼：admin123</p>
   <div id="pw-err" class="al ae hidden">密碼錯誤</div>
   <div class="ifl fe"><button class="btn bs bsm" onclick="closeM('m-pw')">取消</button><button class="btn bpu bsm" onclick="checkPw()">登入</button></div>
 </div></div>
 <div class="ov" id="m-line"><div class="modal" style="max-width:440px">
-  <div class="mh"><div class="mt2">💬 LINE 訊息</div><button class="mc" onclick="closeM('m-line')">✕</button></div>
+  <div class="mh"><div class="mt2">💬 提醒訊息預覽</div><button class="mc" onclick="closeM('m-line')">✕</button></div>
   <div id="line-txt" style="background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:10px;font-size:11px;color:var(--t2);white-space:pre-wrap;max-height:180px;overflow-y:auto;font-family:'DM Mono',monospace"></div>
-  <div class="ifl mt3 fe"><button class="btn bs bsm" onclick="copyEl('line-txt')">複製</button><button class="btn bln bsm" onclick="openLineShare(document.getElementById('line-txt').textContent)">💬 用 LINE 傳送</button></div>
+  <div class="ifl mt3 fe" style="flex-wrap:wrap;gap:6px">
+    <button class="btn bs bsm" onclick="copyEl('line-txt')">複製</button>
+    <button class="btn bln bsm" onclick="openLineShare(document.getElementById('line-txt').textContent)">💬 用 LINE 傳送</button>
+    <button class="btn bfb bsm" onclick="openMessengerShare(document.getElementById('line-txt').textContent)">📘 用 Messenger 傳送</button>
+  </div>
 </div></div>
 
 <div class="ov" id="m-ccc-edit"><div class="modal" style="max-width:480px">
@@ -1742,7 +1755,7 @@ function getAttByNo(no){return ATT.find(a=>String(a.no)===String(no));}
 function getResByNo(no){return RES.find(r=>r.no===no);}
 
 // NAV
-const PT={dashboard:'儀表板',assess:'新增評核',thankyou:'謝謝填寫',history:'評核紀錄',analytics:'統計分析',shher:'SHHER 執業矩陣',residents:'住院醫師管理',attendings:'主治醫師管理',schedule:'班表管理',graduated:'已畢業學員',export:'匯出 / 匯入資料',missing:'未填答名單',remind:'提醒未填答',admin:'系統管理員',firebase:'雲端設定'};
+const PT={dashboard:'儀表板',assess:'新增評核',thankyou:'謝謝填寫',history:'評核紀錄',analytics:'統計分析',imglib:'影像資料庫',shher:'SHHER 執業矩陣',residents:'住院醫師管理',attendings:'主治醫師管理',schedule:'班表管理',graduated:'已畢業學員',export:'匯出 / 匯入資料',missing:'未填答名單',remind:'提醒未填答',admin:'系統管理員',firebase:'雲端設定'};
 function nav(page,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
@@ -1755,6 +1768,7 @@ function nav(page,el){
   if(page==='imaging')initImg();
   if(page==='history')renderHistory();
   if(page==='analytics')renderAnalytics();
+  if(page==='imglib')renderImgLib();
   if(page==='shher'){renderShher();populateSel('growth-res',false);}
   if(page==='residents')renderRes();
   if(page==='attendings')renderAtt();
@@ -2291,7 +2305,11 @@ function renderAnalytics(){
   const ctx1=document.getElementById('ch-ms-r').getContext('2d');charts['ch-ms-r']=new Chart(ctx1,{type:'radar',data:{labels:MS_CATS.map(c=>MS_CAT_LBL[c]),datasets:[{label:'可穩定呈現%',data:cpct,backgroundColor:'rgba(0,201,167,.15)',borderColor:'#00c9a7',pointBackgroundColor:'#00c9a7'}]},options:{...cOpt('radar',100),scales:{r:{min:0,max:100,ticks:{color:'#475569',stepSize:25,callback:v=>v+'%'},grid:{color:'#1e2d45'},pointLabels:{color:'#94a3b8',font:{size:11,weight:'bold'}}}}}});
   const ep=document.getElementById('epa-prog');ep.innerHTML='';EPA.forEach(epa=>{const vs=msD.filter(a=>a.epaScores?.[epa.id]).map(a=>a.epaScores[epa.id]);const avg=vs.length?vs.reduce((a,b)=>a+b,0)/vs.length:0;const col=avg>=4?'var(--acc)':avg>=3?'var(--a2)':avg>=2?'var(--a3)':'var(--danger)';ep.innerHTML+=`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="font-size:12px"><span style="color:var(--a2);font-size:9.5px;font-family:'DM Mono'">${epa.id}</span> ${epa.n}</span><span style="font-family:'DM Mono';font-size:12px;color:${col}">${vs.length?avg.toFixed(1):'—'}</span></div><div class="prog-wrap"><div class="prog-bar" style="width:${(avg/5)*100}%;background:${col}"></div></div></div>`;});
   const mds=document.getElementById('ms-detail-stats');mds.innerHTML='';MS_CATS.forEach(cat=>{let html=`<div style="margin-bottom:13px"><div style="font-size:11px;color:var(--a2);font-weight:600;margin-bottom:5px">${cat}</div>`;MS.filter(m=>m.cat===cat).forEach(ms=>{let t=0,s=0;msD.forEach(a=>{ms.items.forEach(i=>{const v=a.msItems?.[i.id];if(v){t++;if(v==='stable')s++;}});});if(!t)return;const pct=Math.round(s/t*100);const col=pct>=80?'var(--acc)':pct>=60?'var(--a3)':'var(--danger)';html+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:3px"><span style="font-size:11px;min-width:65px;font-family:'DM Mono';color:var(--a2)">${ms.id}</span><span style="font-size:11.5px;min-width:100px;color:var(--t2)">${ms.n}</span><div class="prog-wrap" style="flex:1"><div class="prog-bar" style="width:${pct}%;background:${col}"></div></div><span style="font-size:10.5px;color:${col};font-family:'DM Mono';min-width:35px;text-align:right">${pct}%</span></div>`;});mds.innerHTML+=html+'</div>';});
-  // Imaging stats list
+}
+// ── Imaging registry (standalone page, accessible to all users) ──
+function renderImgLib(){
+  populateSel('imglib-r',false);
+  const fR=document.getElementById('imglib-r')?.value||'';
   const imgData=(fR?ASSESS.filter(a=>a.resId===fR):ASSESS).filter(a=>a.imgData&&a.imgData.imgType);
   const imgList=document.getElementById('img-stats-list');
   if(!imgList)return;
@@ -2316,14 +2334,14 @@ function renderAnalytics(){
   </table></div>`;
 }
 function exportImgCsv(){
-  const fR=document.getElementById('ana-r')?.value||'';
+  const fR=document.getElementById('imglib-r')?.value||'';
   const data=(fR?ASSESS.filter(a=>a.resId===fR):ASSESS).filter(a=>a.imgData&&a.imgData.imgType);
   if(!data.length){alert('尚無影像醫學評核紀錄可匯出');return;}
   const hdrs=['日期','住院醫師','年級','主治醫師','病歷號','影像種類','評核意見'];
   const rows=data.map(a=>[a.date,a.resName,a.resYear||'',a.attName||'',a.imgData.pid||'',a.imgData.imgType,(a.imgData.comment||'').replace(/\n/g,' ')]);
   const bom='\uFEFF';
   const csv=bom+[hdrs,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=`影像醫學評核_${tod()}.csv`;a.click();
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=`影像資料庫_${tod()}.csv`;a.click();
 }
 
 // ══════════════ SHHER MATRIX ══════════════
@@ -2622,16 +2640,56 @@ function editRes(id){const r=getRes(id);if(!r)return;document.getElementById('r-
   const rqpc=document.getElementById('r-qpc');const rqnpc=document.getElementById('r-qnpc');
   if(rqpc)rqpc.value=r.qPcOverride!=null?r.qPcOverride:'';
   if(rqnpc)rqnpc.value=r.qNpcOverride!=null?r.qNpcOverride:'';document.getElementById('m-res-t').textContent='編輯住院醫師';openM('m-res');}
-function saveRes(){const n=document.getElementById('r-n').value.trim();if(!n)return alert('請輸入姓名');const eid=document.getElementById('r-id').value;if(eid){const r=getRes(eid);if(r){r.n=n;r.y=document.getElementById('r-y').value;r.no=document.getElementById('r-no').value;const newGrad=document.getElementById('r-grad').checked;if(newGrad&&!r.grad){if(!confirm('確定將「'+r.n+'」標記為已畢業？\n已畢業後將不出現在一般評核列表中，可隨時在住院醫師管理取消。'))return;}r.grad=newGrad;
-    // Auto-clear the resident code when graduating so the code slot (A, B…)
-    // is freed up for the incoming new resident to reuse.
-    if(newGrad)r.no='';
-    const qpc=document.getElementById('r-qpc')?.value;
-    const qnpc=document.getElementById('r-qnpc')?.value;
-    r.qPcOverride=(!qpc||qpc==='')?null:parseInt(qpc);
-    r.qNpcOverride=(!qnpc||qnpc==='')?null:parseInt(qnpc);
-    r.msSelRelax=document.getElementById('r-ms-relax')?.checked||false;
-  }}else RES.push({id:Date.now().toString(),no:document.getElementById('r-no').value,n,y:document.getElementById('r-y').value,grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}});save();autoSyncDebounced();closeM('m-res');renderRes();}
+function saveRes(){
+  try{
+    const n=document.getElementById('r-n').value.trim();
+    if(!n)return alert('請輸入姓名');
+    const eid=document.getElementById('r-id').value;
+    if(eid){
+      const r=getRes(eid);
+      if(!r){alert('⚠ 找不到此住院醫師資料（可能已被刪除），請關閉視窗重新操作。');return;}
+      r.n=n;
+      r.y=document.getElementById('r-y').value;
+      r.no=document.getElementById('r-no').value;
+      const newGrad=document.getElementById('r-grad').checked;
+      if(newGrad&&!r.grad){
+        if(!confirm('確定將「'+r.n+'」標記為已畢業？\n已畢業後將不出現在一般評核列表中，可隨時在住院醫師管理取消。'))return;
+      }
+      r.grad=newGrad;
+      // Auto-clear the resident code when graduating so the code slot (A, B…)
+      // is freed up for the incoming new resident to reuse.
+      if(newGrad)r.no='';
+      const qpc=document.getElementById('r-qpc')?.value;
+      const qnpc=document.getElementById('r-qnpc')?.value;
+      r.qPcOverride=(!qpc||qpc==='')?null:parseInt(qpc);
+      r.qNpcOverride=(!qnpc||qnpc==='')?null:parseInt(qnpc);
+      r.msSelRelax=document.getElementById('r-ms-relax')?.checked||false;
+    }else{
+      RES.push({id:Date.now().toString(),no:document.getElementById('r-no').value,n,y:document.getElementById('r-y').value,grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}});
+    }
+    save();
+    autoSyncDebounced();
+    closeM('m-res');
+    renderRes();
+    setCst('ok','✅ 已儲存「'+n+'」');
+  }catch(e){
+    console.error('saveRes error:',e);
+    alert('⚠ 儲存時發生錯誤：'+e.message+'\n請按下方「🛟 手動儲存」重試，或聯繫系統管理員。');
+  }
+}
+// Manual save fallback — writes current in-memory data to localStorage and
+// attempts a cloud sync directly, bypassing the resident-modal flow. Useful
+// if saveRes() silently failed (e.g. storage quota, browser restrictions)
+// and the person wants to be sure nothing is lost.
+function manualSaveAll(){
+  try{
+    save();
+    autoSync();
+    alert('✅ 已手動儲存所有資料到本機，並嘗試同步雲端。');
+  }catch(e){
+    alert('⚠ 手動儲存失敗：'+e.message);
+  }
+}
 function delRes(id){if(!confirm('確定刪除此住院醫師的所有資料？\n此操作無法復原。'))return;RES=RES.filter(r=>r.id!==id);save();renderRes();}
 
 // ══════════════ ATTENDINGS ══════════════
@@ -2714,18 +2772,22 @@ function restoreRes(id){
 
 // ══════════════ REMIND ══════════════
 function updateRmBadge(){const t=tod();const sched=getTodayDocs(t);const miss=sched.filter(e=>{const res=getRes(e.resId);if(!res||res.grad)return false;const cnt=ASSESS.filter(a=>a.date===t&&a.attId===e.attId&&a.resId===e.resId).length;return cnt===0;});const b=document.getElementById('rbadge');if(isAdmin&&miss.length>0){b.textContent=miss.length;b.classList.remove('hidden');}else b.classList.add('hidden');}
+function monthStart(dateStr){
+  const d=new Date(dateStr);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+}
 function initRemindRange(){
-  const to=tod();const from=dateOffset(to,-6);
+  const to=tod();const from=monthStart(to);
   document.getElementById('rmd-from').value=from;
   document.getElementById('rmd-to').value=to;
 }
 function initMissingPage(){
-  const to=tod();const from=dateOffset(to,-6);
+  const to=tod();const from=monthStart(to);
   document.getElementById('miss-from').value=from;
   document.getElementById('miss-to').value=to;
 }
 function setMissingWeek(){
-  const to=tod();const from=dateOffset(to,-6);
+  const to=tod();const from=monthStart(to);
   document.getElementById('miss-from').value=from;
   document.getElementById('miss-to').value=to;
   renderMissing();
@@ -2792,6 +2854,9 @@ function navToAssess(attId,resId,date){
     onAttChange();
   },120);
 }
+// The public URL of this system, used in short reminder messages so the
+// recipient can tap straight through to fill in their evaluation.
+const SYSTEM_URL='https://gentleowl-er.github.io/SHHer/';
 function renderRemind(){
   const {from,to}=getDateRange('rmd-from','rmd-to');
   const all=getPendingInRange(from,to);
@@ -2807,14 +2872,33 @@ function renderRemind(){
   list.innerHTML=Object.entries(byAtt).map(([attId,{attName,entries}])=>{
     const miss=entries.filter(e=>!e.filled);
     const att=getAtt(attId);
-    const lineBtn=miss.length?`<button class="btn bln bxs" style="font-size:10.5px" onclick="quickLine('${attId}','${from}','${to}')">💬 提醒</button>`:'';
+    const quickBtns=miss.length?`
+      <button class="btn bln bxs" style="font-size:10.5px" onclick="quickLine('${attId}','${from}','${to}')">💬 LINE</button>
+      <button class="btn bfb bxs" style="font-size:10.5px" onclick="quickMessenger('${attId}','${from}','${to}')">📘 Messenger</button>
+      <button class="btn bs bxs" style="font-size:10.5px" onclick="previewReminderText('${attId}','${from}','${to}')">👁 預覽文字</button>`:'';
     return`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(30,45,69,.5);flex-wrap:wrap;gap:6px">
       <div style="display:flex;align-items:center;gap:8px"><div class="dav">${attName[0]}</div>
         <div><div style="font-weight:600;font-size:12.5px">${attName}</div>
         <div style="font-size:10.5px;color:var(--t3)">共 ${entries.length} 筆，未填 ${miss.length} 筆</div></div></div>
-      <div class="ifl" style="gap:6px"><span class="pill ${miss.length===0?'p4':'p1'}">${miss.length===0?'已完成':'未完成 '+miss.length+' 筆'}</span>${lineBtn}</div>
+      <div class="ifl" style="gap:6px;flex-wrap:wrap">${quickBtns?'':`<span class="pill p4">已完成</span>`}${quickBtns}</div>
     </div>`;
   }).join('');
+}
+// Short, friendly "shiftcard style" reminder text, per the requested format:
+// "陳大明醫師 有空麻煩幫我補「2026/07/01」「2026/07/03」的shiftcard，感謝！ <link>"
+function buildShiftcardReminderText(attId,from,to){
+  const att=getAtt(attId);if(!att)return'';
+  const missing=getPendingInRange(from,to).filter(e=>!e.filled&&e.attId===attId);
+  if(!missing.length)return'';
+  const dates=[...new Set(missing.map(e=>e.date))].sort();
+  const dateStr=dates.map(d=>`「${d}」`).join('');
+  return`${att.n}醫師 有空麻煩幫我補${dateStr}的shiftcard，感謝！ ${SYSTEM_URL}`;
+}
+function previewReminderText(attId,from,to){
+  const txt=buildShiftcardReminderText(attId,from,to);
+  if(!txt){alert('此主治醫師在此區間已無未填答項目');return;}
+  document.getElementById('line-txt').textContent=txt;
+  openM('m-line');
 }
 // Open LINE with pre-filled message text using LINE's official share URL scheme.
 // On mobile this opens the LINE app directly to a "choose contact" screen with
@@ -2823,23 +2907,44 @@ function openLineShare(text){
   const url='https://line.me/R/share?text='+encodeURIComponent(text);
   window.open(url,'_blank');
 }
-// Quick single-attending reminder: builds a message for just this attending's
-// missing assessments in the given date range, then opens LINE share directly.
+// Open Facebook Messenger with pre-filled message text. On mobile, the
+// fb-messenger:// scheme opens the Messenger app's contact/share screen
+// directly with the text pre-filled (works when the person is already
+// logged into Messenger, same as the LINE share flow). On desktop, or if
+// the app isn't installed, this falls back to Messenger's web share page.
+function openMessengerShare(text){
+  const encoded=encodeURIComponent(text);
+  const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if(isMobile){
+    // Try the native app scheme first
+    window.location.href='fb-messenger://share/?link='+encoded;
+    // Fallback to web version shortly after, in case the app isn't installed
+    setTimeout(()=>{window.open('https://www.facebook.com/dialog/send?link='+encoded+'&redirect_uri='+encodeURIComponent(SYSTEM_URL),'_blank');},600);
+  }else{
+    window.open('https://www.facebook.com/dialog/send?link='+encoded+'&redirect_uri='+encodeURIComponent(SYSTEM_URL),'_blank');
+  }
+}
+// Quick single-attending reminder: builds the short shiftcard-style message
+// for just this attending's missing assessments, then opens LINE share.
 function quickLine(attId,from,to){
-  const att=getAtt(attId);if(!att)return;
-  const missing=getPendingInRange(from,to).filter(e=>!e.filled&&e.attId===attId);
-  if(!missing.length){alert('此主治醫師在此區間已無未填答項目');return;}
-  const pairs=missing.map(e=>`${e.date} ${e.resName}`).join('\n');
-  const txt=`【急診住院醫師評核提醒】\n\n${att.n} 醫師您好，\n以下評核於 ${from}~${to} 尚未完成：\n\n${pairs}\n\n請於近期完成評核，謝謝！`;
+  const txt=buildShiftcardReminderText(attId,from,to);
+  if(!txt){alert('此主治醫師在此區間已無未填答項目');return;}
   openLineShare(txt);
+}
+// Same as quickLine but opens Facebook Messenger's share flow instead.
+function quickMessenger(attId,from,to){
+  const txt=buildShiftcardReminderText(attId,from,to);
+  if(!txt){alert('此主治醫師在此區間已無未填答項目');return;}
+  openMessengerShare(txt);
 }
 function buildBatch(ds){const entries=SCHED[ds]||[];const attGroups={};entries.forEach(e=>{const res=getRes(e.resId);if(!res||res.grad)return;if(!attGroups[e.attId])attGroups[e.attId]=[];attGroups[e.attId].push(e.resId);});const miss=[];Object.entries(attGroups).forEach(([attId,resIds])=>{const att=getAtt(attId);if(!att)return;const missing=resIds.filter(rid=>{const cnt=ASSESS.filter(a=>a.date===ds&&a.attId===attId&&a.resId===rid).length;return cnt===0;});if(missing.length){const resNames=missing.map(rid=>getRes(rid)?.n||'?').join('、');miss.push(`• ${att.n}（尚未評核：${resNames}）`);}});return miss.length?`【急診住院醫師評核提醒】\n\n以下主治醫師於 ${ds} 尚未完成評核：\n\n${miss.join('\n')}\n\n請於輪班結束前完成評核，謝謝！`:'無需提醒';}
 function batchEmail(){const {from,to}=getDateRange('rmd-from','rmd-to');const txt=buildBatchRange(from,to);const entries=getPendingInRange(from,to).filter(e=>!e.filled);const emails=[...new Set(entries.map(e=>getAtt(e.attId)?.email).filter(Boolean))].join(',');if(!emails)return alert('無 Email 可發送');window.open(`mailto:${emails}?subject=${encodeURIComponent('評核提醒 '+from+' ~ '+to)}&body=${encodeURIComponent(txt)}`);}
 function batchLine(){const {from,to}=getDateRange('rmd-from','rmd-to');document.getElementById('line-txt').textContent=buildBatchRange(from,to);openM('m-line');}
+function batchMessenger(){const {from,to}=getDateRange('rmd-from','rmd-to');document.getElementById('line-txt').textContent=buildBatchRange(from,to);openM('m-line');}
 // Note: the "用 LINE 傳送" button inside the m-line modal (see HTML) calls
 // openLineShare() directly with this text, opening LINE's contact picker
 // with the message pre-filled — no manual copy/paste needed on mobile.
-function buildBatchRange(from,to){const missing=getPendingInRange(from,to).filter(e=>!e.filled);if(!missing.length)return'無需提醒';const byAtt={};missing.forEach(e=>{if(!byAtt[e.attId])byAtt[e.attId]={attName:e.attName,pairs:[]};byAtt[e.attId].pairs.push(e.date+' '+e.resName);});const lines=Object.values(byAtt).map(({attName,pairs})=>`• ${attName}（${pairs.join('、')}）`).join('\n');return`【急診住院醫師評核提醒】\n\n以下主治醫師於 ${from}~${to} 尚有評核未完成：\n\n${lines}\n\n請於近期完成評核，謝謝！`;}
+function buildBatchRange(from,to){const missing=getPendingInRange(from,to).filter(e=>!e.filled);if(!missing.length)return'無需提醒';const byAtt={};missing.forEach(e=>{if(!byAtt[e.attId])byAtt[e.attId]={attName:e.attName,pairs:[]};byAtt[e.attId].pairs.push(e.date+' '+e.resName);});const lines=Object.values(byAtt).map(({attName,pairs})=>`• ${attName}（${pairs.join('、')}）`).join('\n');return`【急診住院醫師評核提醒】\n\n以下主治醫師於 ${from}~${to} 尚有評核未完成：\n\n${lines}\n\n請於近期完成評核，謝謝！\n${SYSTEM_URL}`;}
 function copyBatch(){navigator.clipboard.writeText(document.getElementById('batch-txt').textContent).then(()=>alert('已複製！'));}
 
 // ══════════════ ADMIN ══════════════
