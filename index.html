@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>急診醫學評核系統 v5.23</title>
+<title>急診醫學評核系統 v5.24</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <!-- Firestore accessed via REST API (no SDK needed - more reliable on mobile/file:// contexts) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -233,6 +233,19 @@ tr:hover td{background:rgba(255,255,255,.015)}
 .shher-tbl th{background:var(--bg3);padding:5px 7px;border:1px solid var(--border);text-align:center;font-size:9.5px;color:var(--t3);font-weight:600}
 .shher-tbl td{padding:5px 7px;border:1px solid var(--border);text-align:center;font-size:11px}
 .shher-tbl td:first-child{text-align:left;font-size:11.5px;color:var(--text);white-space:nowrap}
+/* v5.24 analytics: heatmap + sample-size cues */
+.chart-note{font-size:11px;color:var(--t2);margin-top:8px;line-height:1.6}
+.hm-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.hm{border-collapse:separate;border-spacing:2px;font-size:10.5px;width:auto}
+table.hm th{font-weight:600;color:var(--t2);padding:2px 4px;white-space:nowrap;background:none}
+table.hm .stk{position:sticky;left:0;z-index:1;background:var(--card);text-align:left;white-space:nowrap;padding-right:6px}
+table.hm td.c{min-width:44px;height:34px;text-align:center;border-radius:4px;cursor:pointer;line-height:1.15;padding:2px}
+table.hm td.c small{display:block;font-size:9px;opacity:.85}
+@media(max-width:600px){table.hm .hm-nm{display:none}table.hm td.c{min-width:40px}}
+table.hm td.low{opacity:.4;outline:1px dashed var(--t2);outline-offset:-2px}
+table.hm td.empty{background:repeating-linear-gradient(45deg,transparent 0 4px,var(--border) 4px 5px);color:var(--t3)}
+.hm-legend{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:10.5px;color:var(--t2);margin-top:8px}
+.hm-legend i{display:inline-block;width:16px;height:12px;border-radius:3px;vertical-align:middle;margin-right:3px}
 .cell-pass{background:rgba(34,197,94,.18);color:#22c55e;font-weight:600}
 .cell-fail{background:rgba(239,68,68,.12);color:#ef4444}
 .cell-exp{background:rgba(59,130,246,.08);color:var(--a2)}
@@ -352,7 +365,7 @@ body{font-size:var(--base-font,17px)}
 <div class="sbo" id="sbo" onclick="closeSB()"></div>
 <aside class="sidebar" id="sb">
   <div class="sb-logo">
-    <div class="sb-tag">TSEM · CBME 2025 v5.23</div>
+    <div class="sb-tag">TSEM · CBME 2025 v5.24</div>
     <h1>急診醫學<br>住院醫師評核系統</h1>
   </div>
   <nav class="sb-nav">
@@ -678,12 +691,24 @@ body{font-size:var(--base-font,17px)}
 <div class="page" id="page-analytics">
   <div class="sh mb4">
     <div><div class="st">統計分析</div></div>
-    <select id="ana-r" style="width:170px" onchange="renderAnalytics()"><option value="">所有住院醫師</option></select>
+    <div class="ifl" style="gap:6px;flex-wrap:wrap">
+      <select id="ana-y" style="width:92px" onchange="renderAnalytics()"><option value="">全部年級</option><option>R1</option><option>R2</option><option>R3</option><option>R4</option></select>
+      <select id="ana-r" style="width:150px" onchange="renderAnalytics()"><option value="">所有住院醫師</option></select>
+    </div>
   </div>
   <div class="g2 mb4">
     <div class="card"><div class="ct"><span class="dot"></span>EPA 等級曲線</div><div class="cw"><canvas id="ch-epa-l"></canvas></div></div>
     <div class="card"><div class="ct"><span class="dot" style="background:var(--a2)"></span>MS 各面向可呈現率</div><div class="cw"><canvas id="ch-ms-r"></canvas></div></div>
   </div>
+  <div class="g2 mb4">
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--purple)"></span>CCC 能力雷達（最新 CCC Milestone 等級 vs 同年級平均）</div><div class="cw" style="height:260px"><canvas id="ch-ccc-radar"></canvas></div><div id="ccc-radar-note" class="chart-note"></div></div>
+    <div class="card"><div class="ct"><span class="dot" style="background:var(--a2)"></span>評核覆蓋度（被評次數）</div>
+      <div class="cw" id="cov-epa-wrap" style="height:180px"><canvas id="ch-cov-epa"></canvas></div>
+      <div class="cw mt3" id="cov-ms-wrap"><canvas id="ch-cov-ms"></canvas></div>
+      <div id="cov-note" class="chart-note"></div></div>
+  </div>
+  <div class="card mb4"><div class="ct"><span class="dot" style="background:var(--acc)"></span>Milestone 熱圖（每月可穩定呈現率）</div>
+    <div id="ms-heatmap"></div><div id="ms-heatmap-detail" class="chart-note"></div></div>
   <div class="card mb4"><div class="ct"><span class="dot" style="background:var(--a3)"></span>EPA 各項平均</div><div id="epa-prog"></div></div>
   <div class="card"><div class="ct"><span class="dot" style="background:var(--purple)"></span>Milestone 細項可呈現率</div><div id="ms-detail-stats"></div></div>
 </div>
@@ -2627,7 +2652,7 @@ function epaTimeChartOpts(){
     title:items=>{const r=items[0]?.raw||{};return r.cnt!=null?tsToYM(r.x):tsToYMD(r.x);},
     label:c=>{const r=c.raw||{};const ds=c.dataset;
       if(ds._exp)return`${ds._epa} 期望：${r.y}`;
-      if(r.cnt!=null)return`${ds.label} 平均 ${r.y}（${r.cnt} 筆）`;
+      if(r.cnt!=null)return`${ds.label} 平均 ${r.y}（${r.cnt} 筆${r.cnt<LOW_N?'，樣本少':''}）`;
       return`${ds.label}：${r.y} 分`;},
     afterLabel:c=>{const r=c.raw||{};if(c.dataset._exp||r.cnt!=null)return'';const out=[];if(r.att)out.push('評核：'+r.att);if(r.fb)out.push('回饋：'+r.fb);return out;}
   }};
@@ -2655,7 +2680,8 @@ function epaResChartConfig(list,res){
   return{type:'line',data:{datasets:ds},options:o};
 }
 function gradeChartConfig(list){
-  const ds=buildGradeMonthly(list).map(g=>({label:g.yr,data:g.pts,borderColor:g.color,backgroundColor:g.color,tension:.25,fill:false,pointRadius:3}));
+  const ds=buildGradeMonthly(list).map(g=>({label:g.yr,data:g.pts,borderColor:g.color,backgroundColor:g.color,tension:.25,fill:false,pointRadius:3,
+    pointBackgroundColor:g.pts.map(p=>p.cnt<LOW_N?'transparent':g.color),pointBorderColor:g.pts.map(p=>p.cnt<LOW_N?g.color+'66':g.color)}));
   return{type:'line',data:{datasets:ds},options:epaTimeChartOpts()};
 }
 function setChartHint(canvasId,text){
@@ -2665,10 +2691,140 @@ function setChartHint(canvasId,text){
   h.textContent=text;
 }
 
+// ══════════════ v5.24 ANALYTICS: scope, heatmap, coverage, CCC radar ══════════════
+// Fewer than LOW_N samples → drawn faded (and n is always shown), so a single
+// evaluation isn't read as a trend. Zero samples → "—" + hatching, never 0%.
+const LOW_N=3;
+const HM_BINS=[.15,.3,.45,.65,.85];
+// Who/what the analytics page is looking at. A resident wins over the grade;
+// a grade means the residents who are in that grade NOW (this cohort).
+function anaScope(){
+  const fR=document.getElementById('ana-r')?.value||'';
+  const fY=document.getElementById('ana-y')?.value||'';
+  if(fR)return{res:getRes(fR),residents:[getRes(fR)].filter(Boolean),list:ASSESS.filter(a=>a.resId===fR&&a.type==='ms')};
+  const base=visA().filter(a=>a.type==='ms');
+  if(fY){const rs=RES.filter(r=>!r.grad&&r.y===fY);const ids=new Set(rs.map(r=>r.id));return{res:null,yr:fY,residents:rs,list:base.filter(a=>ids.has(a.resId))};}
+  return{res:null,residents:null,list:base};
+}
+function lastMonths(n,now){
+  const d=now||new Date();const out=[];
+  for(let i=n-1;i>=0;i--)out.push(tsToYM(Date.UTC(d.getFullYear(),d.getMonth()-i,15)));
+  return out;
+}
+// Rows = Milestones, columns = months ('YYYY/MM'). Cell: stable ÷ (stable+unstable)
+// over that month's evaluations that selected the Milestone; "not observed"
+// is left out. pct=null when nothing was judged; n = evaluations.
+function buildMsHeatmap(list,months){
+  const idx={};months.forEach((m,i)=>idx[m]=i);
+  const rows=MS.map(m=>({id:m.id,n:m.n,cells:months.map(()=>({s:0,u:0,n:0,atts:new Set()}))}));
+  const byId={};rows.forEach((r,i)=>byId[r.id]=[r,MS[i]]);
+  list.forEach(a=>{
+    if(a.type!=='ms'||!a.selMs)return;
+    const ts=dateToTs(a.date);if(ts==null)return;const col=idx[tsToYM(ts)];if(col==null)return;
+    a.selMs.forEach(id=>{const e=byId[id];if(!e)return;const c=e[0].cells[col];c.n++;if(a.attName)c.atts.add(a.attName);
+      (e[1].items||[]).forEach(it=>{const v=a.msItems?.[it.id];if(v==='stable')c.s++;else if(v==='unstable')c.u++;});});
+  });
+  rows.forEach(r=>r.cells.forEach(c=>{c.pct=c.s+c.u?Math.round(c.s/(c.s+c.u)*100):null;c.atts=[...c.atts];}));
+  return{months,rows};
+}
+let HM_LAST=null;
+function renderMsHeatmap(list){
+  const el=document.getElementById('ms-heatmap');if(!el)return;
+  const hm=HM_LAST=buildMsHeatmap(list,lastMonths(12));
+  const cell=(c,ri,ci)=>{
+    const click=`onclick="hmDetail(${ri},${ci})"`;
+    if(c.pct==null)return`<td class="c empty${c.n&&c.n<LOW_N?' low':''}" ${click} title="${c.n?'只有未觀察':'未評'}">—${c.n?`<small>n=${c.n}</small>`:''}</td>`;
+    const b=Math.min(4,Math.floor(c.pct/20));
+    return`<td class="c${c.n<LOW_N?' low':''}" ${click} style="background:rgba(0,201,167,${HM_BINS[b]});color:${b>=3?'#0b1220':'var(--text)'}">${c.pct}%<small>n=${c.n}</small></td>`;
+  };
+  el.innerHTML=`<div class="hm-wrap"><table class="hm"><thead><tr><th class="stk">項目</th>${hm.months.map(m=>`<th>${m.slice(2)}</th>`).join('')}</tr></thead><tbody>
+    ${hm.rows.map((r,ri)=>`<tr><th class="stk"><span style="font-family:'DM Mono';color:var(--a2)">${r.id}</span><span class="hm-nm"> ${escH(r.n.slice(0,5))}</span></th>${r.cells.map((c,ci)=>cell(c,ri,ci)).join('')}</tr>`).join('')}
+  </tbody></table></div>
+  <div class="hm-legend">${HM_BINS.map((a,i)=>`<span><i style="background:rgba(0,201,167,${a})"></i>${i*20}–${i*20+20}%</span>`).join('')}
+    <span><i style="background:rgba(0,201,167,.45);opacity:.4;outline:1px dashed var(--t2)"></i>淡色＝少於 ${LOW_N} 筆</span>
+    <span><i class="" style="background:repeating-linear-gradient(45deg,transparent 0 4px,var(--border) 4px 5px)"></i>—＝該月未評</span></div>`;
+  const d=document.getElementById('ms-heatmap-detail');if(d)d.textContent='點格子看明細。可穩定呈現率＝可穩定 ÷（可穩定＋未穩定），未觀察不計；n＝評核筆數。';
+}
+function hmDetail(ri,ci){
+  const r=HM_LAST?.rows[ri],c=r?.cells[ci],d=document.getElementById('ms-heatmap-detail');if(!c||!d)return;
+  const ms=MS.find(m=>m.id===r.id);
+  d.innerHTML=`<b>${HM_LAST.months[ci]} · ${r.id} ${escH(ms?.n||'')}</b><br>`+(c.n
+    ?`${c.n} 筆評核${c.n<LOW_N?'（樣本少，僅供參考）':''}；細項 可穩定 ${c.s}、未穩定 ${c.u}${c.pct!=null?`，可穩定呈現率 ${c.pct}%`:''}<br>評核老師：${escH(c.atts.join('、')||'—')}`
+    :'這個月沒有評到這個項目');
+}
+function medianOf(a){const v=[...a].sort((x,y)=>x-y);if(!v.length)return 0;const m=v.length>>1;return v.length%2?v[m]:(v[m-1]+v[m])/2;}
+// How often each item was assessed. none = never; low = under half the
+// median of its own group (EPA and Milestone are judged separately).
+function buildCoverage(list){
+  const ev=list.filter(a=>a.type==='ms');
+  const tag=(arr)=>{const med=medianOf(arr.map(x=>x.n));arr.forEach(x=>x.flag=x.n===0?'none':(med>0&&x.n<med/2?'low':'ok'));return med;};
+  const epa=EPA.map(e=>({id:e.id,name:e.n,n:ev.filter(a=>a.epaScores?.[e.id]!=null).length}));
+  const ms=MS.map(m=>({id:m.id,name:m.n,n:ev.filter(a=>a.selMs?.includes(m.id)).length}));
+  return{epa,ms,medEpa:tag(epa),medMs:tag(ms)};
+}
+const COV_CLR={ok:'#3b82f6',low:'#f59e0b',none:'#ef4444'};
+function covChartConfig(items){
+  const o=cOpt('bar',undefined);
+  o.indexAxis='y';o.plugins.legend={display:false};
+  o.scales={x:{beginAtZero:true,ticks:{color:'#94a3b8',precision:0},grid:{color:'#1e2d45'}},
+    y:{ticks:{color:c=>items[c.index]?.flag==='ok'?'#94a3b8':COV_CLR[items[c.index]?.flag]||'#94a3b8',font:{size:10},autoSkip:false},grid:{display:false}}};
+  o.plugins.tooltip={callbacks:{label:c=>{const it=items[c.dataIndex];return`${it.name}：${it.n} 次${it.flag==='none'?'（從未評過）':it.flag==='low'?'（偏少）':''}`;}}};
+  return{type:'bar',data:{labels:items.map(it=>`${it.id} · ${it.n}${it.flag==='none'?' ⚠未評':it.flag==='low'?' ▼偏少':''}`),
+    datasets:[{data:items.map(it=>it.n),backgroundColor:items.map(it=>it.flag==='ok'?COV_CLR.ok:COV_CLR[it.flag]),borderRadius:4,barPercentage:.8}]},options:o};
+}
+function renderCoverage(list){
+  const cov=buildCoverage(list);
+  dC('ch-cov-epa');dC('ch-cov-ms');
+  const w=document.getElementById('cov-ms-wrap');if(w)w.style.height=(cov.ms.length*18+40)+'px';
+  const c1=document.getElementById('ch-cov-epa'),c2=document.getElementById('ch-cov-ms');
+  if(c1)charts['ch-cov-epa']=new Chart(c1.getContext('2d'),covChartConfig(cov.epa));
+  if(c2)charts['ch-cov-ms']=new Chart(c2.getContext('2d'),covChartConfig(cov.ms));
+  const none=[...cov.epa,...cov.ms].filter(x=>x.flag==='none').map(x=>x.id);
+  const low=[...cov.epa,...cov.ms].filter(x=>x.flag==='low').map(x=>`${x.id}(${x.n})`);
+  const note=document.getElementById('cov-note');
+  if(note)note.innerHTML=`<b style="color:var(--danger)">⚠ 從未評過：</b>${none.join('、')||'無'}<br><b style="color:var(--a3)">▼ 偏少</b>（低於同組中位數一半；EPA 中位數 ${cov.medEpa}、Milestone 中位數 ${cov.medMs}）：${low.join('、')||'無'}`;
+  return cov;
+}
+// Latest-CCC Milestone level per competency (mean of its Milestones), for the
+// resident and for the average of current same-grade, non-graduated residents.
+function catScores(res){
+  return MS_CATS.map(cat=>{const items=MS.filter(m=>m.cat===cat);const vals=items.map(m=>getCCCMsScore(res,m.id)).filter(v=>v!=null);
+    return{v:vals.length?+(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2):null,n:vals.length,total:items.length};});
+}
+function buildCatRadar(res){
+  const mine=catScores(res);
+  let peer=null;
+  if(!res.grad&&res.y){
+    const per=RES.filter(r=>!r.grad&&r.y===res.y).map(catScores);
+    peer=MS_CATS.map((c,i)=>{const vs=per.map(p=>p[i].v).filter(v=>v!=null);return{v:vs.length?+(vs.reduce((a,b)=>a+b,0)/vs.length).toFixed(2):null,n:vs.length};});
+  }
+  return{cats:MS_CATS,mine,peer};
+}
+function renderCccRadar(res){
+  dC('ch-ccc-radar');
+  const note=document.getElementById('ccc-radar-note');
+  if(!res){if(note)note.textContent='請選擇住院醫師，才能看個人 CCC 能力雷達。';return null;}
+  const rd=buildCatRadar(res);
+  const fade=(clr,n)=>n<LOW_N?clr+'55':clr;
+  const ds=[{label:res.n,data:rd.mine.map(x=>x.v),_n:rd.mine.map(x=>x.n),borderColor:'#00c9a7',backgroundColor:'rgba(0,201,167,.12)',borderWidth:2,spanGaps:true,
+    pointRadius:5,pointBackgroundColor:rd.mine.map(x=>x.n<LOW_N?'transparent':'#00c9a7'),pointBorderColor:rd.mine.map(x=>fade('#00c9a7',x.n))}];
+  if(rd.peer)ds.push({label:res.y+' 同年級平均',data:rd.peer.map(x=>x.v),_n:rd.peer.map(x=>x.n),borderColor:'#94a3b8',backgroundColor:'transparent',borderDash:[5,4],borderWidth:1.5,spanGaps:true,
+    pointRadius:3,pointBackgroundColor:rd.peer.map(x=>x.n<LOW_N?'transparent':'#94a3b8'),pointBorderColor:rd.peer.map(x=>fade('#94a3b8',x.n))});
+  const labels=rd.cats.map((c,i)=>{const m=rd.mine[i];return m.v==null?`${c} —`:`${c} (${m.n}/${m.total})`;});
+  const o=cOpt('radar',5);
+  o.scales={r:{min:0,max:5,ticks:{stepSize:1,color:'#475569',backdropColor:'transparent'},grid:{color:'#1e2d45'},angleLines:{color:'#1e2d45'},pointLabels:{color:'#94a3b8',font:{size:10.5,weight:'bold'}}}};
+  o.plugins.tooltip={callbacks:{label:c=>{const n=c.dataset._n[c.dataIndex];return`${c.dataset.label}：${c.raw??'—'}（n=${n}${n<LOW_N?'，樣本少':''}）`;}}};
+  const cv=document.getElementById('ch-ccc-radar');
+  const cfg={type:'radar',data:{labels,datasets:ds},options:o};
+  if(cv)charts['ch-ccc-radar']=new Chart(cv.getContext('2d'),cfg);
+  if(note)note.textContent=`軸標籤（x/y）＝有 CCC 分數的 Milestone 數／該面向總數；同年級平均的 n＝有分數的學員數。空心點＝樣本少於 ${LOW_N}，僅供參考。`+(rd.peer?'':'（已畢業，不顯示同年級平均）');
+  return cfg;
+}
+
 // ══════════════ ANALYTICS ══════════════
 function renderAnalytics(){
   populateSel('ana-r',false);const fR=document.getElementById('ana-r').value;
-  const msD=(fR?ASSESS.filter(a=>a.resId===fR):visA()).filter(a=>a.type==='ms');
+  const scope=anaScope();const msD=scope.list;
   dC('ch-epa-l');const sorted=[...msD].sort((a,b)=>a.date.localeCompare(b.date));
   if(sorted.length){const ctx=document.getElementById('ch-epa-l').getContext('2d');charts['ch-epa-l']=new Chart(ctx,fR?epaResChartConfig(sorted,getRes(fR)):gradeChartConfig(sorted));}
   setChartHint('ch-epa-l',fR?'點圖例可顯示/隱藏；虛線＝目前年級的 SHHER 期望值；點資料點看日期、老師與回饋':'各年級每月 EPA 平均。選擇住院醫師可看各 EPA 曲線與期望值');
@@ -2676,6 +2832,9 @@ function renderAnalytics(){
   const ctx1=document.getElementById('ch-ms-r').getContext('2d');charts['ch-ms-r']=new Chart(ctx1,{type:'radar',data:{labels:MS_CATS.map(c=>MS_CAT_LBL[c]),datasets:[{label:'可穩定呈現%',data:cpct,backgroundColor:'rgba(0,201,167,.15)',borderColor:'#00c9a7',pointBackgroundColor:'#00c9a7'}]},options:{...cOpt('radar',100),scales:{r:{min:0,max:100,ticks:{color:'#475569',stepSize:25,callback:v=>v+'%'},grid:{color:'#1e2d45'},pointLabels:{color:'#94a3b8',font:{size:11,weight:'bold'}}}}}});
   const ep=document.getElementById('epa-prog');ep.innerHTML='';EPA.forEach(epa=>{const vs=msD.filter(a=>a.epaScores?.[epa.id]).map(a=>a.epaScores[epa.id]);const avg=vs.length?vs.reduce((a,b)=>a+b,0)/vs.length:0;const col=avg>=4?'var(--acc)':avg>=3?'var(--a2)':avg>=2?'var(--a3)':'var(--danger)';ep.innerHTML+=`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="font-size:12px"><span style="color:var(--a2);font-size:9.5px;font-family:'DM Mono'">${epa.id}</span> ${epa.n}</span><span style="font-family:'DM Mono';font-size:12px;color:${col}">${vs.length?avg.toFixed(1):'—'}</span></div><div class="prog-wrap"><div class="prog-bar" style="width:${(avg/5)*100}%;background:${col}"></div></div></div>`;});
   const mds=document.getElementById('ms-detail-stats');mds.innerHTML='';MS_CATS.forEach(cat=>{let html=`<div style="margin-bottom:13px"><div style="font-size:11px;color:var(--a2);font-weight:600;margin-bottom:5px">${cat}</div>`;MS.filter(m=>m.cat===cat).forEach(ms=>{let t=0,s=0;msD.forEach(a=>{ms.items.forEach(i=>{const v=a.msItems?.[i.id];if(v){t++;if(v==='stable')s++;}});});if(!t)return;const pct=Math.round(s/t*100);const col=pct>=80?'var(--acc)':pct>=60?'var(--a3)':'var(--danger)';html+=`<div style="display:flex;align-items:center;gap:7px;margin-bottom:3px"><span style="font-size:11px;min-width:65px;font-family:'DM Mono';color:var(--a2)">${ms.id}</span><span style="font-size:11.5px;min-width:100px;color:var(--t2)">${ms.n}</span><div class="prog-wrap" style="flex:1"><div class="prog-bar" style="width:${pct}%;background:${col}"></div></div><span style="font-size:10.5px;color:${col};font-family:'DM Mono';min-width:35px;text-align:right">${pct}%</span></div>`;});mds.innerHTML+=html+'</div>';});
+  try{renderCccRadar(scope.res);}catch(e){showJsError('CCC雷達圖失敗: '+e.message);}
+  try{renderCoverage(msD);}catch(e){showJsError('覆蓋度圖失敗: '+e.message);}
+  try{renderMsHeatmap(msD);}catch(e){showJsError('熱圖失敗: '+e.message);}
 }
 // ── Imaging registry (standalone page, accessible to all users) ──
 function renderImgLib(){
