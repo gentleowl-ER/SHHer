@@ -2,6 +2,11 @@
 // Usage: node smoke_test.js index.html
 // Runs the page's own JavaScript against a fake browser and an in-memory
 // Firestore REST emulator, then replays multi-device sync scenarios.
+// Run in Taiwan time on a controllable clock so date logic is deterministic
+// (default "now" = 2026-09-26 12:00 Taipei; each call advances 1 ms so ids stay unique).
+process.env.TZ = 'Asia/Taipei';
+const RealDate = Date; let NOW = RealDate.UTC(2026, 8, 26, 4, 0), TICK = 0;
+global.Date = class extends RealDate { constructor(...a) { a.length ? super(...a) : super(NOW + (TICK++)); } static now() { return NOW + (TICK++); } };
 const fs = require('fs');
 const file = process.argv[2] || 'index.html';
 const html = fs.readFileSync(file, 'utf8');
@@ -61,7 +66,7 @@ global.fetch = async (url, opts = {}) => {
   }
   return resp(400, {});
 };
-global.__H = { STORE, LOG, LS, setFail: n => { FAIL_NEXT = n; } };
+global.__H = { STORE, LOG, LS, setFail: n => { FAIL_NEXT = n; }, setNow: ms => { NOW = ms; TICK = 0; } };
 
 // ── Scenarios (appended so they share the page's scope) ──
 js = js.replace(/\ninit\(\);\s*$/, '\n') + `
@@ -371,6 +376,63 @@ js = js.replace(/\ninit\(\);\s*$/, '\n') + `
   T('v5.24 charts render ('+crash18+jsErr.join()+')',!crash18&&!jsErr.length);
   Chart=RC2;showJsError=keepErr;ASSESS=keepA18;RES=RES.filter(r=>!['T1','T2','T3'].includes(r.id));
   document.getElementById('ana-r').value='';document.getElementById('ana-y').value='';
+
+  // ── 19. v5.25: local dates, night-shift default, image block, cross-year roster ──
+  const at=(y,mo,d,h,mi)=>__H.setNow(Date.UTC(y,mo-1,d,h-8,mi||0)); // Taipei wall-clock → UTC
+  at(2026,9,27,7,30);
+  T('07:30 Taipei is today, not yesterday (UTC)',tod()==='2026-09-27');
+  T('monthStart local',monthStart('2026-09-27')==='2026-09-01');
+  T('dateOffset across month/year',dateOffset('2026-12-31',1)==='2027-01-01'&&dateOffset('2026-03-01',-1)==='2026-02-28');
+  at(2026,10,1,7,30);
+  ASSESS.unshift({id:4001,type:'ms',date:'2026-10-01',resId:'RE',attId:'A99',selMs:['PC1'],selEpa:['EPA1']});
+  T('monthly limit counts this local month at 07:30 on the 1st',mkStr()==='2026-10'&&getMsMonthCnt('RE','PC1')===1&&getEpaMonthCnt('RE','EPA1')===1);
+  renderDash();
+  T('"today done" uses local today',document.getElementById('st-td').textContent==1);
+  ASSESS=ASSESS.filter(a=>a.id!==4001);
+  // night shift
+  SCHED['2026-09-26']=[{attId:'A99',resId:'RE'}];
+  at(2026,9,27,8,30);
+  T('before 09:00 + owed yesterday → yesterday',defaultAssessDate('A99')==='2026-09-26');
+  T('someone not on shift → today',defaultAssessDate('A88')==='2026-09-27');
+  at(2026,9,27,10,0);
+  T('after 09:00 → today',defaultAssessDate('A99')==='2026-09-27');
+  at(2026,9,27,8,30);
+  document.getElementById('f-att').value='A99';fDateAuto=true;onAttChange();
+  T('auto date = yesterday + night-shift hint',document.getElementById('f-date').value==='2026-09-26'&&document.getElementById('tshift').textContent.includes('🌙'));
+  fDateAuto=false;document.getElementById('f-date').value='2026-09-20';onAttChange();
+  T('hand-picked / quick-link date not overwritten',document.getElementById('f-date').value==='2026-09-20');
+  ASSESS.unshift({id:4002,type:'ms',date:'2026-09-26',resId:'RE',attId:'A99'});
+  T('already evaluated yesterday → today',defaultAssessDate('A99')==='2026-09-27');
+  ASSESS=ASSESS.filter(a=>a.id!==4002);
+  // image block
+  const fill=(pid,cm,type)=>{document.getElementById('embed-img-enabled').checked=true;document.getElementById('eipid').value=pid;document.getElementById('eimg-comment').value=cm;embedImgType=type;};
+  const trySave=()=>{const n=ASSESS.length;document.getElementById('f-res').value='RE';document.getElementById('f-att').value='A99';document.getElementById('f-overall-fb').value='回饋內容至少十個字以上';
+    selEpa=[];selPcMs=[];selNpcMs=[];document.getElementById('ass-err').classList.add('hidden');['wp3','wp4'].forEach(i=>document.getElementById(i).classList.toggle('active',i==='wp4'));saveAssess();return ASSESS.length>n;};
+  fill('','','');
+  T('image block on but untouched → saves, no image',trySave()&&ASSESS[0].imgData==null);
+  fill('A123','','');
+  T('only chart number → not saved',!trySave());
+  T('…back on step 4 with the field flagged',document.getElementById('wp3').classList.contains('active')&&!document.getElementById('wp4').classList.contains('active')&&!document.getElementById('eimg-type-err').classList.contains('hidden')&&document.getElementById('ass-err').textContent.includes('影像種類'));
+  fill('','','CT');
+  T('type only → saves with image',trySave()&&ASSESS[0].imgData&&ASSESS[0].imgData.imgType==='CT');
+  T('cancel only clears embedded buttons',!/document\\.querySelectorAll\\('\\.itbtn'\\)/.test(cancelEmbedImg.toString())&&!/document\\.querySelectorAll\\('\\.itbtn'\\)/.test(selImgType.toString()));
+  // cross-year roster
+  let conf=0;const realConfirm=confirm;confirm=()=>{conf++;return CONFIRM;};
+  const a99=getAtt('A99').no;
+  const pasteRoster=row=>{document.getElementById('sched-paste').value=['日期\\t'+nm('RE')+'\\t'+nm('RF')+'\\t'+nm('RG'),row+'\\t'+a99+'\\t-\\t-'].join('\\n');parsePaste();return document.getElementById('paste-result').innerHTML;};
+  at(2026,12,20,10);CONFIRM=true;conf=0;
+  let out=pasteRoster('1/5');
+  T('December pasting 1/5 → next year',!!(SCHED['2027-01-05']||[]).some(e=>e.resId==='RE')&&!SCHED['2026-01-05']?.some(e=>e.resId==='RE'&&e.attId==='A99'));
+  T('cross-year asks first + result shows year/month',conf===1&&out.includes('2027 年 1 月'));
+  CONFIRM=false;out=pasteRoster('1/6');
+  T('cancel → nothing written',!SCHED['2027-01-06']&&out.includes('已取消'));
+  CONFIRM=true;at(2027,1,3,10);
+  pasteRoster('12/28');
+  T('January pasting 12/28 → last year',!!(SCHED['2026-12-28']||[]).some(e=>e.resId==='RE'));
+  at(2026,9,26,12);conf=0;out=pasteRoster('9/10');
+  T('same-year paste: no prompt, year/month shown',conf===0&&(SCHED['2026-09-10']||[]).some(e=>e.resId==='RE')&&out.includes('2026 年 9 月'));
+  T('inferYear picks nearest',inferYear(1,5,new Date(2026,11,20))===2027&&inferYear(12,28,new Date(2027,0,3))===2026&&inferYear(6,1,new Date(2026,8,26))===2026);
+  confirm=realConfirm;
 
   console.log((fail?'❌':'✅')+' '+pass+' passed, '+fail+' failed');
   process.exitCode=fail?1:0;
