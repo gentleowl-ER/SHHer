@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>急診醫學評核系統 v5.24</title>
+<title>急診醫學評核系統 v5.25</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <!-- Firestore accessed via REST API (no SDK needed - more reliable on mobile/file:// contexts) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -159,6 +159,8 @@ textarea{resize:vertical;min-height:68px}
 .img-item label{font-size:12px;color:var(--text);cursor:pointer}
 .img-type-row{display:flex;gap:7px;flex-wrap:wrap}
 .itbtn{padding:5px 13px;border:1.5px solid var(--border);border-radius:18px;background:var(--bg3);color:var(--t2);cursor:pointer;font-size:11.5px;transition:all .2s;font-family:inherit}
+.need-fix{outline:2px solid var(--danger);outline-offset:3px;border-radius:10px;animation:needfix 1s ease-in-out 3}
+@keyframes needfix{50%{outline-color:transparent}}
 .itbtn.sel{border-color:var(--acc);background:rgba(0,201,167,.08);color:var(--acc)}
 .star-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(30,45,69,.5)}
 .star-row:last-child{border-bottom:none}
@@ -365,7 +367,7 @@ body{font-size:var(--base-font,17px)}
 <div class="sbo" id="sbo" onclick="closeSB()"></div>
 <aside class="sidebar" id="sb">
   <div class="sb-logo">
-    <div class="sb-tag">TSEM · CBME 2025 v5.24</div>
+    <div class="sb-tag">TSEM · CBME 2025 v5.25</div>
     <h1>急診醫學<br>住院醫師評核系統</h1>
   </div>
   <nav class="sb-nav">
@@ -506,7 +508,7 @@ body{font-size:var(--base-font,17px)}
       <div class="ct"><span class="dot"></span>基本資料</div>
       <div class="fg"><label>住院醫師<span class="req">*</span></label><select id="f-res"><option value="">— 請選擇 —</option></select></div>
       <div class="g2">
-        <div class="fg"><label>評核日期</label><input type="date" id="f-date"></div>
+        <div class="fg"><label>評核日期</label><input type="date" id="f-date" onchange="fDateAuto=false;onAttChange()"></div>
         <div class="fg"><label>臨床情境 / 病例</label><input type="text" id="f-case" placeholder="例：OHCA、休克評估..."></div>
       </div>
     </div>
@@ -553,7 +555,8 @@ body{font-size:var(--base-font,17px)}
         <div class="g2 mb4">
           <div class="fg"><label>病歷號</label><input type="text" id="eipid" placeholder="選填"></div>
           <div class="fg"><label>影像種類<span class="req">*</span></label>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div id="eimg-type-err" class="hidden" style="color:var(--danger);font-size:12px;font-weight:600;margin-bottom:5px">⚠ 已填病歷號／說明，請選擇影像種類，或按「取消」</div>
+            <div id="eimg-type-btns" style="display:flex;gap:8px;flex-wrap:wrap">
               <button class="itbtn" onclick="selEmbedIT('X-ray',this)">X-ray</button>
               <button class="itbtn" onclick="selEmbedIT('CT',this)">CT</button>
               <button class="itbtn" onclick="selEmbedIT('MRI',this)">MRI</button>
@@ -1967,8 +1970,13 @@ function changePw(){const n=document.getElementById('pw-n').value,c=document.get
 
 // DATA HELPERS
 function visA(){return isAdmin||!currentAttId?ASSESS:ASSESS.filter(a=>a.attId===currentAttId);}
-function tod(){return new Date().toISOString().split('T')[0];}
-function mkStr(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;}
+// Dates are LOCAL calendar dates (Taiwan). toISOString() is UTC, which made
+// 00:00–07:59 count as "yesterday"; new Date('YYYY-MM-DD') also parses as UTC.
+function ymd(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function parseYMD(s){const m=String(s||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);return m?new Date(+m[1],+m[2]-1,+m[3]):new Date(NaN);}
+function addDays(s,n){const d=parseYMD(s);d.setDate(d.getDate()+n);return ymd(d);}
+function tod(){return ymd(new Date());}
+function mkStr(){return tod().slice(0,7);}
 function getRes(id){return RES.find(r=>r.id===id);}
 function getAtt(id){return ATT.find(a=>a.id===id);}
 function getAttByNo(no){
@@ -2015,6 +2023,14 @@ function toggleSB(){document.getElementById('sb').classList.toggle('open');docum
 function closeSB(){document.getElementById('sb').classList.remove('open');document.getElementById('sbo').classList.remove('open');}
 
 // ══════════════ SCHEDULE PASTE PARSER ══════════════
+// A pasted "M/D" has no year: pick last/this/next year, whichever puts the
+// date closest to today (Dec pasting 1/5 → next year; Jan pasting 12/28 → last).
+function inferYear(m,d,now){
+  now=now||new Date();const t=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
+  let best=now.getFullYear(),bd=Infinity;
+  [-1,0,1].forEach(k=>{const y=now.getFullYear()+k;const diff=Math.abs(new Date(y,m-1,d).getTime()-t);if(diff<bd){bd=diff;best=y;}});
+  return best;
+}
 function parsePaste(){
   const txt=document.getElementById('sched-paste').value.trim();
   if(!txt){alert('請貼上班表資料');return;}
@@ -2064,7 +2080,8 @@ function parsePaste(){
 
   // ── Parse date rows ──
   const dateRe=/^(\d{1,2})[\/\-](\d{1,2})$/;
-  const year=new Date().getFullYear();
+  const now=new Date();
+  const toDs=(m,d)=>`${inferYear(m,d,now)}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
   let ok=0,entries=0,skip=0;
   const unresolvedCodes={}; // code -> Set of dates where it appeared but couldn't be matched
 
@@ -2076,8 +2093,17 @@ function parsePaste(){
     if(!dm)return;
     const m=parseInt(dm[1]),d=parseInt(dm[2]);
     if(m<1||m>12||d<1||d>31)return;
-    pastedDates.add(`${year}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+    pastedDates.add(toDs(m,d));
   });
+  // Cross-year paste (e.g. January's roster pasted in December): confirm first.
+  const thisYear=String(now.getFullYear());
+  const ymList=[...new Set([...pastedDates].sort().map(ds=>ds.slice(0,7)))];
+  const fmtYM=ym=>`${ym.slice(0,4)} 年 ${+ym.slice(5)} 月`;
+  if(ymList.some(ym=>ym.slice(0,4)!==thisYear)&&!confirm(`班表日期推算為 ${ymList.map(fmtYM).join('、')}（不是今年 ${thisYear}），確定匯入？`)){
+    const el=document.getElementById('paste-result');
+    if(el){el.innerHTML='已取消，班表沒有變更。';el.classList.remove('hidden');}
+    return;
+  }
   // Clear old schedule for those dates
   pastedDates.forEach(ds=>{ SCHED[ds]=[]; });
 
@@ -2087,7 +2113,7 @@ function parsePaste(){
     const [,mm,dd]=first.match(dateRe);
     const m=parseInt(mm),d=parseInt(dd);
     if(m<1||m>12||d<1||d>31)return;
-    const dateStr=`${year}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dateStr=toDs(m,d);
     if(!SCHED[dateStr])SCHED[dateStr]=[];
 
     Object.entries(resColMap).forEach(([col,resId])=>{
@@ -2139,7 +2165,9 @@ function parsePaste(){
       ⚠ 偵測到欄位對應衝突（可能造成漏人，請檢查班表格式）：<br>${colCollisions.join('<br>')}
     </div>`;
   }
-  el.innerHTML=`✅ 解析完成！<b>${ok}</b> 個日期，<b>${entries}</b> 筆${skip>0?` <span style="color:var(--a3)">⚠ ${skip}格未識別</span>`:''}
+  const ymSummary=ymList.map(ym=>{const ds=[...pastedDates].filter(x=>x.startsWith(ym)).sort();const d0=+ds[0].slice(8),d1=+ds[ds.length-1].slice(8),mo=+ym.slice(5);
+    return`${fmtYM(ym)}（${mo}/${d0}–${mo}/${d1}，共 ${ds.length} 天）`;}).join('、');
+  el.innerHTML=`${ymSummary?`<div style="font-weight:700;font-size:13.5px;margin-bottom:4px">📅 已匯入 ${ymSummary}</div>`:''}✅ 解析完成！<b>${ok}</b> 個日期，<b>${entries}</b> 筆${skip>0?` <span style="color:var(--a3)">⚠ ${skip}格未識別</span>`:''}
     <br><span style="font-size:12px;color:var(--t3)">偏移:${dateColOffset} ｜ ${preview}...</span>${unresolvedMsg}`;
   el.className='al aok';el.classList.remove('hidden');
 }
@@ -2192,8 +2220,7 @@ function renderDash(){
   }else pendCard.classList.add('hidden');
   // Recent table — last 7 days, newest first
   const tb=document.getElementById('dash-tbody');
-  const d7=new Date();d7.setDate(d7.getDate()-6);
-  const d7s=`${d7.getFullYear()}-${String(d7.getMonth()+1).padStart(2,'0')}-${String(d7.getDate()).padStart(2,'0')}`;
+  const d7s=addDays(tod(),-6);
   const recentA=[...visA()].filter(a=>a.date>=d7s).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
   tb.innerHTML=recentA.map(a=>`<tr>
     <td>${a.date}</td><td style="color:var(--a2);font-size:11px">${a.attName||'—'}</td><td>${a.resName}</td><td style="color:var(--a2)">${a.resYear||''}</td>
@@ -2220,8 +2247,8 @@ function getPendingDates(attId){
   return result.sort((a,b)=>b.date.localeCompare(a.date));
 }
 function quickAssess(attId,resId){nav('assess');setTimeout(()=>{document.getElementById('f-att').value=attId;document.getElementById('f-res').value=resId;onAttChange();},100);}
-function quickAssessDate(attId,date){nav('assess');setTimeout(()=>{document.getElementById('f-att').value=attId;document.getElementById('f-date').value=date;onAttChange();},100);}
-function quickAssessOnDate(attId,resId,date){nav('assess');setTimeout(()=>{document.getElementById('f-att').value=attId;document.getElementById('f-res').value=resId;document.getElementById('f-date').value=date;onAttChange();},100);}
+function quickAssessDate(attId,date){nav('assess');setTimeout(()=>{fDateAuto=false;document.getElementById('f-att').value=attId;document.getElementById('f-date').value=date;onAttChange();},100);}
+function quickAssessOnDate(attId,resId,date){nav('assess');setTimeout(()=>{fDateAuto=false;document.getElementById('f-att').value=attId;document.getElementById('f-res').value=resId;document.getElementById('f-date').value=date;onAttChange();},100);}
 function renderDashCharts(){
   dC('ch-epa-c');dC('ch-ms-c');
   const msA=ASSESS.filter(a=>a.type==='ms');
@@ -2250,8 +2277,31 @@ function renderAssessPendingCard(){
     card.classList.add('hidden');
   }
 }
-function initAssess(){selEpa=[];selPcMs=[];selNpcMs=[];epaScores={};epaFb={};msScores={};embedImgType='';embedImgTab='req';embedImgStars={};embedImgSubCase='';document.getElementById('f-date').value=tod();document.getElementById('f-case').value='';const ofb=document.getElementById('f-overall-fb');if(ofb){ofb.value='';ofb.classList.remove('fil');ofb.classList.add('mf');}const ofbCnt=document.getElementById('f-overall-fb-cnt');if(ofbCnt){ofbCnt.textContent='0 字';ofbCnt.style.color='var(--t3)';}const eib=document.getElementById('embed-img-enabled');if(eib){eib.checked=true;const inner=document.getElementById('embed-img-inner');if(inner)inner.style.display='block';}['ass-ok','ass-err'].forEach(id=>document.getElementById(id).classList.add('hidden'));populateSel('f-res',false);populateSel('f-att',true);if(currentAttId)document.getElementById('f-att').value=currentAttId;onAttChange();renderAssessPendingCard();[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===0);document.getElementById('ws'+i).className='ws'+(i===0?' active':'');});syncMobBar(0);}
-function onAttChange(){const id=document.getElementById('f-att').value;const entries=(SCHED[tod()]||[]).filter(e=>e.attId===id);const si=document.getElementById('tshift');if(entries.length){const resNames=entries.map(e=>getRes(e.resId)?.n||'').filter(Boolean);si.textContent=resNames.length?`今日需評：${resNames.join('、')}`:'今日值班';}else si.textContent='';}
+function initAssess(){selEpa=[];selPcMs=[];selNpcMs=[];epaScores={};epaFb={};msScores={};embedImgType='';embedImgTab='req';embedImgStars={};embedImgSubCase='';document.getElementById('f-date').value=tod();document.getElementById('f-case').value='';const ofb=document.getElementById('f-overall-fb');if(ofb){ofb.value='';ofb.classList.remove('fil');ofb.classList.add('mf');}const ofbCnt=document.getElementById('f-overall-fb-cnt');if(ofbCnt){ofbCnt.textContent='0 字';ofbCnt.style.color='var(--t3)';}const eib=document.getElementById('embed-img-enabled');if(eib){eib.checked=true;const inner=document.getElementById('embed-img-inner');if(inner)inner.style.display='block';}['eipid','eimg-comment'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.querySelectorAll('#embed-img-inner .itbtn').forEach(b=>b.classList.remove('sel'));clearEmbedImgFlag();fDateAuto=true;['ass-ok','ass-err'].forEach(id=>document.getElementById(id).classList.add('hidden'));populateSel('f-res',false);populateSel('f-att',true);if(currentAttId)document.getElementById('f-att').value=currentAttId;onAttChange();renderAssessPendingCard();[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===0);document.getElementById('ws'+i).className='ws'+(i===0?' active':'');});syncMobBar(0);}
+// Assessment date: today, except before 09:00 when this attending worked
+// yesterday and still owes an evaluation for it (night shift) → yesterday.
+// Only while the date hasn't been set by hand or passed in by a quick link.
+let fDateAuto=true;
+function defaultAssessDate(attId,now){
+  now=now||new Date();const t=ymd(now);
+  if(!attId||now.getHours()>=9)return t;
+  const y=addDays(t,-1);
+  const owed=(SCHED[y]||[]).some(e=>e.attId===attId&&getRes(e.resId)&&!getRes(e.resId).grad&&!ASSESS.some(a=>a.date===y&&a.attId===attId&&a.resId===e.resId));
+  return owed?y:t;
+}
+function onAttChange(){
+  const id=document.getElementById('f-att').value;const fd=document.getElementById('f-date');
+  if(fd&&fDateAuto)fd.value=defaultAssessDate(id);
+  const ds=fd?.value||tod();const today=tod();
+  const entries=(SCHED[ds]||[]).filter(e=>e.attId===id);const si=document.getElementById('tshift');
+  const names=entries.map(e=>getRes(e.resId)?.n||'').filter(Boolean).join('、');
+  const md=`${+ds.slice(5,7)}/${+ds.slice(8,10)}`;
+  if(!entries.length)si.textContent='';
+  else if(ds===today)si.textContent=names?`今日需評：${names}`:'今日值班';
+  else if(fDateAuto&&ds===addDays(today,-1))si.textContent=`🌙 夜班：已帶入昨天（${md}）日期${names?'，需評：'+names:''}`;
+  else si.textContent=names?`${md} 需評：${names}`:`${md} 值班`;
+}
+function showStepOnly(s){[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===s);document.getElementById('ws'+i).className='ws'+(i===s?' active':i<s?' done':'');});syncMobBar(s);}
 function goStep(s){if(s===1&&!v0())return;if(s===2&&!v1())return;if(s===3&&!v2())return;[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===s);document.getElementById('ws'+i).className='ws'+(i===s?' active':i<s?' done':'');});window.scrollTo(0,0);if(s===1)renderSelStep();if(s===2)renderEpaStep();if(s===3)renderMsStep();syncMobBar(s);}
 function syncMobBar(s){
   const bar=document.getElementById('mob-bar');if(!bar)return;
@@ -2283,9 +2333,7 @@ function v2(){for(const id of selEpa){if(!epaScores[id]){alert(`EPA ${id} 尚未
 function getMsUseCnt(resId,msId){if(!resId)return 0;return ASSESS.filter(a=>a.resId===resId&&a.type==='ms'&&a.selMs&&a.selMs.includes(msId)).length;}
 function getMsMonthCnt(resId,msId){
   if(!resId)return 0;
-  // Use local time (Taiwan UTC+8) not UTC
-  const now=new Date();
-  const mon=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const mon=mkStr(); // local month (Taiwan), not UTC
   return ASSESS.filter(a=>a.resId===resId&&a.type==='ms'&&a.selMs&&a.selMs.includes(msId)&&a.date.startsWith(mon)).length;
 }
 function getMsLimit(resId,msId){
@@ -2309,8 +2357,7 @@ function isMsOverMonthLimit(resId,msId){
 function getEpaUseCnt(resId,epaId){if(!resId)return 0;return ASSESS.filter(a=>a.resId===resId&&a.type==='ms'&&a.selEpa&&a.selEpa.includes(epaId)).length;}
 function getEpaMonthCnt(resId,epaId){
   if(!resId)return 0;
-  const now=new Date();
-  const mon=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const mon=mkStr();
   return ASSESS.filter(a=>a.resId===resId&&a.type==='ms'&&a.selEpa&&a.selEpa.includes(epaId)&&a.date.startsWith(mon)).length;
 }
 function getEpaLimit(resId,epaId){
@@ -2517,7 +2564,7 @@ function saveAssess(){
 
 // ══════════════ IMAGING (Independent, Mandatory) ══════════════
 function initImg(){imgType='';imgTab='req';imgStars={};imgSubCase='';document.getElementById('im-date').value=tod();document.getElementById('im-pid').value='';document.getElementById('im-comment').value='';document.getElementById('im-comment').className='mf';populateSel('im-res',false);populateSel('im-att',true);document.querySelectorAll('.itbtn').forEach(b=>b.classList.remove('sel'));if(currentAttId)document.getElementById('im-att').value=currentAttId;renderImgCaseList();renderImgStars();renderImgPresets();['img-ok','img-err'].forEach(id=>document.getElementById(id).classList.add('hidden'));}
-function selImgType(t,btn){imgType=t;document.querySelectorAll('.itbtn').forEach(b=>b.classList.remove('sel'));btn.classList.add('sel');}
+function selImgType(t,btn){imgType=t;btn.closest('div').querySelectorAll('.itbtn').forEach(b=>b.classList.remove('sel'));btn.classList.add('sel');}
 function swImgTab(tab,el){imgTab=tab;document.querySelectorAll('#im-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');imgSubCase='';document.getElementById('im-sub-wrap').classList.add('hidden');renderImgCaseList();}
 function renderImgCaseList(){const cases=imgTab==='req'?IMG_REQ:IMG_SEL;const el=document.getElementById('im-case-list');el.innerHTML=cases.map((c,i)=>`<div class="img-item"><input type="radio" name="imgcase" id="ic-${i}" value="${c}" onchange="onImgCase('${c}')"><label for="ic-${i}">${c}</label></div>`).join('');}
 function onImgCase(v){imgSubCase='';const sub=document.getElementById('im-sub-wrap');if(v==='其他'&&imgTab==='req'){sub.classList.remove('hidden');document.getElementById('im-sub-list').innerHTML=IMG_SEL.map((c,i)=>`<div class="img-item"><input type="radio" name="imgsub" id="ics-${i}" value="${c}" onchange="imgSubCase='${c.replace(/'/g,"\\'")}';"><label for="ics-${i}">${c}</label></div>`).join('');}else sub.classList.add('hidden');}
@@ -3495,10 +3542,7 @@ function restoreRes(id){
 
 // ══════════════ REMIND ══════════════
 function updateRmBadge(){const t=tod();const sched=getTodayDocs(t);const miss=sched.filter(e=>{const res=getRes(e.resId);if(!res||res.grad)return false;const cnt=ASSESS.filter(a=>a.date===t&&a.attId===e.attId&&a.resId===e.resId).length;return cnt===0;});const b=document.getElementById('rbadge');if(isAdmin&&miss.length>0){b.textContent=miss.length;b.classList.remove('hidden');}else b.classList.add('hidden');}
-function monthStart(dateStr){
-  const d=new Date(dateStr);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
-}
+function monthStart(dateStr){return String(dateStr).slice(0,7)+'-01';}
 function initRemindRange(){
   const to=tod();const from=monthStart(to);
   document.getElementById('rmd-from').value=from;
@@ -3515,10 +3559,7 @@ function setMissingWeek(){
   document.getElementById('miss-to').value=to;
   renderMissing();
 }
-function dateOffset(base,days){
-  const d=new Date(base);d.setDate(d.getDate()+days);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
+function dateOffset(base,days){return addDays(base,days);}
 function getDateRange(fromId,toId){
   const from=document.getElementById(fromId)?.value||tod();
   const to=document.getElementById(toId)?.value||tod();
@@ -3839,7 +3880,7 @@ function setCCCLv(resId,id,val){const r=getRes(resId);if(!r)return;if(!r.cccLeve
 function saveCCCSnapshot(resId){
   const r=getRes(resId);if(!r)return;
   if(!r.cccHistory)r.cccHistory=[];
-  const snap={date:new Date().toISOString().split('T')[0],levels:{...r.cccLevels}};
+  const snap={date:tod(),levels:{...r.cccLevels}};
   r.cccHistory.push(snap);
   save();
   alert('CCC 快照已儲存！（共 '+r.cccHistory.length+' 次）\nSHHER 矩陣下拉選單可選擇查看前幾次的 CCC 資料。');
@@ -4029,15 +4070,29 @@ function cancelEmbedImg(){
   embedImgType='';
   const pidEl=document.getElementById('eipid');if(pidEl)pidEl.value='';
   const cmEl=document.getElementById('eimg-comment');if(cmEl)cmEl.value='';
-  document.querySelectorAll('.itbtn').forEach(b=>b.classList.remove('sel'));
+  document.querySelectorAll('#embed-img-inner .itbtn').forEach(b=>b.classList.remove('sel')); // not the standalone imaging page
+  clearEmbedImgFlag();
 }
-function selEmbedIT(t,btn){embedImgType=t;btn.closest('div').querySelectorAll('.itbtn').forEach(b=>b.classList.remove('sel'));btn.classList.add('sel');}
+function selEmbedIT(t,btn){embedImgType=t;btn.closest('div').querySelectorAll('.itbtn').forEach(b=>b.classList.remove('sel'));btn.classList.add('sel');clearEmbedImgFlag();}
+function clearEmbedImgFlag(){document.getElementById('eimg-type-err')?.classList.add('hidden');document.getElementById('eimg-type-btns')?.classList.remove('need-fix');}
+// Nothing entered → no image, save normally (the section is on by default and
+// many teachers never touch it). Partly entered (ID or note but no type) →
+// don't save; take them back to step 4 and point at the missing field.
 function getEmbedImgData(){
   if(!document.getElementById('embed-img-enabled')?.checked)return null;
-  if(!embedImgType){alert('請選擇影像種類');return false;}
   const comment=(document.getElementById('eimg-comment')?.value||'').trim();
   const pid=(document.getElementById('eipid')?.value||'').trim();
+  if(!embedImgType&&!pid&&!comment)return null;
+  if(!embedImgType){flagEmbedImgType();return false;}
   return{imgType:embedImgType,pid,comment};
+}
+function flagEmbedImgType(){
+  showStepOnly(3);
+  const inner=document.getElementById('embed-img-inner');if(inner)inner.style.display='block';
+  document.getElementById('eimg-type-err')?.classList.remove('hidden');
+  const btns=document.getElementById('eimg-type-btns');
+  if(btns){btns.classList.remove('need-fix');void btns.offsetWidth;btns.classList.add('need-fix');setTimeout(()=>btns.scrollIntoView&&btns.scrollIntoView({behavior:'smooth',block:'center'}),60);}
+  showErr('ass-err','⚠ 影像資料庫只填了一部分：請選擇影像種類，或按「取消」表示這次沒有影像。');
 }
 function applyFontSize(px){
   // Inject/update a dynamic style tag - this overrides ALL other CSS
