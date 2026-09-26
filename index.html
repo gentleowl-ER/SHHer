@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>急診醫學評核系統 v5.2</title>
+<title>急診醫學評核系統 v5.21</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <!-- Firestore accessed via REST API (no SDK needed - more reliable on mobile/file:// contexts) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -352,7 +352,7 @@ body{font-size:var(--base-font,17px)}
 <div class="sbo" id="sbo" onclick="closeSB()"></div>
 <aside class="sidebar" id="sb">
   <div class="sb-logo">
-    <div class="sb-tag">TSEM · CBME 2025 v5.18</div>
+    <div class="sb-tag">TSEM · CBME 2025 v5.21</div>
     <h1>急診醫學<br>住院醫師評核系統</h1>
   </div>
   <nav class="sb-nav">
@@ -754,6 +754,7 @@ body{font-size:var(--base-font,17px)}
   <div class="sh mb4"><div><div class="st">住院醫師管理</div></div>
     <div class="ifl"><button class="btn bs bsm" onclick="manualSaveAll()" title="強制儲存全部資料到本機並嘗試同步雲端">🛟 手動儲存</button><button class="btn bs bsm" onclick="nav('graduated')">🎓 已畢業</button><button class="btn bp bsm" onclick="openResM()">＋ 新增</button></div>
   </div>
+  <div id="res-dup-warn" class="al ae hidden mb4" style="font-size:12px"></div>
   <div class="card" style="overflow-x:auto">
     <table><thead><tr><th>代號</th><th>姓名</th><th>年級</th><th>評核次數</th><th>MS%</th><th>EPA均</th><th>操作</th></tr></thead>
     <tbody id="res-tbody"></tbody></table>
@@ -936,9 +937,9 @@ body{font-size:var(--base-font,17px)}
       <div class="fg"><label>每月每項 MS 上限（0=不限）</label><div class="ifl"><input type="number" id="q-mm" style="width:60px;text-align:center" min="0" max="50"></div></div>
       <button class="btn bpu bsm" onclick="saveAdmin()">💾 儲存上限設定</button>
       <div id="admin-limit-ok" class="al aok hidden mt3" style="font-size:12px">✅ 上限已儲存</div>
-      <div class="ah mt4">🛠 名單修復</div>
-      <p style="font-size:11px;color:var(--t2);margin-bottom:8px">若主治醫師/住院醫師名單顯示不完整或消失（例如雲端曾存有舊測試資料），點此鍵會用系統內建的正確固定名單修復本機與雲端。</p>
-      <button class="btn bsm" style="border:1px solid var(--danger);color:var(--danger)" onclick="repairRoster()">🔧 修復名單（本機+雲端）</button>
+      <div class="ah mt4">🛠 名單健檢</div>
+      <p style="font-size:11px;color:var(--t2);margin-bottom:8px">檢查名單：補回遺失的姓名、統一代碼格式、清除畢業生代碼，並列出同名重複與代碼衝突。不會覆蓋現有資料。</p>
+      <button class="btn bsm" style="border:1px solid var(--a3);color:var(--a3)" onclick="repairRoster()">🩺 名單健檢</button>
       <div id="repair-result" class="hidden mt3" style="font-size:12px"></div>
       <div class="ah mt4">🔐 密碼</div>
       <div class="g2"><div class="fg"><label>新密碼</label><input type="password" id="pw-n"></div><div class="fg"><label>確認</label><input type="password" id="pw-c"></div></div>
@@ -1390,28 +1391,64 @@ if(!ATT)ATT=DEF_ATT.map(a=>({...a}));
 // so corrupt/incomplete cloud data can never make people disappear entirely.
 const RES_MUTABLE_FIELDS=['no','n','y','grad','ward','cccLevels','cccHistory','itemLocks','qPcOverride','qNpcOverride','msMonthLimits','msSelRelax'];
 const ATT_MUTABLE_FIELDS=['no','n','email','line','presets'];
-function mergeRosterWithCloud(defaults,cloudList,mutableFields){
-  const cloudById={};
-  (cloudList||[]).forEach(c=>{if(c&&c.id)cloudById[c.id]=c;});
-  const merged=defaults.map(def=>{
-    const cloud=cloudById[def.id];
-    const out={...def};
-    if(cloud)mutableFields.forEach(f=>{
-      // Only override when cloud actually has a meaningful value (skip blank/undefined),
-      // so missing fields in old cloud data can't blank out no/n by accident.
-      if(cloud[f]!==undefined&&cloud[f]!==null&&cloud[f]!=='')out[f]=cloud[f];
-    });
-    return out;
-  });
-  // IMPORTANT: entries that exist in the cloud but were never part of the
-  // hardcoded defaults list (i.e. people added later via "＋ 新增") must be
-  // preserved too — otherwise every sync silently deletes newly-added
-  // residents/attendings the moment mergeRosterWithCloud runs.
-  const defaultIds=new Set(defaults.map(d=>d.id));
-  (cloudList||[]).forEach(c=>{
-    if(c&&c.id&&!defaultIds.has(c.id))merged.push({...c});
-  });
-  return merged;
+// Cloud is the source of truth for the roster. The hard-coded lists
+// (DEF_RES / DEF_ATT) only seed an empty database and repair a record whose
+// name went missing. The old version rebuilt the roster FROM the hard-coded
+// list on every sync, which (a) resurrected anyone who had been deleted —
+// the "duplicate M that can't be deleted" — and (b) refilled codes cleared
+// at graduation, so a graduate grabbed a schedule column again.
+// Returns null when the cloud list is empty, so the caller keeps what it has.
+function mergeRosterWithCloud(defaults,cloudList){
+  const list=(cloudList||[]).filter(c=>c&&c.id!=null&&c.id!=='');
+  if(!list.length)return null;
+  const defById={};(defaults||[]).forEach(d=>{defById[d.id]=d;});
+  const seen=new Set();
+  return list.filter(c=>{const k=String(c.id);if(seen.has(k))return false;seen.add(k);return true;})
+    .map(c=>{const out={...c};if(!String(out.n??'').trim()&&defById[c.id])out.n=defById[c.id].n;return out;});
+}
+// Display order: residents in training first, then by schedule code, then name;
+// attendings keep the order of the built-in list, newcomers after.
+function sortRoster(){
+  RES.sort((a,b)=>((a.grad?1:0)-(b.grad?1:0))||(normCode(a.no)||'~').localeCompare(normCode(b.no)||'~')||String(a.n).localeCompare(String(b.n),'zh'));
+  const idx={};DEF_ATT.forEach((d,i)=>{idx[d.id]=i;});
+  ATT.sort((a,b)=>((idx[a.id]??1e9)-(idx[b.id]??1e9))||String(a.n).localeCompare(String(b.n),'zh'));
+}
+
+// ══════════════ IDENTITY：姓名為主，代碼只給班表用 ══════════════
+// A resident is identified by NAME. The single-letter code exists only
+// because the department schedule uses it, so it is consulted only when
+// reading a schedule, only among residents still in training, and never
+// guessed. Internal ids stay as the stable link between records (so a
+// typo fix in a name doesn't disconnect past evaluations).
+function normCode(s){return String(s??'').normalize('NFKC').replace(/\s+/g,'').toUpperCase();}
+function normName(s){return String(s??'').normalize('NFKC').replace(/\s+/g,'').toLowerCase();}
+function findResByName(name,opts={}){
+  const key=normName(name);if(!key)return[];
+  return RES.filter(r=>normName(r.n)===key&&(!opts.activeOnly||!r.grad));
+}
+function findActiveResByCode(code){
+  const key=normCode(code);if(!key)return[];
+  return RES.filter(r=>!r.grad&&normCode(r.no)===key);
+}
+// Resolve one schedule header cell. Name wins over code.
+function resolveResHeader(cell){
+  const byName=findResByName(cell,{activeOnly:true});
+  if(byName.length===1)return{res:byName[0]};
+  if(byName.length>1)return{error:'ambiguous',list:byName};
+  const byCode=findActiveResByCode(cell);
+  if(byCode.length===1)return{res:byCode[0]};
+  if(byCode.length>1)return{error:'ambiguous',list:byCode};
+  if(findResByName(cell).length)return{error:'grad'};
+  return{error:'none'};
+}
+function describeHeaderIssues(issues){
+  return issues.map(x=>x.error==='ambiguous'?`「${x.cell}」同時符合 ${x.list.map(r=>r.n).join('、')}（代碼或姓名重複）`
+    :x.error==='grad'?`「${x.cell}」是已畢業學員`
+    :`「${x.cell}」找不到對應的在職學員`);
+}
+function findDuplicateNameGroups(){
+  const g={};RES.forEach(r=>{const k=normName(r.n);if(!k)return;(g[k]=g[k]||[]).push(r);});
+  return Object.values(g).filter(l=>l.length>1);
 }
 let isAdmin=false,currentAttId=null;
 let charts={};
@@ -1423,7 +1460,9 @@ let selEpa=[],selPcMs=[],selNpcMs=[],epaScores={},epaFb={},msScores={},lastSaved
 let imgType='',imgTab='req',imgStars={},imgSubCase='';
 let editAttId=null;
 
-function save(){localStorage.setItem('em52_res',JSON.stringify(RES));localStorage.setItem('em52_att',JSON.stringify(ATT));localStorage.setItem('em52_assess',JSON.stringify(ASSESS));localStorage.setItem('em52_sched',JSON.stringify(SCHED));localStorage.setItem('em52_cfg',JSON.stringify(CFG));}
+function save(){localStorage.setItem('em52_res',JSON.stringify(RES));localStorage.setItem('em52_att',JSON.stringify(ATT));localStorage.setItem('em52_assess',JSON.stringify(ASSESS));localStorage.setItem('em52_sched',JSON.stringify(SCHED));localStorage.setItem('em52_cfg',JSON.stringify(CFG));
+  // Only records that actually changed get uploaded (see SYNC ENGINE), so this is cheap.
+  try{autoSyncDebounced();}catch(e){}}
 
 // FIREBASE
 // ── 內建 Firebase 設定（傳給別人不需重新設定）──
@@ -1446,7 +1485,7 @@ let db=null; // kept as a "connected" flag (true/false) for compatibility with r
 function fsEncodeValue(v){
   if(v===null||v===undefined)return{nullValue:null};
   if(typeof v==='boolean')return{booleanValue:v};
-  if(typeof v==='number')return Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v};
+  if(typeof v==='number'){if(!Number.isFinite(v))return{nullValue:null};return Number.isInteger(v)?{integerValue:String(v)}:{doubleValue:v};}
   if(typeof v==='string')return{stringValue:v};
   if(Array.isArray(v))return{arrayValue:{values:v.map(fsEncodeValue)}};
   if(typeof v==='object')return{mapValue:{fields:fsEncodeFields(v)}};
@@ -1541,6 +1580,22 @@ async function fsWriteMany(collection,items,getId,concurrency=6){
   const workers=Array.from({length:Math.min(concurrency,items.length||1)},()=>worker());
   await Promise.all(workers);
 }
+// Firestore field-path segment: keys like "2026-07-01" must be back-quoted.
+function fsFieldSeg(k){return /^[A-Za-z_][A-Za-z0-9_]*$/.test(k)?k:'`'+String(k).replace(/\\/g,'\\\\').replace(/`/g,'\\`')+'`';}
+// Update only the listed field paths of one document (others untouched).
+// A path listed in fieldPaths but absent from `data` is deleted server-side.
+async function fsPatchFields(collection,docId,data,fieldPaths){
+  if(!fieldPaths.length)return;
+  const qs=fieldPaths.map(p=>'updateMask.fieldPaths='+encodeURIComponent(p)).join('&');
+  const url=`${FS_BASE}/${collection}/${fsSafeId(docId)}?${qs}&key=${FS_KEY}`;
+  const res=await fsFetch(url,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields:fsEncodeFields(data)})});
+  if(!res.ok){const t=await res.text().catch(()=>'');throw new Error(fsHumanError(res.status,t));}
+}
+async function fsDeleteDoc(collection,docId){
+  const url=`${FS_BASE}/${collection}/${fsSafeId(String(docId))}?key=${FS_KEY}`;
+  const res=await fsFetch(url,{method:'DELETE'});
+  if(!res.ok&&res.status!==404){const t=await res.text().catch(()=>'');throw new Error(fsHumanError(res.status,t));}
+}
 
 function setCst(t,msg){
   const el=document.getElementById('cst');
@@ -1634,6 +1689,112 @@ async function syncUp(){
     console.error('syncUp error:',e);
   }
 }
+// ══════════════ SYNC ENGINE (diff-based, v5.21) ══════════════
+// Each device remembers what the cloud looked like at its last sync
+// (SYNC_BASE, persisted in localStorage). autoSync uploads only what differs
+// from that snapshot: one resident, one attending, one schedule DATE, one
+// settings KEY at a time. The old version re-uploaded the entire roster,
+// schedule and settings on every save, so an attending whose page had been
+// open since morning overwrote the admin's newer CCC locks, schedule and
+// settings the moment they saved an evaluation.
+let SYNC_BASE=null;
+function stableStr(v){
+  if(v===undefined||v===null)return'null';
+  if(typeof v!=='object')return JSON.stringify(v);
+  if(Array.isArray(v))return'['+v.map(stableStr).join(',')+']';
+  return'{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stableStr(v[k])).join(',')+'}';
+}
+function snapRecords(list){const m={};(list||[]).forEach(x=>{if(x&&x.id!=null&&x.id!=='')m[String(x.id)]=stableStr(x);});return m;}
+function snapMap(obj){const m={};Object.entries(obj||{}).forEach(([k,v])=>{m[k]=stableStr(v);});return m;}
+function saveSyncBase(){try{localStorage.setItem('em52_syncbase',JSON.stringify(SYNC_BASE));}catch(e){console.warn('syncbase save failed',e);}}
+function initSyncBase(){
+  try{SYNC_BASE=JSON.parse(localStorage.getItem('em52_syncbase')||'null');}catch(e){SYNC_BASE=null;}
+  if(!SYNC_BASE||!SYNC_BASE.res||!SYNC_BASE.att||!SYNC_BASE.sched||!SYNC_BASE.cfg){
+    // First run on this device: assume local == cloud until the first download.
+    SYNC_BASE={res:snapRecords(RES),att:snapRecords(ATT),sched:snapMap(SCHED),cfg:snapMap(CFG)};
+    saveSyncBase();
+  }
+}
+function countDiff(cur,base){return Object.keys(cur).filter(k=>cur[k]!==base[k]).length+Object.keys(base).filter(k=>!(k in cur)).length;}
+function pendingSyncCount(){
+  if(!SYNC_BASE)return 0;
+  return countDiff(snapRecords(RES),SYNC_BASE.res)+countDiff(snapRecords(ATT),SYNC_BASE.att)
+    +countDiff(snapMap(SCHED),SYNC_BASE.sched)+countDiff(snapMap(CFG),SYNC_BASE.cfg)
+    +PENDING_ASSESS.length+PENDING_DEL_ASSESS.length;
+}
+// 3-way merge by id: records changed on this device since the last sync win;
+// everything else follows the cloud (including deletions made elsewhere).
+function merge3Records(baseSnap,localList,cloudList){
+  const L={},C={};
+  localList.forEach(x=>{if(x&&x.id!=null)L[String(x.id)]=x;});
+  cloudList.forEach(x=>{if(x&&x.id!=null)C[String(x.id)]=x;});
+  const out=[],used=new Set();
+  [...Object.keys(C),...Object.keys(L)].forEach(id=>{
+    if(used.has(id))return;used.add(id);
+    const inB=id in baseSnap,inL=id in L,inC=id in C;
+    const localChanged=inL?(!inB||stableStr(L[id])!==baseSnap[id]):inB;
+    if(localChanged){if(inL)out.push(L[id]);}
+    else if(inC)out.push(C[id]);
+  });
+  return out;
+}
+function merge3Map(baseSnap,localMap,cloudMap){
+  const out={};
+  new Set([...Object.keys(cloudMap),...Object.keys(localMap)]).forEach(k=>{
+    const inB=k in baseSnap,inL=k in localMap,inC=k in cloudMap;
+    const localChanged=inL?(!inB||stableStr(localMap[k])!==baseSnap[k]):inB;
+    if(localChanged){if(inL)out[k]=localMap[k];}
+    else if(inC)out[k]=cloudMap[k];
+  });
+  return out;
+}
+
+// ── Evaluations are queued until the cloud confirms them, so a dropped
+// connection can never silently lose an attending's evaluation. ──
+let PENDING_ASSESS=[],PENDING_DEL_ASSESS=[];
+try{PENDING_ASSESS=JSON.parse(localStorage.getItem('em52_pending_assess')||'[]');}catch(e){}
+try{PENDING_DEL_ASSESS=JSON.parse(localStorage.getItem('em52_pending_delassess')||'[]');}catch(e){}
+function savePendingQueues(){try{localStorage.setItem('em52_pending_assess',JSON.stringify(PENDING_ASSESS));localStorage.setItem('em52_pending_delassess',JSON.stringify(PENDING_DEL_ASSESS));}catch(e){}}
+async function saveCloud(rec){
+  const id=String(rec.id);
+  if(!PENDING_ASSESS.includes(id)){PENDING_ASSESS.push(id);savePendingQueues();}
+  try{
+    await fsSetDoc('assessments',rec.id,rec);
+    PENDING_ASSESS=PENDING_ASSESS.filter(x=>x!==id);savePendingQueues();
+    return true;
+  }catch(e){
+    console.warn('saveCloud failed:',e.message);
+    setCst('err','⚠️ 評核已存在本機，網路恢復後自動上傳');
+    scheduleSyncRetry();
+    return false;
+  }
+}
+async function deleteAssessCloud(id){
+  id=String(id);
+  PENDING_ASSESS=PENDING_ASSESS.filter(x=>x!==id);
+  if(!PENDING_DEL_ASSESS.includes(id))PENDING_DEL_ASSESS.push(id);
+  savePendingQueues();
+  try{await fsDeleteDoc('assessments',id);PENDING_DEL_ASSESS=PENDING_DEL_ASSESS.filter(x=>x!==id);savePendingQueues();}
+  catch(e){console.warn('delete failed, queued:',e.message);scheduleSyncRetry();}
+}
+async function retryPendingAssess(){
+  let fails=0,done=0;
+  for(const id of [...PENDING_ASSESS]){
+    const rec=ASSESS.find(a=>String(a.id)===id);
+    if(!rec){PENDING_ASSESS=PENDING_ASSESS.filter(x=>x!==id);continue;}
+    try{await fsSetDoc('assessments',rec.id,rec);PENDING_ASSESS=PENDING_ASSESS.filter(x=>x!==id);done++;}catch(e){fails++;}
+  }
+  for(const id of [...PENDING_DEL_ASSESS]){
+    try{await fsDeleteDoc('assessments',id);PENDING_DEL_ASSESS=PENDING_DEL_ASSESS.filter(x=>x!==id);done++;}catch(e){fails++;}
+  }
+  savePendingQueues();
+  return{fails,done};
+}
+// Best-effort delete, kept for other callers
+async function deleteCloud(collection,docId){
+  try{await fsDeleteDoc(collection,docId);}catch(e){console.warn('deleteCloud failed:',e.message);}
+}
+
 async function syncDown(silent=false){
   const el=document.getElementById('fb-status');
   if(!silent&&el){el.textContent='⬇ 從雲端下載中...';el.className='al ai';el.classList.remove('hidden');}
@@ -1646,18 +1807,40 @@ async function syncDown(silent=false){
       fsGetDoc('config','cfg'),
       fsGetDoc('config','customItems'),
     ]);
-    if(assessList.length)ASSESS=assessList;
-    // Protect the fixed roster: merge mutable fields only, never let cloud
-    // garbage/test data replace the baked-in attending/resident name list.
-    RES=mergeRosterWithCloud(DEF_RES,resList,RES_MUTABLE_FIELDS);
-    ATT=mergeRosterWithCloud(DEF_ATT,attList,ATT_MUTABLE_FIELDS);
-    if(schedDoc&&schedDoc.data)SCHED=schedDoc.data;
-    if(cfgDoc)Object.assign(CFG,cfgDoc);
+    if(!SYNC_BASE)initSyncBase();
+    // Evaluations: cloud list + anything still queued on this device
+    if(assessList.length||PENDING_ASSESS.length){
+      const cloudIds=new Set(assessList.map(a=>String(a.id)));
+      const keep=ASSESS.filter(a=>PENDING_ASSESS.includes(String(a.id))&&!cloudIds.has(String(a.id)));
+      ASSESS=[...keep,...assessList].filter(a=>!PENDING_DEL_ASSESS.includes(String(a.id)));
+    }
+    // Roster: 3-way merge — unsent local edits survive, the rest follows the cloud
+    const cloudRes=mergeRosterWithCloud(DEF_RES,resList);
+    if(cloudRes){RES=merge3Records(SYNC_BASE.res,RES,cloudRes);SYNC_BASE.res=snapRecords(resList);}
+    else SYNC_BASE.res={}; // empty cloud → local roster gets uploaded
+    const cloudAtt=mergeRosterWithCloud(DEF_ATT,attList);
+    if(cloudAtt){ATT=merge3Records(SYNC_BASE.att,ATT,cloudAtt);SYNC_BASE.att=snapRecords(attList);}
+    else SYNC_BASE.att={};
+    sortRoster();
+    // Schedule: per date
+    const cloudSched=(schedDoc&&schedDoc.data&&typeof schedDoc.data==='object')?schedDoc.data:{};
+    SCHED=merge3Map(SYNC_BASE.sched,SCHED,cloudSched);
+    SYNC_BASE.sched=snapMap(cloudSched);
+    // Settings: per key (keys the cloud doesn't have keep their local value)
+    const cloudCfg=cfgDoc||{};
+    Object.keys(cloudCfg).forEach(k=>{
+      const localChanged=(k in CFG)&&(!(k in SYNC_BASE.cfg)||stableStr(CFG[k])!==SYNC_BASE.cfg[k]);
+      if(!localChanged)CFG[k]=cloudCfg[k];
+    });
+    SYNC_BASE.cfg=snapMap(cloudCfg);
     if(itemsDoc&&Array.isArray(itemsDoc.epa)&&itemsDoc.epa.length){EPA=itemsDoc.epa;localStorage.setItem('em_custom_epa',JSON.stringify(EPA));}
     if(itemsDoc&&Array.isArray(itemsDoc.ms)&&itemsDoc.ms.length){MS=itemsDoc.ms;localStorage.setItem('em_custom_ms',JSON.stringify(MS));}
-    save();
-    db=true;setCst('ok','☁️ 已連線');
-    if(!silent&&el){el.textContent='✅ 同步成功！評核 '+ASSESS.length+' 筆';el.className='al aok';}
+    saveSyncBase();
+    save(); // also schedules upload of any local edits that survived the merge
+    db=true;
+    const p=pendingSyncCount();
+    setCst('ok',p?`⏳ ${p} 筆待上傳`:'☁️ 已連線');
+    if(!silent&&el){el.textContent='✅ 同步成功！評核 '+ASSESS.length+' 筆'+(p?`（保留本機 ${p} 筆尚未上傳的變更，稍後自動上傳）`:'');el.className='al aok';}
     renderDash();
   }catch(e){
     if(!silent&&el){el.textContent='❌ 同步失敗：'+e.message;el.className='al ae';}
@@ -1665,35 +1848,53 @@ async function syncDown(silent=false){
     console.error('syncDown error:',e);
   }
 }
-async function saveCloud(rec){
-  try{await fsSetDoc('assessments',rec.id,rec);}catch(e){console.warn('saveCloud failed:',e.message);}
-}
-async function deleteCloud(collection,docId){
-  try{
-    const url=`${FS_BASE}/${collection}/${fsSafeId(String(docId))}?key=${FS_KEY}`;
-    const res=await fsFetch(url,{method:'DELETE'});
-    if(!res.ok){const t=await res.text().catch(()=>'');console.warn('deleteCloud failed:',fsHumanError(res.status,t));}
-  }catch(e){console.warn('deleteCloud error:',e.message);}
-}
+
+let _syncBusy=false,_syncAgain=false,_retryTimer=null;
+function scheduleSyncRetry(){if(!_retryTimer)_retryTimer=setTimeout(()=>{_retryTimer=null;autoSync();},30000);}
 async function autoSync(){
-  // IMPORTANT: ASSESS is NOT written here. Each assessment is written
-  // individually via saveCloud() at the moment it is created or deleted.
-  // Writing all assessments on every sync was the main cause of hitting
-  // the Firestore free-tier 20,000 write/day limit.
+  if(_syncBusy){_syncAgain=true;return;}
+  _syncBusy=true;
+  let fails=0,writes=0;
   try{
-    await fsWriteMany('residents',RES,r=>r.id);
-    await fsWriteMany('attendings',ATT,a=>a.id);
-    await fsSetDoc('config','schedule',{data:SCHED});
-    await fsSetDoc('config','cfg',CFG);
-    setCst('ok','☁️ 已同步');
-    const ind=document.getElementById('sync-ind');
-    if(ind){ind.style.opacity='1';setTimeout(()=>ind.style.opacity='0',1500);}
-  }catch(e){setCst('err','⚠️ 同步失敗');console.warn('autoSync error:',e.message);}
+    if(!SYNC_BASE)initSyncBase();
+    // Residents & attendings: one document per changed record
+    for(const[col,list,key]of[['residents',RES,'res'],['attendings',ATT,'att']]){
+      const base=SYNC_BASE[key],cur=snapRecords(list),byId={};
+      list.forEach(x=>{if(x&&x.id!=null)byId[String(x.id)]=x;});
+      for(const id of Object.keys(cur)){
+        if(cur[id]===base[id])continue;
+        try{await fsSetDoc(col,id,byId[id]);base[id]=cur[id];writes++;}catch(e){fails++;console.warn('sync write failed',col,id,e.message);}
+      }
+      for(const id of Object.keys(base)){
+        if(id in cur)continue;
+        try{await fsDeleteDoc(col,id);delete base[id];writes++;}catch(e){fails++;console.warn('sync delete failed',col,id,e.message);}
+      }
+    }
+    // Schedule & settings: only the changed dates / keys of the shared document
+    for(const[docId,obj,key,prefix]of[['schedule',SCHED,'sched','data.'],['cfg',CFG,'cfg','']]){
+      const base=SYNC_BASE[key],cur=snapMap(obj);
+      const changed=Object.keys(cur).filter(k=>cur[k]!==base[k]);
+      const removed=Object.keys(base).filter(k=>!(k in cur));
+      if(!changed.length&&!removed.length)continue;
+      const part={};changed.forEach(k=>{part[k]=obj[k];});
+      try{
+        await fsPatchFields('config',docId,prefix?{data:part}:part,[...changed,...removed].map(k=>prefix+fsFieldSeg(k)));
+        changed.forEach(k=>{base[k]=cur[k];});removed.forEach(k=>{delete base[k];});writes++;
+      }catch(e){fails++;console.warn('sync patch failed',docId,e.message);}
+    }
+    const q=await retryPendingAssess();fails+=q.fails;writes+=q.done;
+    saveSyncBase();
+    if(fails){setCst('err',`⚠️ ${fails} 筆尚未上傳，稍後自動重試`);scheduleSyncRetry();}
+    else if(writes){
+      setCst('ok','☁️ 已同步');
+      const ind=document.getElementById('sync-ind');
+      if(ind){ind.style.opacity='1';setTimeout(()=>ind.style.opacity='0',1500);}
+    }
+  }finally{
+    _syncBusy=false;
+    if(_syncAgain){_syncAgain=false;autoSync();}
+  }
 }
-// Debounced version: prevents race conditions when many rapid edits each
-// trigger autoSync (e.g. ticking multiple lock checkboxes quickly). Without
-// this, overlapping in-flight writes of the full RES array can resolve out
-// of order and a stale snapshot can overwrite a newer one in the cloud.
 let _autoSyncTimer=null,_autoSyncPending=false;
 function autoSyncDebounced(delay=900){
   _autoSyncPending=true;
@@ -1703,14 +1904,14 @@ function autoSyncDebounced(delay=900){
     if(_autoSyncPending){_autoSyncPending=false;autoSync();}
   },delay);
 }
-// Flush any pending debounced sync immediately if the user navigates away
-// or backgrounds the tab, so a lock toggle made right before closing isn't lost.
+// Flush any pending sync right away when the page is hidden or closed
 function flushAutoSync(){
   if(_autoSyncTimer){clearTimeout(_autoSyncTimer);_autoSyncTimer=null;}
   if(_autoSyncPending){_autoSyncPending=false;autoSync();}
 }
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushAutoSync();});
 window.addEventListener('beforeunload',flushAutoSync);
+window.addEventListener('online',()=>{autoSync();});
 
 // AUTH
 function toggleMode(){if(isAdmin){isAdmin=false;applyMode();}else{document.getElementById('pw-in').value='';document.getElementById('pw-err').classList.add('hidden');openM('m-pw');}}
@@ -1811,51 +2012,46 @@ function parsePaste(){
   if(!txt){alert('請貼上班表資料');return;}
 
   const lines=txt.split('\n').map(l=>l.split('\t').map(c=>(c||'').trim()));
-  const defaultOrder=['A','B','C','D','E','F','G','H','J','K','L','M','N'];
-  const allResCodes=RES.map(r=>r.no).filter(Boolean);
-  const allResNames=RES.map(r=>r.n).filter(Boolean);
+  // Identity rule: a header column is resolved by NAME first, then by code —
+  // codes only count for residents still in training — and nothing is guessed.
+  const looksLikeResHeader=c=>{if(!c)return false;const k=normCode(c);return /^[A-Z]$/.test(k)||RES.some(r=>k&&normCode(r.no)===k)||findResByName(c).length>0;};
 
-  // ── Find header row: the row with most resident codes/names ──
+  // ── Find header row: first row with ≥3 resident-like cells ──
   let resHeaderIdx=-1;
   let headerRow=null;
   for(let i=0;i<Math.min(lines.length,8);i++){
     const row=lines[i];
-    const mc=row.filter(c=>allResCodes.includes(c)||allResNames.includes(c)||defaultOrder.includes(c)).length;
+    const mc=row.filter(looksLikeResHeader).length;
     if(mc>=3){resHeaderIdx=i;headerRow=row;break;}
   }
   if(!headerRow){alert('找不到住院醫師欄位，請確認格式');return;}
 
   // ── Determine offset: col0 of date rows is always the date string ──
-  // If header[0] is a resident code → header has no leading empty cell
-  //   → dateColOffset = 1 (A's data in date row is at col 1, not col 0)
-  // If header[0] is empty/label → dateColOffset = 0 (no adjustment needed)
-  const firstCellIsRes=allResCodes.includes(headerRow[0])||allResNames.includes(headerRow[0])||defaultOrder.includes(headerRow[0]);
-  const dateColOffset=firstCellIsRes?1:0;
+  // If header[0] is a resident → header has no leading empty cell → offset 1
+  const dateColOffset=looksLikeResHeader(headerRow[0])?1:0;
 
-  // ── Build resColMap: headerColIdx → resId, then map to dateColIdx ──
-  // In date rows, we read col = (headerColIdx + dateColOffset)
-  const resColMap={};  // dateColIdx → resId
-  const colCollisions=[]; // track any column index that gets overwritten (would silently drop a resident)
+  // ── Build resColMap: dateColIdx → resId ──
+  const resColMap={};
+  const colCollisions=[]; // a column index overwritten would silently drop a resident
+  const headerIssues=[];  // header cells that couldn't be tied to exactly one resident in training
   headerRow.forEach((cell,hCol)=>{
-    let r=RES.find(x=>x.no&&String(x.no)===String(cell));
-    if(!r)r=RES.find(x=>x.n===cell);
-    if(r){
-      const dateCol=hCol+dateColOffset;
-      if(resColMap[dateCol]!=null&&resColMap[dateCol]!==r.id){
-        const prevRes=getRes(resColMap[dateCol]);
-        colCollisions.push(`欄${dateCol}：${prevRes?.n||'?'} 被 ${r.n} 覆蓋`);
-      }
-      resColMap[dateCol]=r.id;
+    if(!looksLikeResHeader(cell))return;
+    const hit=resolveResHeader(cell);
+    if(!hit.res){headerIssues.push({cell,...hit});return;}
+    const r=hit.res;
+    const dateCol=hCol+dateColOffset;
+    if(resColMap[dateCol]!=null&&resColMap[dateCol]!==r.id){
+      const prevRes=getRes(resColMap[dateCol]);
+      colCollisions.push(`欄${dateCol}：${prevRes?.n||'?'} 被 ${r.n} 覆蓋`);
     }
+    resColMap[dateCol]=r.id;
   });
 
   if(Object.keys(resColMap).length<3){
-    // Last resort: A at col(1+dateColOffset), map 13 residents from there
-    const anchorCol=1;
-    defaultOrder.forEach((code,i)=>{
-      const r=RES.find(x=>x.no===code)||RES.filter(x=>!x.grad)[i];
-      if(r)resColMap[anchorCol+i]=r.id;
-    });
+    // Never guess whose column it is — a wrong guess files shifts (and later
+    // evaluations) under the wrong resident without anyone noticing.
+    alert('班表標題列只對應到 '+Object.keys(resColMap).length+' 位在職住院醫師，已停止匯入（系統不會用猜的）。\n\n'+describeHeaderIssues(headerIssues).join('\n')+'\n\n請到「住院醫師管理」確認代碼或姓名後再貼一次。');
+    return;
   }
 
   // ── Parse date rows ──
@@ -1923,6 +2119,11 @@ function parsePaste(){
         const dates=[...unresolvedCodes[code]].sort();
         return `<b style="color:var(--danger)">「${code}」</b>：${dates.length}天（${dates.slice(0,4).join('、')}${dates.length>4?'...':''}）`;
       }).join('<br>')}
+    </div>`;
+  }
+  if(headerIssues.length){
+    unresolvedMsg+=`<div style="margin-top:8px;padding:8px 10px;background:rgba(245,158,11,.08);border:1px solid var(--a3);border-radius:7px;font-size:11.5px;color:var(--t2)">
+      ⚠ 以下標題欄沒有對應到唯一的在職住院醫師，整欄已略過（若本來就不是學員欄可忽略）：<br>${describeHeaderIssues(headerIssues).join('<br>')}
     </div>`;
   }
   if(colCollisions.length){
@@ -2426,7 +2627,7 @@ function deleteImgEntry(id){
   if(!confirm(`確定刪除這筆影像資料庫紀錄？\n${rec.date} ${rec.resName}（${rec.imgData?.imgType||''}）\n此操作無法復原。`))return;
   ASSESS=ASSESS.filter(a=>a.id!==id);
   save();
-  deleteCloud('assessments',id);
+  deleteAssessCloud(id);
   autoSyncDebounced();
   updateRmBadge();
   renderImgLib();
@@ -2533,7 +2734,10 @@ function parseCCCPaste(){
   // Match names to RES (including graduated, so historical data is preserved)
   let matched=0,unmatched=[];
   Object.values(groups).forEach(g=>{
-    const res=RES.find(r=>r.n===g.resName);
+    // Name is the identity. Two records with the same name → refuse to guess.
+    const cands=findResByName(g.resName);
+    if(cands.length>1){unmatched.push(g.resName+'（同名 '+cands.length+' 筆，請先合併）');return;}
+    const res=cands[0];
     if(!res){unmatched.push(g.resName);return;}
     if(!res.cccHistory)res.cccHistory=[];
     // Auto-derive half-year label (e.g. "R2上半") from month if not overridden later
@@ -2732,7 +2936,26 @@ function renderGrowthChart(){
 }
 
 // ══════════════ RESIDENTS ══════════════
-function renderRes(){const tb=document.getElementById('res-tbody');const active=RES.filter(r=>!r.grad);if(!active.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:16px">尚無資料</td></tr>';return;}tb.innerHTML=active.map(r=>{const as=ASSESS.filter(a=>a.resId===r.id&&a.type==='ms');const pcts=as.filter(a=>a.msPresRate!=null).map(a=>a.msPresRate);const msPct=pcts.length?(pcts.reduce((a,b)=>a+b,0)/pcts.length).toFixed(0)+'%':'—';const ev=as.filter(a=>a.epaAvg).map(a=>parseFloat(a.epaAvg));const epaAvg=ev.length?(ev.reduce((a,b)=>a+b,0)/ev.length).toFixed(1):'—';return`<tr><td style="font-family:'DM Mono';font-size:10.5px;color:var(--t3)">${r.no||'—'}</td><td>${r.n}</td><td style="color:var(--a2)">${r.y}</td><td>${as.length}</td><td>${msPct!=='—'?`<span class="pill ${parseInt(msPct)>=80?'p4':parseInt(msPct)>=60?'p3':'p1'}">${msPct}</span>`:'—'}</td><td>${epaAvg!=='—'?`<span class="pill p${Math.round(epaAvg)}">${epaAvg}</span>`:'—'}</td><td class="ifl" style="gap:4px"><button class="btn bs bxs" onclick="editRes('${r.id}')">編輯</button><button class="btn bxs bd" onclick="delRes('${r.id}')">刪除</button></td></tr>`;}).join('');}
+function renderRes(){
+  const tb=document.getElementById('res-tbody');
+  const active=RES.filter(r=>!r.grad);
+  // Surface duplicate-code warning so "the same code M won't delete" issues
+  // are immediately visible instead of looking like a broken delete button —
+  // when two different records share a code, deleting one still leaves the
+  // other showing the same code, which looks like "nothing happened".
+  const dupWarn=document.getElementById('res-dup-warn');
+  if(dupWarn){
+    const nameGroups=findDuplicateNameGroups();
+    const codeClash=findDuplicateResCodes().filter(([,l])=>new Set(l.map(r=>normName(r.n))).size>1);
+    let html='';
+    if(nameGroups.length)html+=`<div>⚠ 同名重複（系統以姓名辨識，同一人應只有一筆）：${nameGroups.map(g=>`<span style="white-space:nowrap;margin-right:8px">「${g[0].n}」×${g.length} <button class="btn bp bxs" onclick="mergeDupResidents('${normName(g[0].n).replace(/'/g,"\\'")}')">合併</button></span>`).join('')}</div>`;
+    if(codeClash.length)html+=`<div style="margin-top:4px">⚠ 代碼衝突：${codeClash.map(([c,l])=>`「${c}」＝${l.map(r=>r.n).join('、')}`).join('；')}。同一代碼只能給一位在職學員，否則班表無法分辨，請編輯其中一位。</div>`;
+    dupWarn.innerHTML=html;
+    dupWarn.classList.toggle('hidden',!html);
+  }
+  if(!active.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:16px">尚無資料</td></tr>';return;}
+  tb.innerHTML=active.map(r=>{const as=ASSESS.filter(a=>a.resId===r.id&&a.type==='ms');const pcts=as.filter(a=>a.msPresRate!=null).map(a=>a.msPresRate);const msPct=pcts.length?(pcts.reduce((a,b)=>a+b,0)/pcts.length).toFixed(0)+'%':'—';const ev=as.filter(a=>a.epaAvg).map(a=>parseFloat(a.epaAvg));const epaAvg=ev.length?(ev.reduce((a,b)=>a+b,0)/ev.length).toFixed(1):'—';return`<tr><td style="font-family:'DM Mono';font-size:10.5px;color:var(--t3)">${r.no||'—'}</td><td>${r.n}</td><td style="color:var(--a2)">${r.y}</td><td>${as.length}</td><td>${msPct!=='—'?`<span class="pill ${parseInt(msPct)>=80?'p4':parseInt(msPct)>=60?'p3':'p1'}">${msPct}</span>`:'—'}</td><td>${epaAvg!=='—'?`<span class="pill p${Math.round(epaAvg)}">${epaAvg}</span>`:'—'}</td><td class="ifl" style="gap:4px"><button class="btn bs bxs" onclick="editRes('${r.id}')">編輯</button><button class="btn bxs bd" onclick="delRes('${r.id}')">刪除</button></td></tr>`;}).join('');
+}
 function openResM(){document.getElementById('r-id').value='';['r-no','r-n','r-qpc','r-qnpc'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('r-y').value='R1';document.getElementById('r-grad').checked=false;document.getElementById('r-ms-relax').checked=false;document.getElementById('m-res-t').textContent='新增住院醫師';openM('m-res');}
 function editRes(id){const r=getRes(id);if(!r)return;document.getElementById('r-id').value=id;document.getElementById('r-no').value=r.no||'';document.getElementById('r-n').value=r.n;document.getElementById('r-y').value=r.y;document.getElementById('r-grad').checked=r.grad||false;document.getElementById('r-ms-relax').checked=r.msSelRelax||false;
   const rqpc=document.getElementById('r-qpc');const rqnpc=document.getElementById('r-qnpc');
@@ -2743,52 +2966,121 @@ function saveRes(){
     const n=document.getElementById('r-n').value.trim();
     if(!n)return alert('請輸入姓名');
     const eid=document.getElementById('r-id').value;
-    if(eid){
-      const r=getRes(eid);
-      if(!r){alert('⚠ 找不到此住院醫師資料（可能已被刪除），請關閉視窗重新操作。');return;}
-      r.n=n;
-      r.y=document.getElementById('r-y').value;
-      r.no=document.getElementById('r-no').value;
-      const newGrad=document.getElementById('r-grad').checked;
-      if(newGrad&&!r.grad){
-        if(!confirm('確定將「'+r.n+'」標記為已畢業？\n已畢業後將不出現在一般評核列表中，可隨時在住院醫師管理取消。'))return;
-      }
-      r.grad=newGrad;
-      // Auto-clear the resident code when graduating so the code slot (A, B…)
-      // is freed up for the incoming new resident to reuse.
-      if(newGrad)r.no='';
+    const r=eid?getRes(eid):null;
+    if(eid&&!r){alert('⚠ 找不到此住院醫師資料（可能已被刪除），請關閉視窗重新操作。');return;}
+    const y=document.getElementById('r-y').value;
+    const newGrad=r?document.getElementById('r-grad').checked:false;
+    // The code only exists to read the department schedule. Normalize it so a
+    // stray space, lowercase or full-width letter from a phone keyboard can't
+    // silently break schedule matching. Graduates release their code.
+    const no=newGrad?'':normCode(document.getElementById('r-no').value);
+    // Identity is the name: never create a second record for the same person.
+    const sameName=findResByName(n).filter(x=>x.id!==eid);
+    if(sameName.some(x=>!x.grad)){
+      alert(`已有同名的在職住院醫師「${n}」。\n系統以姓名辨識學員，請直接編輯那一筆，不要重複新增。`);return;
+    }
+    if(sameName.length&&!confirm(`已有同名的「已畢業」學員「${n}」。\n若是同一人，請取消並到「已畢業學員」復原；確定要建立另一位同名學員嗎？`))return;
+    // One code per resident in training, or the schedule can't tell them apart.
+    if(no){
+      const clash=RES.find(x=>x.id!==eid&&!x.grad&&normCode(x.no)===no);
+      if(clash){alert(`代碼「${no}」已被在職學員「${clash.n}」使用。\n同一代碼只能給一位在職住院醫師，請先修改其中一位。`);return;}
+    }
+    if(r&&newGrad&&!r.grad&&!confirm('確定將「'+r.n+'」標記為已畢業？\n已畢業後不出現在一般評核列表，代碼會釋出給新學員；可隨時在住院醫師管理取消。'))return;
+    // All checks passed — only now touch the data.
+    if(r){
+      r.n=n;r.y=y;r.no=no;r.grad=newGrad;
       const qpc=document.getElementById('r-qpc')?.value;
       const qnpc=document.getElementById('r-qnpc')?.value;
       r.qPcOverride=(!qpc||qpc==='')?null:parseInt(qpc);
       r.qNpcOverride=(!qnpc||qnpc==='')?null:parseInt(qnpc);
       r.msSelRelax=document.getElementById('r-ms-relax')?.checked||false;
     }else{
-      RES.push({id:Date.now().toString(),no:document.getElementById('r-no').value,n,y:document.getElementById('r-y').value,grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}});
+      RES.push({id:Date.now().toString(),no,n,y,grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}});
     }
+    sortRoster();
     save();
-    autoSyncDebounced();
     closeM('m-res');
     renderRes();
     setCst('ok','✅ 已儲存「'+n+'」');
   }catch(e){
     console.error('saveRes error:',e);
-    alert('⚠ 儲存時發生錯誤：'+e.message+'\n請按下方「🛟 手動儲存」重試，或聯繫系統管理員。');
+    alert('⚠ 儲存時發生錯誤：'+e.message+'\n請按「🛟 手動儲存」重試，或聯繫系統管理員。');
   }
 }
-// Manual save fallback — writes current in-memory data to localStorage and
-// attempts a cloud sync directly, bypassing the resident-modal flow. Useful
-// if saveRes() silently failed (e.g. storage quota, browser restrictions)
-// and the person wants to be sure nothing is lost.
-function manualSaveAll(){
+// Manual save: push every pending change now and report honestly.
+async function manualSaveAll(){
   try{
     save();
-    autoSync();
-    alert('✅ 已手動儲存所有資料到本機，並嘗試同步雲端。');
+    while(_syncBusy)await new Promise(r=>setTimeout(r,200));
+    const before=pendingSyncCount();
+    await autoSync();
+    const after=pendingSyncCount();
+    if(after===0)alert(before?`✅ 已上傳 ${before} 筆變更，雲端與本機一致。`:'✅ 沒有待上傳的變更，雲端與本機一致。');
+    else alert(`⚠ 仍有 ${after} 筆未能上傳（網路或權限問題）。資料已保存在本機，會自動重試。`);
   }catch(e){
     alert('⚠ 手動儲存失敗：'+e.message);
   }
 }
-function delRes(id){if(!confirm('確定刪除此住院醫師的所有資料？\n此操作無法復原。'))return;RES=RES.filter(r=>r.id!==id);save();renderRes();}
+function delRes(id){
+  const r=getRes(id);
+  if(!r){alert('⚠ 找不到此筆資料（id: '+id+'），畫面可能未更新，正在重新整理列表...');renderRes();return;}
+  const nA=ASSESS.filter(a=>String(a.resId)===String(r.id)).length;
+  const warn=nA?`\n\n⚠ 此學員有 ${nA} 筆評核紀錄，刪除後這些評核會失去對應的學員。\n若只是離開訓練，建議改為「標記已畢業」。若是重複建檔，請用上方的「合併」。`:'';
+  if(!confirm(`確定刪除「${r.n}」（代碼 ${r.no||'—'}）？此操作無法復原。${warn}`))return;
+  const beforeLen=RES.length;
+  RES=RES.filter(x=>x.id!==id);
+  const removed=beforeLen-RES.length;
+  save(); // the sync engine deletes the cloud document, and retries if offline
+  renderRes();
+  setCst('ok',removed>1?`✅ 已刪除，並清除了 ${removed} 筆 id 重複的歷史資料`:'✅ 已刪除「'+r.n+'」');
+}
+// Scan for residents sharing the same code ("no") — a common source of
+// confusion when someone reports "can't delete the duplicate M", since two
+// different underlying records can display the same code A/B/M/etc if a
+// code wasn't properly freed up when the previous person graduated.
+function findDuplicateResCodes(){
+  const byCode={};
+  RES.filter(r=>!r.grad&&normCode(r.no)).forEach(r=>{const c=normCode(r.no);(byCode[c]=byCode[c]||[]).push(r);});
+  return Object.entries(byCode).filter(([,list])=>list.length>1);
+}
+// Same name = same person (identity is by name). Folds duplicate records —
+// usually left behind by the old "added resident disappears" bug — into one,
+// moving every evaluation, schedule entry and CCC record onto the survivor.
+function mergeDupResidents(nameKey){
+  const group=RES.filter(r=>normName(r.n)===nameKey);
+  if(group.length<2)return;
+  const cnt=id=>ASSESS.filter(a=>String(a.resId)===String(id)).length;
+  const keep=[...group].sort((a,b)=>(cnt(b.id)-cnt(a.id))||((a.grad?1:0)-(b.grad?1:0))||((b.no?1:0)-(a.no?1:0))||String(a.id).localeCompare(String(b.id)))[0];
+  const drop=group.filter(r=>r!==keep);
+  const dropIds=new Set(drop.map(r=>String(r.id)));
+  const nA=ASSESS.filter(a=>dropIds.has(String(a.resId))).length;
+  const nS=Object.values(SCHED).reduce((t,es)=>t+(es||[]).filter(e=>dropIds.has(String(e.resId))).length,0);
+  const nC=drop.reduce((t,r)=>t+(r.cccHistory||[]).length,0);
+  if(!confirm(`把 ${group.length} 筆「${keep.n}」合併成一筆？\n轉移：評核 ${nA} 筆、班表 ${nS} 筆、CCC 紀錄 ${nC} 次，其餘重複紀錄會刪除。\n\n⚠ 若其實是兩位同名的不同學員，請按取消，改在姓名加註區別（例如「王小明B」）。`))return;
+  const moved=[];
+  ASSESS.forEach(a=>{if(dropIds.has(String(a.resId))){a.resId=keep.id;a.resName=keep.n;moved.push(a);}});
+  Object.keys(SCHED).forEach(d=>{
+    const seen=new Set();
+    SCHED[d]=(SCHED[d]||[]).map(e=>dropIds.has(String(e.resId))?{...e,resId:keep.id}:e)
+      .filter(e=>{const k=e.attId+'|'+e.resId;if(seen.has(k))return false;seen.add(k);return true;});
+  });
+  drop.forEach(d=>{
+    keep.cccHistory=keep.cccHistory||[];
+    (d.cccHistory||[]).forEach(h=>{const ex=keep.cccHistory.find(x=>x.date===h.date);if(ex){ex.levels={...(h.levels||{}),...(ex.levels||{})};if(!ex.half&&h.half)ex.half=h.half;}else keep.cccHistory.push(JSON.parse(JSON.stringify(h)));});
+    keep.itemLocks={...(keep.itemLocks||{})};Object.entries(d.itemLocks||{}).forEach(([k,v])=>{if(v)keep.itemLocks[k]=true;});
+    keep.cccLevels={...(d.cccLevels||{}),...(keep.cccLevels||{})};
+    ['msMonthLimits','epaMonthLimits'].forEach(f=>{if(d[f])keep[f]={...d[f],...(keep[f]||{})};});
+    if(d.ward){keep.ward={...(keep.ward||{})};Object.entries(d.ward).forEach(([k,v])=>{if(v&&!keep.ward[k])keep.ward[k]=v;});}
+    if(keep.grad&&!d.grad)keep.grad=false; // an active copy keeps the person active
+    if(!keep.no&&d.no&&!d.grad)keep.no=normCode(d.no);
+  });
+  keep.cccHistory.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  RES=RES.filter(r=>!dropIds.has(String(r.id)));
+  save();
+  moved.forEach(a=>saveCloud(a));
+  renderRes();
+  setCst('ok',`✅ 已合併「${keep.n}」`);
+}
 
 // ══════════════ ATTENDINGS ══════════════
 function renderAtt(){const sortedATT=[...ATT].sort((a,b)=>{const na=parseInt(a.no)||999,nb=parseInt(b.no)||999;return na-nb;});const tb=document.getElementById('att-tbody');if(!ATT.length){tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--t3);padding:16px">尚無資料</td></tr>';return;}const m=mkStr();tb.innerHTML=sortedATT.map(a=>{const c=ASSESS.filter(x=>x.attId===a.id&&x.date.startsWith(m)).length;return`<tr><td style="font-family:'DM Mono';font-size:10.5px;color:var(--t3)">${a.no||'—'}</td><td><div style="display:flex;align-items:center;gap:7px"><div class="dav">${a.n[0]}</div>${a.n}</div></td><td>${c} 份</td><td style="font-size:11px;color:var(--t3)">${a.note||'—'}</td><td class="ifl" style="gap:4px"><button class="btn bs bxs" onclick="editAtt('${a.id}')">編輯</button><button class="btn bxs" style="background:rgba(59,130,246,.12);color:var(--a2);border:1px solid rgba(59,130,246,.25)" onclick="showAccCal('${a.id}')">📅</button><button class="btn bxs bd" onclick="delAtt('${a.id}')">刪除</button></td></tr>`;}).join('');}
@@ -3249,25 +3541,28 @@ function setWard(resId,key,val){const r=getRes(resId);if(!r)return;if(!r.ward)r.
 function renderAdmToggles(){document.getElementById('adm-ep').innerHTML=EPA.map(e=>`<div class="tw"><div class="tl">${e.id} ${e.n}</div><label class="tog"><input type="checkbox" ${CFG.enEpa[e.id]?'checked':''} onchange="togEn('epa','${e.id}',this.checked)"><span class="tsl"></span></label></div>`).join('');document.getElementById('adm-ms').innerHTML=MS_CATS.map(cat=>`<div style="margin-bottom:5px"><div style="font-size:9.5px;color:var(--a2);padding:4px 0;font-weight:600">${cat}</div>${MS.filter(m=>m.cat===cat).map(m=>`<div class="tw"><div class="tl" style="font-size:11px">${m.id} ${m.n}</div><label class="tog"><input type="checkbox" ${CFG.enMs[m.id]?'checked':''} onchange="togEn('ms','${m.id}',this.checked)"><span class="tsl"></span></label></div>`).join('')}</div>`).join('');}
 function togEn(t,id,val){if(t==='epa')CFG.enEpa[id]=val;else CFG.enMs[id]=val;saveAdmin(true);}
 async function repairRoster(){
-  if(!confirm('將以系統內建的固定名單（29位主治醫師、13位住院醫師）覆蓋目前本機與雲端的名單資料。\n已設定的已畢業狀態、CCC紀錄等個人資料會盡量保留，但若雲端先前存有錯誤/測試資料，此動作會清除它們。\n\n確定要修復名單嗎？'))return;
-  // Rebuild from defaults, keeping any good mutable data found in current RES/ATT by id
-  RES=mergeRosterWithCloud(DEF_RES,RES,RES_MUTABLE_FIELDS);
-  ATT=mergeRosterWithCloud(DEF_ATT,ATT,ATT_MUTABLE_FIELDS);
-  save();
+  if(!confirm('名單健檢會：\n1. 補回遺失姓名的紀錄\n2. 統一代碼格式（去空白、轉大寫、全形轉半形）\n3. 清除已畢業學員的代碼\n4. 列出同名重複與代碼衝突\n\n不會再用程式內建的舊名單覆蓋目前資料。確定執行？'))return;
+  let fixed=0;
+  const defR={};DEF_RES.forEach(d=>{defR[d.id]=d;});
+  RES.forEach(r=>{
+    if(!String(r.n??'').trim()&&defR[r.id]){r.n=defR[r.id].n;fixed++;}
+    const nc=r.grad?'':normCode(r.no);
+    if((r.no||'')!==nc){r.no=nc;fixed++;}
+  });
+  const defA={};DEF_ATT.forEach(d=>{defA[d.id]=d;});
+  ATT.forEach(a=>{if(!String(a.n??'').trim()&&defA[a.id]){a.n=defA[a.id].n;fixed++;}});
+  sortRoster();save();
+  if(typeof renderRes==='function')renderRes();
+  if(typeof renderAtt==='function')renderAtt();
+  const dupN=findDuplicateNameGroups().length;
+  const dupC=findDuplicateResCodes().filter(([,l])=>new Set(l.map(r=>normName(r.n))).size>1).length;
   const el=document.getElementById('repair-result');
-  if(el){el.textContent='⏳ 正在將正確名單寫回雲端...';el.className='al ai';el.classList.remove('hidden');}
-  try{
-    await fsWriteMany('residents',RES,r=>r.id);
-    await fsWriteMany('attendings',ATT,a=>a.id);
-    if(el){el.textContent='✅ 名單已修復！本機與雲端現在都是正確的 29 位主治醫師、13 位住院醫師。';el.className='al aok';}
-    renderDash();
-    if(typeof renderRes==='function')renderRes();
-    if(typeof renderAtt==='function')renderAtt();
-  }catch(e){
-    if(el){el.textContent='⚠️ 本機名單已修復，但寫回雲端失敗：'+e.message+'（請稍後點「⬆ 上傳資料」重試）';el.className='al ae';}
+  if(el){
+    el.textContent=`✅ 健檢完成：修正 ${fixed} 處。`+(dupN?` 同名重複 ${dupN} 組、`:'')+(dupC?` 代碼衝突 ${dupC} 組、`:'')+((dupN||dupC)?'請到「住院醫師管理」上方處理。':'名單沒有重複或衝突。');
+    el.className=(dupN||dupC)?'al ai':'al aok';el.classList.remove('hidden');
   }
 }
-function saveAdmin(silent=false){const _em=document.getElementById('q-em');const _mm=document.getElementById('q-mm');if(_em&&_em.value!=='')CFG.qEpaM=parseInt(_em.value)||0;if(_mm&&_mm.value!=='')CFG.qMsM=parseInt(_mm.value)||0;save();fsSetDoc('config','cfg',CFG).catch(()=>{});if(!silent){['admin-ok','admin-limit-ok'].forEach(id=>{const el=document.getElementById(id);if(el){el.classList.remove('hidden');setTimeout(()=>el.classList.add('hidden'),2500);}});}}
+function saveAdmin(silent=false){const _em=document.getElementById('q-em');const _mm=document.getElementById('q-mm');if(_em&&_em.value!=='')CFG.qEpaM=parseInt(_em.value)||0;if(_mm&&_mm.value!=='')CFG.qMsM=parseInt(_mm.value)||0;save();if(!silent){['admin-ok','admin-limit-ok'].forEach(id=>{const el=document.getElementById(id);if(el){el.classList.remove('hidden');setTimeout(()=>el.classList.add('hidden'),2500);}});}}
 
 
 // ══════════════ DETAIL ══════════════
@@ -3286,7 +3581,7 @@ function viewDet(id){
   }
   document.getElementById('m-det-b').innerHTML=html;openM('m-detail');
 }
-function delA(id){if(!confirm('確定刪除？'))return;ASSESS=ASSESS.filter(a=>a.id!==id);save();deleteCloud('assessments',id);autoSyncDebounced();updateRmBadge();renderDash();if(document.getElementById('page-history').classList.contains('active'))renderHistory();}
+function delA(id){if(!confirm('確定刪除？'))return;ASSESS=ASSESS.filter(a=>a.id!==id);save();deleteAssessCloud(id);updateRmBadge();renderDash();if(document.getElementById('page-history').classList.contains('active'))renderHistory();}
 
 // EXPORT
 function exportCSV(){
@@ -3441,6 +3736,7 @@ function init(){
   // Each step wrapped individually: if one fails, the rest (including the
   // critical attending-selector screen) still runs instead of the whole
   // page silently breaking.
+  try{initSyncBase();sortRoster();}catch(e){showJsError('initSyncBase失敗: '+e.message);}
   try{loadTheme();}catch(e){showJsError('loadTheme失敗: '+e.message);}
   try{loadFontSize();}catch(e){showJsError('loadFontSize失敗: '+e.message);}
   try{loadCustomItems();}catch(e){showJsError('loadCustomItems失敗: '+e.message);}
