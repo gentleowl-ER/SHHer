@@ -218,6 +218,56 @@ js = js.replace(/\ninit\(\);\s*$/, '\n') + `
   const cnt=RES.length;getRes('RE').no=' e ';CONFIRM=true;await repairRoster();
   T('health check normalizes code',getRes('RE').no==='E'&&RES.length===cnt);
 
+  // ── 13. CCC item codes: alias table, unknown codes reported, never stored ──
+  T('alias PBLI → PBLI1',normalizeCCCCode('PBLI')==='PBLI1');
+  T('alias pbl2 → PBLI2',normalizeCCCCode(' pbl2 ')==='PBLI2');
+  T('full-width ＰＣ１ → PC1',normalizeCCCCode('ＰＣ１')==='PC1');
+  T('unknown code → null',normalizeCCCCode('XYZ9')===null);
+  const rg=getRes('RG');rg.cccHistory=[];
+  document.getElementById('ccc-paste-area').value=[
+    '1\\t'+nm('RG')+'\\tR3\\t2026/06\\tPBL2\\t3',
+    '2\\t'+nm('RG')+'\\tR3\\t2026/06\\tXYZ9\\t2',
+    '3\\t'+nm('RG')+'\\tR3\\t2026/06\\tEPA1\\t3c',
+    '4\\t'+nm('RG')+'\\tR3\\t2026/06\\tPC1\\t3a',
+    '5\\t'+nm('RG')+'\\tR3\\t2026/06\\tEPA2\\t2.5'].join('\\n');
+  parseCCCPaste();
+  const pr=document.getElementById('ccc-paste-result').innerHTML;
+  const lv=(rg.cccHistory[0]||{}).levels||{};
+  T('alias imported as PBLI2',lv.PBLI2===3&&!('PBL2' in lv));
+  T('unknown code listed with line no., not stored',pr.includes('第 2 行')&&pr.includes('XYZ9')&&!Object.keys(lv).some(k=>k.includes('XYZ')));
+  T('3c kept as "3c"',lv.EPA1==='3c');
+  T('letter level on Milestone rejected + listed',!('PC1' in lv)&&pr.includes('第 4 行'));
+  T('half level on EPA rejected + listed',!('EPA2' in lv)&&pr.includes('第 5 行'));
+  await autoSync();writes();
+
+  // ── 14. Legacy codes in stored CCC data are fixed once ──
+  rg.cccHistory=[{date:'2025/06',levels:{PBLI:2,PBL2:2.5,XX9:1}},{date:'2025/12',levels:{PBLI:2,PBLI1:3}}];save();await autoSync();writes();
+  T('migration reports a change',migrateCCCCodes()===true);
+  T('legacy keys renamed',rg.cccHistory[0].levels.PBLI1===2&&rg.cccHistory[0].levels.PBLI2===2.5&&!('PBLI' in rg.cccHistory[0].levels));
+  T('clash keeps correct key + noted',rg.cccHistory[1].levels.PBLI1===3&&!('PBLI' in rg.cccHistory[1].levels)&&CCC_MIGRATE_NOTES.length===1);
+  T('leftover unknown code surfaced',findUnknownCCCCodes().some(u=>u.key==='XX9'));
+  await autoSync();const w14=writes();
+  T('migration = one write per resident',w14.length===1&&w14[0]==='PATCH residents/RG');
+  T('second run is a no-op',migrateCCCCodes()===false);
+  await autoSync();T('no further writes',writes().length===0);
+
+  // ── 15. Growth-chart scales and matrix Milestone source ──
+  T('EPA 3 plotted as 3a',epaLevelToY('3')===epaLevelToY('3a')&&epaLevelToY('3a')===3);
+  T('EPA axis 1,2,3a,3b,3c,4,5 evenly',['1','2','3a','3b','3c','4','5'].map(epaLevelToY).join()==='1,2,3,4,5,6,7');
+  T('MS 2.5 stays 2.5 (no 3a/3b mapping)',msScoreToY(2.5)===2.5&&msScoreToY('3')===3&&msScoreToY('3a')===null);
+  rg.cccHistory=[{date:'2025/06',levels:{PC1:2}},{date:'2025/12',levels:{PC1:3.5}},{date:'2026/06',levels:{EPA1:'4'}}];
+  T('matrix MS = latest CCC score',getCCCMsScore(rg,'PC1')===3.5);
+  T('matrix MS without CCC = null',getCCCMsScore(rg,'PC6')===null);
+  rg.cccHistory.push({date:'2026/07',levels:{EPA3:'3'}});
+  T('matrix EPA plain "3" read from CCC',getCCCScore(rg,'EPA3',0)===3);
+  let crash='';
+  try{renderShher();document.getElementById('growth-res').value='RG';
+    ['epa','ms'].forEach(c=>{document.getElementById('growth-cat').value=c;renderGrowthChart();});}catch(e){crash=e.message;}
+  T('matrix + growth chart render ('+crash+')',!crash&&document.getElementById('shher-table').innerHTML.includes('可呈現'));
+
+  // ── 16. Whole-database upload is gone ──
+  T('no syncUp button or function',typeof syncUp==='undefined'&&!html.includes('syncUp('));
+
   console.log((fail?'❌':'✅')+' '+pass+' passed, '+fail+' failed');
   process.exitCode=fail?1:0;
 })().catch(e=>{console.log('❌ CRASH',e&&e.stack||e);process.exitCode=1;});

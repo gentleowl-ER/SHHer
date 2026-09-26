@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>急診醫學評核系統 v5.21</title>
+<title>急診醫學評核系統 v5.22</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <!-- Firestore accessed via REST API (no SDK needed - more reliable on mobile/file:// contexts) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -352,7 +352,7 @@ body{font-size:var(--base-font,17px)}
 <div class="sbo" id="sbo" onclick="closeSB()"></div>
 <aside class="sidebar" id="sb">
   <div class="sb-logo">
-    <div class="sb-tag">TSEM · CBME 2025 v5.21</div>
+    <div class="sb-tag">TSEM · CBME 2025 v5.22</div>
     <h1>急診醫學<br>住院醫師評核系統</h1>
   </div>
   <nav class="sb-nav">
@@ -733,7 +733,7 @@ body{font-size:var(--base-font,17px)}
   <div id="shher-paste-wrap" class="hidden">
     <div class="card mb4">
       <div class="ah">📋 貼上 CCC 評核結果</div>
-      <p style="font-size:12px;color:var(--t2);margin-bottom:8px">將每次 CCC 結束後的評分資料貼入下方欄位，格式為「序號\t姓名\t年級\t日期(YYYY/MM)\tEPA或MS項目\t分數」，每行一筆，按下「解析並匯入」即可自動更新所有住院醫師的 CCC 紀錄。「分數」欄位可填數字（如 2.5）或 CCC 等級（如 3a、3b），「年級」欄位（如 R2）會自動換算成「R2上半/下半」（依日期月份，1-6月=上半，7-12月=下半），匯入後可個別編輯。</p>
+      <p style="font-size:12px;color:var(--t2);margin-bottom:8px">將每次 CCC 結束後的評分資料貼入下方欄位，格式為「序號\t姓名\t年級\t日期(YYYY/MM)\tEPA或MS項目\t分數」，每行一筆，按下「解析並匯入」即可自動更新所有住院醫師的 CCC 紀錄。「分數」欄位：EPA 填等級（1、2、2a、2b、3a、3b、3c、4、5，只寫 3 視為 3a），Milestone 填數字 1–5（如 2.5）。項目代碼會自動對照（例如 PBLI→PBLI1、PBL2→PBLI2），對不上的會列出來、不會匯入。「年級」欄位（如 R2）會自動換算成「R2上半/下半」（依日期月份，1-6月=上半，7-12月=下半），匯入後可個別編輯。</p>
       <p style="font-size:11px;color:var(--a3);margin-bottom:10px">⚡ 相同姓名、相同日期的資料會自動歸為同一次 CCC，不同日期視為不同次 CCC。</p>
       <textarea id="ccc-paste-area" style="width:100%;min-height:200px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:10px 12px;font-size:12px;font-family:'DM Mono',monospace;outline:none;resize:vertical" placeholder="55&#9;李宜蒼&#9;R2&#9;2025/06&#9;PC1&#9;2.5&#10;56&#9;李宜蒼&#9;R2&#9;2025/06&#9;PC2&#9;2&#10;..."></textarea>
       <div class="ifl" style="gap:8px;margin-top:10px">
@@ -1001,10 +1001,10 @@ body{font-size:var(--base-font,17px)}
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn bp bsm" onclick="loadFBCfg().then(()=>{const e=document.getElementById('fb-conn-live');if(e)e.textContent=db?'✅ 已連線':'❌ 失敗';})">🔄 重新連線</button>
-      <button class="btn bp bsm" onclick="syncUp()">⬆ 上傳資料</button>
       <button class="btn bs bsm" onclick="syncDown()">⬇ 下載資料</button>
       <button class="btn bs bsm" style="border-color:var(--purple);color:var(--purple)" onclick="runFBDiagnostics()">🔍 連線診斷（手機請點此）</button>
     </div>
+    <div style="font-size:11px;color:var(--t3);margin-top:6px">修改會自動上傳（只傳有變動的部分），不需手動上傳。</div>
     <div id="fb-diag-result" class="hidden mt3" style="background:var(--bg3);border-radius:8px;padding:8px 12px"></div>
   </div>
 
@@ -1048,7 +1048,6 @@ body{font-size:var(--base-font,17px)}
     </div>
     <div class="ifl mt4" style="flex-wrap:wrap;gap:8px">
       <button class="btn bpu" onclick="connectFB()" style="font-size:14px">🔗 連接並寫入設定</button>
-      <button class="btn bp bsm" onclick="syncUp()">⬆ 同步到雲端</button>
       <button class="btn bs bsm" onclick="syncDown()">⬇ 從雲端同步</button>
     </div>
     <div id="fb-status" class="al ai hidden mt3"></div>
@@ -1672,23 +1671,6 @@ async function runFBDiagnostics(){
 async function batchWrite(items,colName,getId){
   await fsWriteMany(colName,items,getId);
 }
-async function syncUp(){
-  const el=document.getElementById('fb-status');
-  if(el){el.textContent='⬆ 同步中...';el.className='al ai';el.classList.remove('hidden');}
-  try{
-    await fsWriteMany('assessments',ASSESS,a=>a.id);
-    await fsWriteMany('residents',RES,r=>r.id);
-    await fsWriteMany('attendings',ATT,a=>a.id);
-    await fsSetDoc('config','schedule',{data:SCHED});
-    await fsSetDoc('config','cfg',CFG);
-    await fsSetDoc('config','customItems',{epa:EPA,ms:MS});
-    if(el){el.textContent='✅ 同步成功！評核 '+ASSESS.length+' 筆、住院醫師 '+RES.length+' 位';el.className='al aok';}
-    db=true;setCst('ok','☁️ 已連線');
-  }catch(e){
-    if(el){el.textContent='❌ 同步失敗：'+e.message;el.className='al ae';}
-    console.error('syncUp error:',e);
-  }
-}
 // ══════════════ SYNC ENGINE (diff-based, v5.21) ══════════════
 // Each device remembers what the cloud looked like at its last sync
 // (SYNC_BASE, persisted in localStorage). autoSync uploads only what differs
@@ -1836,6 +1818,7 @@ async function syncDown(silent=false){
     if(itemsDoc&&Array.isArray(itemsDoc.epa)&&itemsDoc.epa.length){EPA=itemsDoc.epa;localStorage.setItem('em_custom_epa',JSON.stringify(EPA));}
     if(itemsDoc&&Array.isArray(itemsDoc.ms)&&itemsDoc.ms.length){MS=itemsDoc.ms;localStorage.setItem('em_custom_ms',JSON.stringify(MS));}
     saveSyncBase();
+    try{migrateCCCCodes();}catch(e){console.warn('migrateCCCCodes',e);} // legacy CCC codes → uploaded as ordinary edits
     save(); // also schedules upload of any local edits that survived the merge
     db=true;
     const p=pendingSyncCount();
@@ -2654,7 +2637,7 @@ function getCCCScore(res, epaId, nthBack){
     levels=res.cccLevels||{};
   }
   const lv=levels[epaId]||'';
-  const map={'1':1,'2a':2,'2b':2,'3a':3,'3b':3,'3c':3,'4':4,'5':5};
+  const map={'1':1,'2':2,'2a':2,'2b':2,'3':3,'3a':3,'3b':3,'3c':3,'4':4,'5':5};
   return map[lv]||getLatestEpaScore(res.id,epaId);
 }
 function swShherTab(tab,el){
@@ -2673,10 +2656,17 @@ function renderShher(){
   if(!activeRes.length){document.getElementById('shher-table').innerHTML='<div class="al ai">目前無未畢業住院醫師資料</div>';return;}
   let html='';
   html+=buildShherSection('EPA',SHHER_EPA,activeRes,(res,id)=>getCCCScore(res,id,0));
-  html+=buildShherSection('Milestone',SHHER_MS,activeRes,(res,id)=>getMsPct(res.id,id)/25);
+  html+=buildShherSection('Milestone（最新一次 CCC 分數；小字為評核可呈現率，僅供參考）',SHHER_MS,activeRes,(res,id)=>getCCCMsScore(res,id),(res,id)=>`可呈現 ${Math.round(getMsPct(res.id,id))}%`);
   document.getElementById('shher-table').innerHTML=html;
 }
-function buildShherSection(title,rows,activeRes,getScore){
+// Latest CCC Milestone score for one item: walk back from the newest CCC
+// to the first one that scored this item. null = never scored by CCC.
+function getCCCMsScore(res,msId){
+  const hist=res.cccHistory||[];
+  for(let i=hist.length-1;i>=0;i--){const y=msScoreToY(hist[i]?.levels?.[msId]);if(y!=null)return y;}
+  return null;
+}
+function buildShherSection(title,rows,activeRes,getScore,getSub){
   // No early/late columns — just threshold + resident current score
   let html=`<div class="card mb4"><div class="ct"><span class="dot"></span>${title}</div><div style="overflow-x:auto"><table class="shher-tbl"><thead>
   <tr>
@@ -2696,8 +2686,10 @@ function buildShherSection(title,rows,activeRes,getScore){
         const expCols=rest.slice(0,8);
         const yrI={'R1':0,'R2':2,'R3':4,'R4':6}[res.y]??0;
         const expScore=expCols[yrI]||expCols[0];
+        const sub=getSub?`<br><small style="opacity:.55;font-size:9.5px">${getSub(res,id)}</small>`:'';
+        if(score==null)return`<td style="font-size:12px;color:var(--t3)">—<br><small style="opacity:.65">/${expScore}</small>${sub}</td>`;
         const pass=score>=expScore;
-        return`<td class="${pass?'cell-pass':'cell-fail'}" style="font-size:12px">${score.toFixed(1)}<br><small style="opacity:.65">/${expScore}</small></td>`;
+        return`<td class="${pass?'cell-pass':'cell-fail'}" style="font-size:12px">${score.toFixed(1)}<br><small style="opacity:.65">/${expScore}</small>${sub}</td>`;
       }).join('')}
     </tr>`;
   });
@@ -2706,29 +2698,63 @@ function buildShherSection(title,rows,activeRes,getScore){
 }
 
 // ── CCC PASTE IMPORT ──
+// CCC sheets use shorthand codes that differ from the system's item ids.
+// Anything that still doesn't match after this table is reported, never
+// stored silently (an unknown key is invisible to charts and the matrix).
+const CCC_CODE_ALIAS={PBLI:'PBLI1',PBL1:'PBLI1',PBL2:'PBLI2'};
+const escH=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const EPA_LEVELS=['1','2','2a','2b','3','3a','3b','3c','4','5'];
+function cccItemKind(id){
+  if(EPA.some(e=>e.id===id))return'epa';
+  if(MS.some(m=>m.id===id||(m.items||[]).some(i=>i.id===id)))return'ms';
+  return null;
+}
+function normalizeCCCCode(raw){
+  let c=normCode(raw);if(!c)return null;
+  if(CCC_CODE_ALIAS[c])c=CCC_CODE_ALIAS[c];
+  return cccItemKind(c)?c:null;
+}
+// EPA: '1','2','2a','2b','3','3a','3b','3c','4','5' (kept as strings).
+// Milestone: a number 1–5 (0.5 steps allowed). Returns {ok,val} or {ok:false,why}.
+function parseCCCScore(kind,raw){
+  const t=normCode(raw).toLowerCase();
+  if(kind==='epa'){
+    const n=parseFloat(t);
+    if(EPA_LEVELS.includes(t))return{ok:true,val:t};
+    if(/^[1-5](\.0+)?$/.test(t))return{ok:true,val:String(n)};
+    return{ok:false,why:'EPA 等級需為 1、2、2a、2b、3a、3b、3c、4、5'};
+  }
+  if(!/^\d+(\.\d+)?$/.test(t))return{ok:false,why:'Milestone 分數需為數字 1–5'};
+  const n=parseFloat(t);
+  if(n<1||n>5)return{ok:false,why:'Milestone 分數需介於 1–5'};
+  return{ok:true,val:n};
+}
 function parseCCCPaste(){
   const raw=document.getElementById('ccc-paste-area').value.trim();
   if(!raw){alert('請先貼上資料');return;}
-  const lines=raw.split('\n').map(l=>l.trim()).filter(Boolean);
-  // Group by (name, date) → {levels:{msId->score}, date, resName, year}
+  const lines=raw.split('\n').map(l=>l.trim());
+  // Group by (name, date) → {levels:{itemId->score}, date, resName, year}
   const groups={};
-  let ok=0,skip=0;
-  lines.forEach(line=>{
+  let ok=0,skip=0;const bad=[];
+  lines.forEach((line,i)=>{
+    if(!line)return;
     const parts=line.split('\t');
-    if(parts.length<6)return;
-    const[,name,yr,date,itemId,scoreStr]=parts;
-    // Support both numeric scores (e.g. "2.5") and CCC level strings (e.g. "3a")
-    const isLevelStr=/^[1-5][ab]?$/i.test(scoreStr.trim());
-    const scoreVal=isLevelStr?scoreStr.trim():parseFloat(scoreStr);
-    if(!name||!date||!itemId||(typeof scoreVal==='number'&&isNaN(scoreVal))||scoreVal===''){skip++;return;}
+    if(parts.length<6){skip++;return;}
+    const[,name,yr,date,itemRaw,scoreStr]=parts.map(x=>(x||'').trim());
+    if(!name||!date||!itemRaw||!scoreStr){skip++;return;}
+    const itemId=normalizeCCCCode(itemRaw);
+    if(!itemId){bad.push(`第 ${i+1} 行：${escH(name)} ${escH(date)} 「${escH(itemRaw)}」→ 找不到對應項目`);return;}
+    const sc=parseCCCScore(cccItemKind(itemId),scoreStr);
+    if(!sc.ok){bad.push(`第 ${i+1} 行：${escH(name)} ${escH(date)} ${itemId}「${escH(scoreStr)}」→ ${sc.why}`);return;}
     const key=name+'|'+date;
     if(!groups[key])groups[key]={resName:name,date,yr:yr||'',levels:{}};
-    groups[key].levels[itemId]=scoreVal;
+    groups[key].levels[itemId]=sc.val;
     ok++;
   });
+  const r=document.getElementById('ccc-paste-result');
+  const badHtml=bad.length?`<div style="margin-top:8px;padding:8px 10px;border:1px solid var(--danger);border-radius:7px;background:rgba(239,68,68,.1);color:var(--danger)"><b>❌ ${bad.length} 行沒有匯入，請修正後重新貼上：</b><br>${bad.join('<br>')}</div>`:'';
   if(!ok){
-    const r=document.getElementById('ccc-paste-result');
-    r.textContent='⚠ 無法解析任何資料，請確認格式正確（Tab分隔）';
+    r.innerHTML='⚠ 沒有可匯入的資料，請確認格式正確（Tab分隔）'+badHtml;
     r.className='al ai';r.classList.remove('hidden');return;
   }
   // Match names to RES (including graduated, so historical data is preserved)
@@ -2751,11 +2777,40 @@ function parseCCCPaste(){
     matched++;
   });
   save();autoSyncDebounced();
-  const r=document.getElementById('ccc-paste-result');
-  const unmatchedMsg=unmatched.length?`（找不到：${[...new Set(unmatched)].join('、')}）`:'';
-  r.innerHTML=`✅ 解析完成！共 ${ok} 筆，匯入 ${matched} 位住院醫師的 CCC 資料。${skip?`⚠ ${skip} 行跳過。`:''} ${unmatchedMsg}`;
-  r.className='al aok';r.classList.remove('hidden');
+  const unmatchedMsg=unmatched.length?`（找不到：${escH([...new Set(unmatched)].join('、'))}）`:'';
+  r.innerHTML=`✅ 解析完成！共 ${ok} 筆，匯入 ${matched} 位住院醫師的 CCC 資料。${skip?`⚠ ${skip} 行格式不完整已跳過。`:''} ${unmatchedMsg}`+badHtml;
+  r.className=bad.length?'al ai':'al aok';r.classList.remove('hidden');
   renderCCCHistoryList();
+}
+// Rename legacy shorthand keys (PBLI → PBLI1 …) in stored CCC data.
+// Idempotent: a second run changes nothing, so it only costs one write per
+// affected resident, once. If both the old and the correct key exist in the
+// same snapshot, the correct key's value wins and the clash is reported.
+let CCC_MIGRATE_NOTES=[];
+function migrateCCCCodes(){
+  let changed=false;const notes=[];
+  const fix=(obj,res,label)=>{
+    if(!obj||typeof obj!=='object')return;
+    Object.keys(obj).forEach(k=>{
+      const to=normalizeCCCCode(k);
+      if(!to||to===k)return;
+      if(to in obj){if(stableStr(obj[to])!==stableStr(obj[k]))notes.push(`${res.n} ${label}：${k}=${obj[k]} 與 ${to}=${obj[to]} 並存，保留 ${to}`);}
+      else obj[to]=obj[k];
+      delete obj[k];changed=true;
+    });
+  };
+  RES.forEach(r=>{
+    (r.cccHistory||[]).forEach(h=>fix(h.levels,r,h.date));
+    fix(r.cccLevels,r,'CCC等級設定');
+  });
+  CCC_MIGRATE_NOTES=notes;
+  if(changed)save();
+  return changed;
+}
+function findUnknownCCCCodes(){
+  const out=[];
+  RES.forEach(r=>(r.cccHistory||[]).forEach((h,i)=>Object.keys(h.levels||{}).forEach(k=>{if(!cccItemKind(k))out.push({res:r,idx:i,date:h.date,key:k});})));
+  return out;
 }
 // Derive a "R2上半"/"R2下半" style label from the resident's year-at-time-of-CCC
 // and the CCC month. Convention: months 1-6 = 上半 (H1), 7-12 = 下半 (H2).
@@ -2769,8 +2824,12 @@ function renderCCCHistoryList(){
   const el=document.getElementById('ccc-history-list');if(!el)return;
   const allRes=[...RES].sort((a,b)=>a.n.localeCompare(b.n,'zh'));
   const withHistory=allRes.filter(r=>(r.cccHistory||[]).length>0);
-  if(!withHistory.length){el.innerHTML='<div style="color:var(--t3);padding:10px">尚無 CCC 紀錄</div>';return;}
-  el.innerHTML=withHistory.map(r=>`
+  const unk=findUnknownCCCCodes();
+  let warn='';
+  if(unk.length)warn+=`<div class="al ai mb4" style="border-color:var(--a3)"><b>⚠ ${unk.length} 個項目代碼對不上系統項目</b>（圖表與矩陣看不到這些分數）：<br>${unk.map(u=>`${escH(u.res.n)} ${escH(u.date)}「${escH(u.key)}」 <button class="btn bs bxs" style="font-size:9.5px;padding:1px 6px" onclick="editCCCEntry('${u.res.id}',${u.idx})">✏️修正</button>`).join('<br>')}</div>`;
+  if(CCC_MIGRATE_NOTES.length)warn+=`<div class="al ai mb4"><b>ℹ 舊代碼自動修正時發現重複</b>：<br>${CCC_MIGRATE_NOTES.map(escH).join('<br>')}</div>`;
+  if(!withHistory.length){el.innerHTML=warn+'<div style="color:var(--t3);padding:10px">尚無 CCC 紀錄</div>';return;}
+  el.innerHTML=warn+withHistory.map(r=>`
     <div style="margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:12px">
       <div style="font-weight:600;font-size:13px;margin-bottom:6px">${r.n} <span style="font-size:11px;color:var(--t3)">${r.y}${r.grad?'（已畢業）':''}</span></div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">
@@ -2803,15 +2862,23 @@ function editCCCEntry(resId,idx){
   document.getElementById('ccc-edit-name').textContent=r.n;
   document.getElementById('ccc-edit-date').value=entry.date;
   document.getElementById('ccc-edit-half').value=entry.half||'';
-  // Build editable score table for all items in this snapshot
+  // Build editable score table for all items in this snapshot.
+  // EPA → level picker (1…5 incl. 2a/2b/3a/3b/3c); Milestone → number 1–5.
+  // An unknown code gets an editable code box so it can be corrected here.
   const allKeys=Object.keys(entry.levels).sort();
   const wrap=document.getElementById('ccc-edit-items');
-  wrap.innerHTML=allKeys.map(k=>{
-    const label=(EPA.find(e=>e.id===k)?.n)||(MS.find(m=>m.id===k)?.n)||k;
+  wrap.innerHTML=allKeys.map((k,i)=>{
+    const kind=cccItemKind(k),v=entry.levels[k];
+    const label=(EPA.find(e=>e.id===k)?.n)||(MS.find(m=>m.id===k)?.n)||'⚠ 代碼對不上，請改成正確代碼（留空＝刪除）';
+    const codeCell=kind?`<span style="font-size:11px;min-width:50px;font-family:'DM Mono';color:var(--a2)">${k}</span>`
+      :`<input type="text" value="${escH(k)}" data-code-for="${i}" style="width:70px;font-size:11px;border-color:var(--danger)">`;
+    const valCell=kind==='epa'
+      ?`<select data-key="${escH(k)}" data-i="${i}" style="width:66px">${EPA_LEVELS.map(o=>`<option ${String(v)===o?'selected':''}>${o}</option>`).join('')}${EPA_LEVELS.includes(String(v))?'':`<option selected value="${escH(v)}">${escH(v)}（無效）</option>`}</select>`
+      :`<input type="text" inputmode="decimal" value="${escH(v)}" style="width:60px;text-align:center" data-key="${escH(k)}" data-i="${i}">`;
     return`<div class="ifl" style="gap:8px;margin-bottom:5px;align-items:center">
-      <span style="font-size:11px;min-width:50px;font-family:'DM Mono';color:var(--a2)">${k}</span>
-      <span style="font-size:11px;flex:1;color:var(--t2)">${label.slice(0,18)}</span>
-      <input type="number" step="0.5" min="1" max="5" value="${entry.levels[k]}" style="width:60px;text-align:center" data-key="${k}">
+      ${codeCell}
+      <span style="font-size:11px;flex:1;color:var(--t2)">${escH(label.slice(0,18))}</span>
+      ${valCell}
     </div>`;
   }).join('');
   openM('m-ccc-edit');
@@ -2821,12 +2888,24 @@ function saveCCCEdit(){
   const idx=parseInt(document.getElementById('ccc-edit-idx').value);
   const r=getRes(resId);if(!r||!r.cccHistory||!r.cccHistory[idx])return;
   const entry=r.cccHistory[idx];
+  const levels={},errs=[];
+  document.querySelectorAll('#ccc-edit-items [data-key]').forEach(inp=>{
+    const orig=inp.dataset.key;
+    const codeBox=document.querySelector(`#ccc-edit-items [data-code-for="${inp.dataset.i}"]`);
+    let key=orig;
+    if(codeBox){
+      if(!codeBox.value.trim())return; // blank code = drop this item
+      key=normalizeCCCCode(codeBox.value);
+      if(!key){errs.push(`「${codeBox.value}」仍然對不上系統項目`);return;}
+    }
+    const sc=parseCCCScore(cccItemKind(key),inp.value);
+    if(!sc.ok){errs.push(`${key}：${sc.why}`);return;}
+    levels[key]=sc.val;
+  });
+  if(errs.length){alert('無法儲存：\n'+errs.join('\n'));return;}
   entry.date=document.getElementById('ccc-edit-date').value;
   entry.half=document.getElementById('ccc-edit-half').value;
-  document.querySelectorAll('#ccc-edit-items input[data-key]').forEach(inp=>{
-    const key=inp.dataset.key;const val=parseFloat(inp.value);
-    if(!isNaN(val))entry.levels[key]=val;
-  });
+  entry.levels=levels;
   r.cccHistory.sort((a,b)=>a.date.localeCompare(b.date));
   save();autoSyncDebounced();
   closeM('m-ccc-edit');
@@ -2834,22 +2913,22 @@ function saveCCCEdit(){
   renderGrowthChart();
 }
 
-// Milestone level scale per requested axis: 1,2,3a,3b,3c,4,5 as 7 EVENLY
-// SPACED ticks (slots 1-7). 2a/2b (if present in data) fold into slot 2
-// alongside plain "2", since only 7 labels are shown on the axis.
-const CCC_LEVEL_ORDER=['1','2','2a','2b','3a','3b','3c','4','5'];
-const CCC_SLOT_MAP={'1':1,'2':2,'2a':2,'2b':2,'3a':4,'3b':5,'3c':6,'4':7,'5':8};
-// Wait — re-derive per exact spec: 3a is slot 4, 3b is slot 5. That means
-// slot 3 is reserved (2a/2b region) and slots run 1,2,3,4,5,6,7,8 for
-// 1,2,(2a/2b@3),3a,3b,3c,4,5. We keep this 8-slot internal scale but only
-// label slots 1,2,4,5,6,7,8 on the visible axis (7 labels total).
-function cccLevelToY(val){
-  if(typeof val==='string'&&CCC_SLOT_MAP[val]!=null)return CCC_SLOT_MAP[val];
-  const n=parseFloat(val);
-  if(isNaN(n))return null;
-  // Legacy numeric scores (1-5, .5 steps) map onto the same 8-slot axis
-  const map={1:1,1.5:1.5,2:2,2.5:3,3:5,3.5:5.5,4:7,4.5:7.5,5:8};
-  return map[n]!=null?map[n]:Math.max(1,Math.min(8,n*1.6-0.6));
+// Growth-chart scales. EPA: 7 evenly spaced levels 1,2,3a,3b,3c,4,5
+// (2a/2b sit on 2; a bare "3" counts as 3a). Milestone: the plain number
+// on a 1–5 axis — never converted to 3a/3b.
+const EPA_AXIS=['1','2','3a','3b','3c','4','5'];
+const EPA_Y={'1':1,'2':2,'2a':2,'2b':2,'3':3,'3a':3,'3b':4,'3c':5,'4':6,'5':7};
+function epaLevelToY(v){
+  if(v==null||v==='')return null;
+  let t=String(v).trim().toLowerCase();
+  if(/^[1-5]\.0+$/.test(t))t=t[0];
+  return EPA_Y[t]??null;
+}
+function msScoreToY(v){
+  if(v==null||v==='')return null;
+  if(typeof v!=='number'&&!/^\s*\d+(\.\d+)?\s*$/.test(String(v)))return null;
+  const n=parseFloat(v);
+  return n>=1&&n<=5?n:null;
 }
 function renderGrowthChart(){
   const resId=document.getElementById('growth-res')?.value;
@@ -2871,7 +2950,7 @@ function renderGrowthChart(){
     datasets=epaIds.map((id,i)=>{
       const epaObj=EPA.find(e=>e.id===id)||SHHER_EPA.find(s=>s[0]===id);
       const label=id+(epaObj?(epaObj.n||epaObj[1]?` ${(epaObj.n||epaObj[1]).slice(0,6)}…`:''):'');
-      return{label,data:hist.map(h=>cccLevelToY(h.levels[id])),borderColor:colors[i%colors.length],backgroundColor:'transparent',tension:.35,pointRadius:4,spanGaps:false};
+      return{label,data:hist.map(h=>epaLevelToY(h.levels[id])),borderColor:colors[i%colors.length],backgroundColor:'transparent',tension:.35,pointRadius:4,spanGaps:false};
     }).filter(d=>d.data.some(v=>v!==null));
   }else{
     // One line per MS category (average slot position of its items in that CCC)
@@ -2882,7 +2961,7 @@ function renderGrowthChart(){
       const name=msObj?(msObj.n||msObj[1]||id).slice(0,6)+'…':id;
       return{label:id+' '+name,data:hist.map(h=>{
         const relevant=Object.entries(h.levels).filter(([k])=>k.startsWith(id+'-')||k===id);
-        const vals=(relevant.length?relevant.map(([,v])=>v):[h.levels[id]]).filter(v=>v!=null).map(cccLevelToY).filter(v=>v!=null);
+        const vals=(relevant.length?relevant.map(([,v])=>v):[h.levels[id]]).filter(v=>v!=null).map(msScoreToY).filter(v=>v!=null);
         return vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length):null;
       }),borderColor:colors[i%colors.length],backgroundColor:'transparent',tension:.35,pointRadius:4,spanGaps:false};
     }).filter(d=>d.data.some(v=>v!==null));
@@ -2893,19 +2972,9 @@ function renderGrowthChart(){
     responsive:true,maintainAspectRatio:true,
     plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:10},color:'#94a3b8'}}},
     scales:{
-      y:{min:0.5,max:8.5,
-        ticks:{
-          stepSize:1,
-          color:'#94a3b8',
-          callback:function(value){
-            // Map slot positions back to CCC level labels (7 visible labels).
-            // Slot 3 (2a/2b region) intentionally has no separate label.
-            const slotLabel={1:'1',2:'2',4:'3a',5:'3b',6:'3c',7:'4',8:'5'};
-            return slotLabel[value]||'';
-          }
-        },
-        grid:{color:'rgba(148,163,184,.15)'}
-      },
+      y:cat==='epa'
+        ?{min:0.5,max:7.5,ticks:{stepSize:1,color:'#94a3b8',callback:v=>EPA_AXIS[v-1]||''},grid:{color:'rgba(148,163,184,.15)'}}
+        :{min:1,max:5,ticks:{stepSize:0.5,color:'#94a3b8'},grid:{color:'rgba(148,163,184,.15)'}},
       x:{ticks:{color:'#94a3b8'},grid:{color:'rgba(148,163,184,.08)'}}
     }
   }});
@@ -2913,6 +2982,11 @@ function renderGrowthChart(){
   if(detail){
     const prevH=hist.length>1?hist[hist.length-2]:null;
     const items=cat==='epa'?EPA.map(e=>({id:e.id,n:e.n})):MS.map(m=>({id:m.id,n:m.n}));
+    // Same scale as the chart; colour bands: EPA 4+ / 3a+ / 2 / 1, MS 4 / 3 / 2 / <2
+    const toY=cat==='epa'?epaLevelToY:msScoreToY;
+    const lvCol=y=>cat==='epa'?(y>=6?'#22c55e':y>=3?'var(--a3)':y>=2?'var(--a2)':'var(--danger)'):(y>=4?'#22c55e':y>=3?'var(--a3)':y>=2?'var(--a2)':'var(--danger)');
+    const badVals=[];
+    hist.forEach(h=>items.forEach(it=>{const v=h.levels[it.id];if(v!=null&&v!==''&&toY(v)==null)badVals.push(`${h.date} ${it.id}「${v}」`);}));
     detail.innerHTML=`<div class="card"><div class="ct"><span class="dot"></span>各項目 CCC 分數變化</div><div style="overflow-x:auto"><table style="width:100%;font-size:11.5px;border-collapse:collapse">
       <thead><tr style="border-bottom:2px solid var(--border)">
         <th style="text-align:left;padding:5px 8px">項目</th>
@@ -2923,15 +2997,15 @@ function renderGrowthChart(){
         const vals=hist.map(h=>h.levels[item.id]??null);
         if(vals.every(v=>v===null))return'';
         const latest=vals[vals.length-1];const prev=hist.length>1?vals[hist.length-2]:null;
-        const latestY=cccLevelToY(latest),prevY=cccLevelToY(prev);
+        const latestY=toY(latest),prevY=toY(prev);
         const diff=latestY!=null&&prevY!=null?latestY-prevY:null;
         return`<tr style="border-bottom:1px solid rgba(30,45,69,.35)">
           <td style="padding:5px 8px;font-weight:600"><span style="font-size:9.5px;color:var(--a2);font-family:'DM Mono'">${item.id}</span> ${item.n.slice(0,14)}</td>
-          ${vals.map(v=>v!=null?`<td style="padding:5px 8px;text-align:center;color:${v>=4?'#22c55e':v>=3?'var(--a3)':v>=2?'var(--a2)':'var(--danger)'};font-weight:600">${v}</td>`:'<td style="padding:5px 8px;text-align:center;color:var(--t3)">—</td>').join('')}
+          ${vals.map(v=>v!=null?`<td style="padding:5px 8px;text-align:center;color:${toY(v)==null?'var(--danger)':lvCol(toY(v))};font-weight:600">${escH(v)}${toY(v)==null?' ⚠':''}</td>`:'<td style="padding:5px 8px;text-align:center;color:var(--t3)">—</td>').join('')}
           ${prevH?`<td style="padding:5px 8px;text-align:center;font-weight:700;color:${diff===null?'var(--t3)':diff>0?'#22c55e':diff<0?'var(--danger)':'var(--t3)'}">${diff===null?'—':diff>0?'▲進步':diff<0?'▼退步':'→'}</td>`:''}
         </tr>`;
       }).join('')}
-      </tbody></table></div></div>`;
+      </tbody></table></div>${badVals.length?`<div class="al ai mt3">⚠ 以下分數不符合${cat==='epa'?' EPA 等級（1、2、2a、2b、3a、3b、3c、4、5）':' Milestone 1–5 分'}，沒有畫在圖上，請到「CCC 貼上」分頁編輯：<br>${badVals.map(escH).join('<br>')}</div>`:''}</div>`;
   }
 }
 
@@ -3740,6 +3814,7 @@ function init(){
   try{loadTheme();}catch(e){showJsError('loadTheme失敗: '+e.message);}
   try{loadFontSize();}catch(e){showJsError('loadFontSize失敗: '+e.message);}
   try{loadCustomItems();}catch(e){showJsError('loadCustomItems失敗: '+e.message);}
+  try{migrateCCCCodes();}catch(e){showJsError('migrateCCCCodes失敗: '+e.message);}
   try{save();}catch(e){showJsError('save失敗: '+e.message);}
   try{
     if(location.protocol==='file:'||location.protocol==='about:'){
