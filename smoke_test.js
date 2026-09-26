@@ -268,6 +268,51 @@ js = js.replace(/\ninit\(\);\s*$/, '\n') + `
   // ── 16. Whole-database upload is gone ──
   T('no syncUp button or function',typeof syncUp==='undefined'&&!html.includes('syncUp('));
 
+  // ── 17. EPA time charts: every EPA, own points only, real dates ──
+  const g=getRes('RG');g.grad=false;g.y='R3';
+  const EV=[
+    {id:2001,type:'ms',date:'2025-11-20',resId:'RG',resYear:'R2',attName:'甲醫師',epaScores:{EPA1:2},epaFb:{EPA1:'第一次'},overallFb:'整體'},
+    {id:2002,type:'ms',date:'2026-02-03',resId:'RG',resYear:'R3',attName:'乙醫師',epaScores:{EPA3:3},overallFb:'x'.repeat(60)},
+    {id:2003,type:'ms',date:'2026-02-10',resId:'RG',resYear:'R3',attName:'丙醫師',epaScores:{EPA1:3}},
+    {id:2004,type:'ms',date:'2026-02-25',resId:'RC',resYear:'R3',attName:'丙醫師',epaScores:{EPA1:5}},
+    {id:2005,type:'ms',date:'2026-03-01',resId:'RG',resYear:'R3',attName:'甲醫師',epaScores:{EPA7:4}}];
+  const ser=buildEpaSeries(EV.filter(a=>a.resId==='RG'));
+  T('all 7 EPAs built',ser.length===EPA.length&&EPA.length>=7);
+  const e1=ser.find(s=>s.id==='EPA1').pts;
+  T('EPA1 has only its own points, no gaps',e1.length===2&&e1.every(p=>p.y!=null));
+  T('x is real time, ascending, across years',e1[0].x===Date.UTC(2025,10,20)&&e1[1].x===Date.UTC(2026,1,10)&&tsToYM(e1[0].x)==='2025/11');
+  T('point carries teacher + per-EPA feedback',e1[0].att==='甲醫師'&&e1[0].fb==='第一次');
+  const e3=ser.find(s=>s.id==='EPA3').pts[0];
+  T('falls back to overall feedback, cut to 40',e3.fb.length===41&&e3.fb.endsWith('…'));
+  const gm=buildGradeMonthly(EV);
+  const r3=gm.find(x=>x.yr==='R3');
+  T('grade monthly: same grade+month averaged',r3.pts.find(p=>tsToYM(p.x)==='2026/02').y===3.67&&r3.pts.find(p=>tsToYM(p.x)==='2026/02').cnt===3);
+  T('grade monthly: grades kept apart (evaluation-time grade)',gm.find(x=>x.yr==='R2').pts.length===1);
+  const row1=SHHER_EPA.find(r=>r[0]==='EPA1');
+  T('expectation = matrix column',shherExpected(row1,'R3')===row1[6]&&shherExpected(row1,'R1')===row1[2]);
+  const CFGS=[];const RealChart=Chart;Chart=function(ctx,cfg){CFGS.push(cfg);return{destroy(){}};};
+  const keepA=ASSESS;ASSESS=[...EV,...keepA];
+  let crash17='';
+  try{
+    document.getElementById('ana-r').value='RG';renderAnalytics();
+    const c1=CFGS.find(c=>c.type==='line');CFGS.length=0;
+    const main=c1.data.datasets.filter(d=>!d._exp),exp=c1.data.datasets.filter(d=>d._exp);
+    T('resident chart: each scored EPA one line + dashed expectation',main.length===3&&exp.length===3&&exp.every(d=>d.borderDash));
+    T('resident chart: time axis',c1.options.scales.x.type==='linear');
+    T('expectation line at current-grade value',exp.find(d=>d._epa==='EPA1').data[0].y===row1[6]);
+    T('legend hides dashed entries',c1.options.plugins.legend.labels.filter({datasetIndex:c1.data.datasets.indexOf(exp[0])})===false);
+    document.getElementById('ana-r').value='';renderAnalytics();
+    const c2=CFGS.find(c=>c.type==='line');CFGS.length=0;
+    T('no resident → grade lines',c2.data.datasets.every(d=>/^R[1-4]$/.test(d.label))&&c2.data.datasets.length>=2);
+    renderDashCharts();
+    const c3=CFGS.find(c=>c.type==='line');
+    T('dashboard → grade lines, not first 6 residents',c3&&c3.data.datasets.every(d=>/^R[1-4]$/.test(d.label)));
+    CFGS.length=0;showGrad('RG');
+    T('graduate chart uses per-EPA series, no expectation',CFGS.some(c=>c.data.datasets.some(d=>d._epa)&&!c.data.datasets.some(d=>d._exp)));
+  }catch(e){crash17=e.stack||e.message;}
+  T('charts render ('+crash17+')',!crash17);
+  Chart=RealChart;ASSESS=keepA;
+
   console.log((fail?'❌':'✅')+' '+pass+' passed, '+fail+' failed');
   process.exitCode=fail?1:0;
 })().catch(e=>{console.log('❌ CRASH',e&&e.stack||e);process.exitCode=1;});
