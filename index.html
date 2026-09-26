@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>急診醫學評核系統 v5.25</title>
+<title>急診醫學評核系統 v5.26</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <!-- Firestore accessed via REST API (no SDK needed - more reliable on mobile/file:// contexts) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -351,7 +351,7 @@ body{font-size:var(--base-font,17px)}
 </head>
 <body>
 <div id="origin-warn-banner" class="hidden" style="position:fixed;top:0;left:0;right:0;z-index:300;background:#f59e0b;color:#1a1a1a;padding:10px 16px;font-size:13px;text-align:center;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.2)">
-  ⚠️ 偵測到此頁面非透過正式網址開啟，雲端同步可能不穩定 — <a href="#" onclick="nav('firebase');document.getElementById('origin-warn-banner').classList.add('hidden');return false;" style="color:#1a1a1a;text-decoration:underline">點此查看徹底解決方式</a>
+  ⚠️ 此頁面不是從正式網址開啟，請改用正式網址開啟，雲端同步才穩定
   <span style="cursor:pointer;margin-left:10px;font-weight:700" onclick="document.getElementById('origin-warn-banner').classList.add('hidden');document.body.style.paddingTop=''">✕</span>
 </div>
 <div id="js-error-banner" class="hidden" style="position:fixed;top:0;left:0;right:0;z-index:301;background:#dc2626;color:#fff;padding:12px 16px;font-size:12px;font-family:'DM Mono',monospace;box-shadow:0 2px 8px rgba(0,0,0,.3);max-height:40vh;overflow-y:auto">
@@ -367,7 +367,7 @@ body{font-size:var(--base-font,17px)}
 <div class="sbo" id="sbo" onclick="closeSB()"></div>
 <aside class="sidebar" id="sb">
   <div class="sb-logo">
-    <div class="sb-tag">TSEM · CBME 2025 v5.25</div>
+    <div class="sb-tag">TSEM · CBME 2025 v5.26</div>
     <h1>急診醫學<br>住院醫師評核系統</h1>
   </div>
   <nav class="sb-nav">
@@ -597,69 +597,6 @@ body{font-size:var(--base-font,17px)}
 </div>
 
 <!-- ═══ IMAGING (獨立頁面，必填) ═══ -->
-<div class="page" id="page-imaging">
-  <div class="sh mb4"><div><div class="st">🩻 影像醫學判讀評核表</div><div class="ss2">急診影像醫學評核（必填）</div></div></div>
-  <div id="img-ok" class="al aok hidden">✅ 影像評核已儲存！</div>
-  <div id="img-err" class="al ae hidden"></div>
-  <div class="g2">
-    <div>
-      <div class="card mb4">
-        <div class="ct"><span class="dot"></span>基本資料</div>
-        <div class="who-bar" style="margin-bottom:11px">
-          <span style="font-size:11.5px;color:var(--t2);font-weight:600">📌 主治醫師：</span>
-          <select id="im-att" style="max-width:190px"><option value="">— 請選擇 —</option></select>
-        </div>
-        <div class="fg"><label>住院醫師<span class="req">*</span></label><select id="im-res"><option value="">— 請選擇 —</option></select></div>
-        <div class="g2">
-          <div class="fg"><label>評核日期</label><input type="date" id="im-date"></div>
-          <div class="fg"><label>病歷號</label><input type="text" id="im-pid" placeholder="選填"></div>
-        </div>
-        <div class="fg"><label>影像種類<span class="req">*</span></label>
-          <div class="img-type-row" id="im-type-row">
-            <button class="itbtn" onclick="selImgType('X-ray',this)">X-ray</button>
-            <button class="itbtn" onclick="selImgType('CT',this)">CT</button>
-            <button class="itbtn" onclick="selImgType('MRI',this)">MRI</button>
-          </div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="ct"><span class="dot" style="background:var(--a2)"></span>案例選擇</div>
-        <div class="tabs" id="im-tabs">
-          <div class="tab active" onclick="swImgTab('req',this)">必要案例</div>
-          <div class="tab" onclick="swImgTab('sel',this)">選擇案例</div>
-        </div>
-        <p style="font-size:10.5px;color:var(--t3);margin-bottom:7px">如當日無適合個案，請點選「其他」。</p>
-        <div class="img-scroll mb4" id="im-case-list"></div>
-        <div id="im-sub-wrap" class="hidden">
-          <div style="font-size:11px;font-weight:600;color:var(--t2);margin-bottom:6px">選擇案例（進一步分類）</div>
-          <div class="img-scroll" id="im-sub-list"></div>
-        </div>
-      </div>
-    </div>
-    <div>
-      <div class="card">
-        <div class="ct"><span class="dot" style="background:var(--a3)"></span>評核項目（1=非常不滿意 5=非常滿意）</div>
-        <div id="im-stars"></div>
-        <div class="fg mt4">
-          <label>哪裡做得很好或未來如何改善<span class="req">*</span></label>
-          <div class="fb-box">
-            <div class="fb-title">💬 影像評核意見
-              
-            </div>
-            <div class="fb-tools" id="im-pre-tools"></div>
-            <textarea id="im-comment" class="mf" oninput="checkFb(this)" placeholder="請具體描述評核意見..."></textarea>
-          </div>
-        </div>
-        <div class="ifl fe mt4">
-          <button class="btn bs bsm" onclick="clearImg()">清除</button>
-          <button class="btn bp" onclick="saveImg()">💾 儲存影像評核</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- THANK YOU PAGE -->
 <div class="page" id="page-thankyou">
   <div class="ty-wrap">
     <div class="ty-icon">🙏</div>
@@ -1018,114 +955,18 @@ body{font-size:var(--base-font,17px)}
 
 <!-- FIREBASE -->
 <div class="page" id="page-firebase">
-  <div class="sh mb4"><div><div class="st">☁️ 雲端設定</div><div class="ss2">若手機持續連線失敗，請見下方「真正徹底的解法」</div></div></div>
-  <div style="background:rgba(0,201,167,.12);border:2px solid var(--acc);border-radius:10px;padding:14px 18px;margin-bottom:14px">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-      <span style="font-size:24px">☁️</span>
-      <div>
-        <div style="font-size:15px;font-weight:700;color:var(--acc)">Firebase 設定已內建 — 傳給別人直接可用</div>
-        <div style="font-size:13px;color:var(--t2);margin-top:2px">Project：<b>shher-d2331</b>　連線狀態：<span id="fb-conn-live">檢查中...</span></div>
-      </div>
-    </div>
+  <div class="sh mb4"><div><div class="st">☁️ 雲端設定</div><div class="ss2">資料存在雲端（Firestore），修改會自動上傳</div></div></div>
+  <div class="card mb4">
+    <div style="font-size:13px;color:var(--t2);margin-bottom:10px">專案：<b>shher-d2331</b>　連線狀態：<span id="fb-conn-live">檢查中...</span></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn bp bsm" onclick="loadFBCfg().then(()=>{const e=document.getElementById('fb-conn-live');if(e)e.textContent=db?'✅ 已連線':'❌ 失敗';})">🔄 重新連線</button>
       <button class="btn bs bsm" onclick="syncDown()">⬇ 下載資料</button>
-      <button class="btn bs bsm" style="border-color:var(--purple);color:var(--purple)" onclick="runFBDiagnostics()">🔍 連線診斷（手機請點此）</button>
+      <button class="btn bs bsm" onclick="fullResync()">⬇ 完整重新下載</button>
+      <button class="btn bs bsm" style="border-color:var(--purple);color:var(--purple)" onclick="runFBDiagnostics()">🔍 連線診斷</button>
     </div>
-    <div style="font-size:11px;color:var(--t3);margin-top:6px">修改會自動上傳（只傳有變動的部分），不需手動上傳。</div>
-    <div id="fb-diag-result" class="hidden mt3" style="background:var(--bg3);border-radius:8px;padding:8px 12px"></div>
-  </div>
-
-  <div class="card mb4" style="border-left:4px solid var(--a2)">
-    <div style="font-size:16px;font-weight:700;color:var(--a2);margin-bottom:14px">📋 設定步驟（管理員一次性操作）</div>
-    <div style="font-size:14px;line-height:2;color:var(--text)">
-      <div style="background:var(--bg3);border-radius:8px;padding:12px 16px;margin-bottom:10px">
-        <b>步驟一：建立 Firebase 專案</b><br>
-        前往 <a href="https://console.firebase.google.com" target="_blank" style="color:var(--a2);font-weight:600">console.firebase.google.com</a> → 點「<b>新增專案</b>」→ 輸入名稱（如 em-cbme）→ 停用 Analytics → 點「建立專案」
-      </div>
-      <div style="background:var(--bg3);border-radius:8px;padding:12px 16px;margin-bottom:10px">
-        <b>步驟二：建立 Firestore 資料庫</b><br>
-        左側選「<b>建構 → Firestore Database</b>」→「建立資料庫」→ 選「<b>正式版模式</b>」→ 位置選「<b>asia-east1（台灣）</b>」→「啟用」
-      </div>
-      <div style="background:var(--bg3);border-radius:8px;padding:12px 16px;margin-bottom:10px">
-        <b>步驟三：開放讀寫權限</b><br>
-        進入 Firestore →「<b>規則</b>」頁籤 → 將規則改為下方內容 → 點「<b>發布</b>」：<br>
-        <code style="display:block;background:var(--bg2);border:1px solid var(--border);padding:10px 14px;border-radius:6px;font-size:13px;margin:8px 0;line-height:1.7">rules_version = '2';<br>service cloud.firestore {<br>&nbsp;&nbsp;match /databases/{database}/documents {<br>&nbsp;&nbsp;&nbsp;&nbsp;match /{document=**} {<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;allow read, write: if true;<br>&nbsp;&nbsp;&nbsp;&nbsp;}<br>&nbsp;&nbsp;}<br>}</code>
-      </div>
-      <div style="background:var(--bg3);border-radius:8px;padding:12px 16px;margin-bottom:10px">
-        <b>步驟四：取得設定碼</b><br>
-        點左上角「<b>齒輪 → 專案設定</b>」→ 往下找「您的應用程式」→ 點網頁圖示「<b>&lt;/&gt;</b>」→ 輸入名稱（如 em-web）→「<b>註冊應用程式</b>」→ 複製 apiKey、authDomain、projectId、appId 四個值
-      </div>
-      <div style="background:rgba(0,201,167,.08);border:1px solid rgba(0,201,167,.25);border-radius:8px;padding:12px 16px">
-        <b>步驟五：填入下方欄位並連接</b><br>
-        填入四個值 → 點「🔗 連接並寫入設定」→ 看到「✅ 連線成功」→ 點「⬆ 同步到雲端」上傳所有現有資料<br>
-        <b style="color:var(--acc)">其他主治醫師</b>：打開同一個 HTML 檔案，填入相同的四個值 → 點「⬇ 從雲端同步」即可
-      </div>
-    </div>
-  </div>
-
-  <div class="card mb4">
-    <div class="ct"><span class="dot" style="background:var(--purple)"></span>Firebase 設定碼</div>
-    <div class="g2">
-      <div class="fg"><label>API Key</label><input type="text" id="fb-k" placeholder="AIzaSy..."></div>
-      <div class="fg"><label>Auth Domain</label><input type="text" id="fb-d" placeholder="xxx.firebaseapp.com"></div>
-    </div>
-    <div class="g2">
-      <div class="fg"><label>Project ID <span class="req">*</span></label><input type="text" id="fb-p" placeholder="my-em-project"></div>
-      <div class="fg"><label>App ID</label><input type="text" id="fb-a" placeholder="1:xxx:web:xxx"></div>
-    </div>
-    <div class="ifl mt4" style="flex-wrap:wrap;gap:8px">
-      <button class="btn bpu" onclick="connectFB()" style="font-size:14px">🔗 連接並寫入設定</button>
-      <button class="btn bs bsm" onclick="syncDown()">⬇ 從雲端同步</button>
-    </div>
+    <div style="font-size:11.5px;color:var(--t3);margin-top:8px;line-height:1.7">修改會自動上傳（只傳有變動的部分）。「下載資料」只取上次同步後的新資料；「完整重新下載」會重新讀取全部評核，只在資料看起來不一致時使用。</div>
     <div id="fb-status" class="al ai hidden mt3"></div>
-  </div>
-
-  <div class="card mb4" style="border-left:4px solid var(--danger)">
-    <div style="font-size:15px;font-weight:700;color:var(--danger);margin-bottom:12px">📱 手機持續連線失敗？— 真正徹底的解法</div>
-    <div style="font-size:14px;line-height:1.9;color:var(--text)">
-      <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:12px 16px;margin-bottom:12px">
-        <b>為什麼「本機開啟」和「Google Drive 開啟」都不可靠？</b><br>
-        本機 HTML 檔案（file://）和 Google Drive 的「預覽」功能都<b>不是真正的網頁伺服器</b>。Drive 預覽常以唯讀/安全模式顯示內容，內嵌的 JavaScript 經常不會被執行 —— 也就是說頁面看起來正常，但同步功能可能根本沒有啟動過。<br>
-        唯一徹底的解法：把檔案放到<b>真正會執行程式碼的網頁主機</b>上，取得一個 https:// 開頭的正式網址。
-      </div>
-
-      <div style="background:rgba(0,201,167,.1);border:2px solid var(--acc);border-radius:8px;padding:12px 16px;margin-bottom:10px">
-        <b style="color:var(--acc)">✅ 方案一：GitHub Pages（推薦，永久免費、最穩定）</b><br>
-        1. 前往 <a href="https://github.com" target="_blank" style="color:var(--a2)">github.com</a> 註冊免費帳號（已有的話略過）<br>
-        2. 點右上角「+」→「New repository」→ 命名（如 em-cbme）→ 設為 Public → Create<br>
-        3. 進入該 repository → 「Add file」→「Upload files」→ 把這個 HTML 檔案拖進去，<b>檔名改為 index.html</b> → Commit<br>
-        4. 左側「Settings」→「Pages」→ Source 選「main」分支 → Save<br>
-        5. 等 1-2 分鐘，會得到一個網址，格式如：<code style="background:var(--bg3);padding:1px 6px;border-radius:4px">https://你的帳號.github.io/em-cbme/</code><br>
-        6. 把這個網址傳給所有人，<b>用瀏覽器打開（不是下載檔案）</b>，手機/電腦都能穩定同步
-      </div>
-
-      <div style="background:var(--bg3);border-radius:8px;padding:12px 16px;margin-bottom:10px">
-        <b>✅ 方案二：GitHub Gist + githack（不需建立 repository，更快速）</b><br>
-        1. 前往 <a href="https://gist.github.com" target="_blank" style="color:var(--a2)">gist.github.com</a>（需登入 GitHub 帳號）<br>
-        2. 檔名填 <code style="background:var(--bg2);padding:1px 6px;border-radius:4px">index.html</code>，把整個 HTML 內容貼上 → 「Create public gist」<br>
-        3. 點右上「Raw」按鈕，複製網址列的網址（類似 https://gist.githubusercontent.com/.../raw/.../index.html）<br>
-        4. 在該網址前面加上 <code style="background:var(--bg2);padding:1px 6px;border-radius:4px">https://raw.githack.com/</code>（去掉原本的 https://），組成新網址<br>
-        5. 用這個新網址打開即可，會是正式執行 JS 的網頁，非常穩定
-      </div>
-
-      <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:12px 16px">
-        <b style="color:var(--a3)">過渡方案（仍有風險，僅供緊急測試）</b><br>
-        若暫時無法設定上述方式：用 <b>Safari（iOS）</b> 或 <b>Chrome（Android）</b> 直接開啟本機檔案，並點下方「🔍 連線診斷」確認狀態。但此方式仍可能因瀏覽器安全限制而間歇性失敗，不建議長期使用。
-      </div>
-    </div>
-  </div>
-
-  <div class="card" style="border-left:4px solid var(--a3)">
-    <div style="font-size:15px;font-weight:700;color:var(--a3);margin-bottom:10px">⚠️ 常見問題</div>
-    <div style="font-size:14px;line-height:2">
-      <b>手機持續連線失敗（最常見原因）</b> → 此 Firebase 專案的 API Key 若設定了「HTTP 來源限制」，本機 HTML（file://）開啟時瀏覽器不會送出網址來源，會被 Google 拒絕。<br>
-      　→ 解法：管理員登入 <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--a2)">Google Cloud Console → API 和服務 → 憑證</a>，找到對應的 API Key，將「應用程式限制」設為「<b>無</b>」，或改用「Google Drive 開啟」方式（見上方）完全避開此問題<br>
-      <b>安全性規則錯誤</b> → 回 Firebase Console 確認 Firestore 規則已點「發布」<br>
-      <b>同步後資料不見</b> → 「⬇ 從雲端同步」會以雲端資料覆蓋本地，建議先用「匯出/匯入」頁面做 JSON 備份<br>
-      <b>其他人看不到資料</b> → 確認大家用的是同一份內建設定（Project ID: shher-d2331）<br>
-      <b>免費額度</b> → Firestore 免費方案每日可讀取 5 萬次、寫入 2 萬次，一般科內使用完全足夠
-    </div>
+    <div id="fb-diag-result" class="hidden mt3" style="background:var(--bg3);border-radius:8px;padding:8px 12px"></div>
   </div>
 </div>
 
@@ -1298,8 +1139,6 @@ const SHHER_MS=[
   ['PC14','血管通路',1,1.5,2,2.5,3,3.5,4,4,3,2.5,2],
   ['ICS2','跨專業溝通',1,1.5,2,2,3,3.5,4,4,3,2,1.5],
 ];
-const IMG_REQ=['Stroke / brain infarction','Intracranial hemorrhage (traumatic & non-traumatic)','Increased intracranial pressure / herniation signs','Intracranial space occupying lesions','Cervical spine injury','Pneumothorax','Pneumomediastinum','Pleural effusion','Pulmonary infection','Pulmonary edema','Pulmonary embolism','Aortic dissection','Aortic rupture','Pericardial effusion / cardiac tamponade','Diaphragmatic rupture','Pneumoperitoneum','Small bowel obstruction','Cecal and sigmoid volvulus','Large bowel obstruction','Cholecystitis / biliary tract obstruction','Appendicitis','Urolithiasis','Fracture with extension into joint','Elbow joint effusion','Shoulder dislocation','Misplaced lines and tubes','Child abuse','其他'];
-const IMG_SEL=['Skull fractures','Stroke / brain infarction','Central Nervous system infections','Dural sinus thrombosis','Pituitary apoplexy','Spinal trauma and spinal cord injury','Facial fractures','Trauma to the aerodigestive tract','Infection of the paranasal sinuses','Infection of the neck','Ear Infections','Orbital infection','Rib fractures','Pulmonary contusion','Tracheobronchial injury','Airway foreign bodies','ARDS','Obstructive airway disease','Myocardial infarction','Aortic aneurysm','Active arterial extravasation on CT','Liver / Splenic injuries','Bowel injuries','Abdominal abscess','Pancreatitis','Diverticulitis','Ovarian cystic disease','Ovarian torsion','Pelvic inflammatory disease','Fracture','Dislocation','Arthritis / Avascular necrosis','其他'];
 const IMG_CR=['說明檢查之適應症','鑑別診斷之能力','判讀之正確性','溝通技巧'];
 let MS=[
   {id:'PC1',cat:'PC',n:'緊急穩定處置',d:'急救危急病人時，按優先次序進行初步穩定措施，並且整合運用醫院之支援服務，且在執行急救後再度評估。',items:[{id:'PC1-L1-1',lv:1,t:'察覺病人的生命徵象出現異常，並適時求助。'},{id:'PC1-L1-2',lv:1,t:'評估病人的ABCs，並執行基本醫療措施。'},{id:'PC1-L2-3',lv:2,t:'評估並處理病人不穩定的生命徵象，啟動高級復甦處置流程。'},{id:'PC1-L2-4',lv:2,t:'辨別相關數據資料以形成初步診斷(diagnostic impression)和治療計畫。'},{id:'PC1-L2-5',lv:2,t:'評估是否有預立不施行心肺復甦術(DNR)醫囑並且有效適用於該次急救情境。'},{id:'PC1-L3-6',lv:3,t:'處理及辨別危急病人的輕重緩急優先順序。'},{id:'PC1-L3-7',lv:3,t:'急救危急病人時，優先進行關鍵的初步穩定措施。'},{id:'PC1-L3-8',lv:3,t:'實施穩定治療措施後，重新評估病人的狀況。'},{id:'PC1-L4-9',lv:4,t:'當進一步的臨床處置沒有效益時能夠即時察覺。'},{id:'PC1-L4-10',lv:4,t:'辨認出不易察覺且可能導致不穩定或病情惡化的病徵。'},{id:'PC1-L4-11',lv:4,t:'整合運用院內外相關支援及服務於處理重症病人與困難的急救情境。'}]},
@@ -1484,7 +1323,6 @@ let accId=null,accY=new Date().getFullYear(),accMo=new Date().getMonth();
 // assess state
 let selEpa=[],selPcMs=[],selNpcMs=[],epaScores={},epaFb={},msScores={},lastSavedAttId=null;
 // imaging state
-let imgType='',imgTab='req',imgStars={},imgSubCase='';
 let editAttId=null;
 
 function save(){localStorage.setItem('em52_res',JSON.stringify(RES));localStorage.setItem('em52_att',JSON.stringify(ATT));localStorage.setItem('em52_assess',JSON.stringify(ASSESS));localStorage.setItem('em52_sched',JSON.stringify(SCHED));localStorage.setItem('em52_cfg',JSON.stringify(CFG));
@@ -1594,6 +1432,15 @@ async function fsListDocs(collection){
   }while(pageToken);
   return docs;
 }
+// Documents whose `field` > value (Firestore :runQuery). Billed per document
+// returned (minimum 1), so asking "what changed since X" stays cheap.
+async function fsQueryGreater(collection,field,value){
+  const body={structuredQuery:{from:[{collectionId:collection}],where:{fieldFilter:{field:{fieldPath:field},op:'GREATER_THAN',value:fsEncodeValue(value)}}}};
+  const res=await fsFetch(`${FS_BASE}:runQuery?key=${FS_KEY}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!res.ok){const t=await res.text().catch(()=>'');throw new Error(fsHumanError(res.status,t));}
+  const rows=await res.json();
+  return(Array.isArray(rows)?rows:[]).filter(r=>r&&r.document).map(r=>fsDecodeFields(r.document.fields||{}));
+}
 // Write many docs with limited concurrency (gentle on mobile networks)
 async function fsWriteMany(collection,items,getId,concurrency=6){
   let i=0;
@@ -1650,15 +1497,6 @@ async function loadFBCfg(retrying=false){
     setCst('err','❌ 連線失敗');
     console.error('Firestore REST error:',e);
   }
-}
-function connectFB(){
-  loadFBCfg().then(()=>{
-    const el=document.getElementById('fb-status');
-    if(el){
-      el.textContent=db?'✅ 連線成功！使用內建設定 (shher-d2331)':('❌ 連線失敗：'+lastFBError);
-      el.className=db?'al aok':'al ae';el.classList.remove('hidden');
-    }
-  });
 }
 // ── Connection diagnostics tool ──
 async function runFBDiagnostics(){
@@ -1765,11 +1603,19 @@ let PENDING_ASSESS=[],PENDING_DEL_ASSESS=[];
 try{PENDING_ASSESS=JSON.parse(localStorage.getItem('em52_pending_assess')||'[]');}catch(e){}
 try{PENDING_DEL_ASSESS=JSON.parse(localStorage.getItem('em52_pending_delassess')||'[]');}catch(e){}
 function savePendingQueues(){try{localStorage.setItem('em52_pending_assess',JSON.stringify(PENDING_ASSESS));localStorage.setItem('em52_pending_delassess',JSON.stringify(PENDING_DEL_ASSESS));}catch(e){}}
+// Every write stamps `upd` so other devices pick the change up incrementally.
+function pushAssess(rec){rec.upd=Date.now();return fsSetDoc('assessments',rec.id,rec);}
+// Deletions leave a tombstone in config/assessDel (data.<id> = time) first,
+// so devices that only download "what changed" still learn about them.
+async function pushAssessDelete(id){
+  await fsPatchFields('config','assessDel',{data:{[id]:Date.now()}},['data.'+fsFieldSeg(String(id))]);
+  await fsDeleteDoc('assessments',id);
+}
 async function saveCloud(rec){
   const id=String(rec.id);
   if(!PENDING_ASSESS.includes(id)){PENDING_ASSESS.push(id);savePendingQueues();}
   try{
-    await fsSetDoc('assessments',rec.id,rec);
+    await pushAssess(rec);
     PENDING_ASSESS=PENDING_ASSESS.filter(x=>x!==id);savePendingQueues();
     return true;
   }catch(e){
@@ -1784,7 +1630,7 @@ async function deleteAssessCloud(id){
   PENDING_ASSESS=PENDING_ASSESS.filter(x=>x!==id);
   if(!PENDING_DEL_ASSESS.includes(id))PENDING_DEL_ASSESS.push(id);
   savePendingQueues();
-  try{await fsDeleteDoc('assessments',id);PENDING_DEL_ASSESS=PENDING_DEL_ASSESS.filter(x=>x!==id);savePendingQueues();}
+  try{await pushAssessDelete(id);PENDING_DEL_ASSESS=PENDING_DEL_ASSESS.filter(x=>x!==id);savePendingQueues();}
   catch(e){console.warn('delete failed, queued:',e.message);scheduleSyncRetry();}
 }
 async function retryPendingAssess(){
@@ -1792,10 +1638,10 @@ async function retryPendingAssess(){
   for(const id of [...PENDING_ASSESS]){
     const rec=ASSESS.find(a=>String(a.id)===id);
     if(!rec){PENDING_ASSESS=PENDING_ASSESS.filter(x=>x!==id);continue;}
-    try{await fsSetDoc('assessments',rec.id,rec);PENDING_ASSESS=PENDING_ASSESS.filter(x=>x!==id);done++;}catch(e){fails++;}
+    try{await pushAssess(rec);PENDING_ASSESS=PENDING_ASSESS.filter(x=>x!==id);done++;}catch(e){fails++;}
   }
   for(const id of [...PENDING_DEL_ASSESS]){
-    try{await fsDeleteDoc('assessments',id);PENDING_DEL_ASSESS=PENDING_DEL_ASSESS.filter(x=>x!==id);done++;}catch(e){fails++;}
+    try{await pushAssessDelete(id);PENDING_DEL_ASSESS=PENDING_DEL_ASSESS.filter(x=>x!==id);done++;}catch(e){fails++;}
   }
   savePendingQueues();
   return{fails,done};
@@ -1805,12 +1651,54 @@ async function deleteCloud(collection,docId){
   try{await fsDeleteDoc(collection,docId);}catch(e){console.warn('deleteCloud failed:',e.message);}
 }
 
-async function syncDown(silent=false){
+// ── Evaluations: local cache + incremental download ──
+// ASSESS lives in localStorage; the cloud is asked only for evaluations
+// stamped after the last one seen (upd, or id for pages that predate upd),
+// plus the deletion tombstones. A full download runs the first time, every
+// 7 days as self-repair, and on demand.
+let ASSESS_SYNC={cur:0,full:0};
+try{ASSESS_SYNC={...ASSESS_SYNC,...JSON.parse(localStorage.getItem('em52_assess_sync')||'{}')};}catch(e){}
+function saveAssessSync(){try{localStorage.setItem('em52_assess_sync',JSON.stringify(ASSESS_SYNC));}catch(e){}}
+const ASSESS_FULL_EVERY=7*864e5,ASSESS_OVERLAP=36e5; // overlap tolerates phone clocks being off
+const assessStamp=a=>Math.max(+a.upd||0,+a.id||0);
+async function pullAssessments(full){
+  const now=Date.now();
+  const doFull=!!full||!ASSESS_SYNC.cur||now-(+ASSESS_SYNC.full||0)>ASSESS_FULL_EVERY;
+  let cloud;
+  const delP=fsGetDoc('config','assessDel');
+  if(doFull){
+    cloud=await fsListDocs('assessments');
+    if(cloud.length||PENDING_ASSESS.length){
+      const ids=new Set(cloud.map(a=>String(a.id)));
+      const keep=ASSESS.filter(a=>PENDING_ASSESS.includes(String(a.id))&&!ids.has(String(a.id)));
+      ASSESS=[...keep,...cloud];
+    }
+  }else{
+    const since=ASSESS_SYNC.cur-ASSESS_OVERLAP;
+    const[byUpd,byId]=await Promise.all([fsQueryGreater('assessments','upd',since),fsQueryGreater('assessments','id',since)]);
+    cloud=[...byUpd,...byId];
+    const idx=new Map(ASSESS.map((a,i)=>[String(a.id),i]));
+    cloud.forEach(c=>{const k=String(c.id);if(PENDING_ASSESS.includes(k))return;
+      if(idx.has(k))ASSESS[idx.get(k)]=c;else{ASSESS.unshift(c);idx.clear();ASSESS.forEach((a,i)=>idx.set(String(a.id),i));}});
+  }
+  const deleted=new Set(Object.keys((await delP)?.data||{}));
+  ASSESS=ASSESS.filter(a=>!PENDING_DEL_ASSESS.includes(String(a.id))&&!deleted.has(String(a.id)));
+  const mx=Math.min(now,cloud.reduce((m,a)=>Math.max(m,assessStamp(a)),0)); // never jump past this clock
+  ASSESS_SYNC.cur=doFull?mx:Math.max(ASSESS_SYNC.cur,mx);
+  if(doFull)ASSESS_SYNC.full=now;
+  saveAssessSync();
+  return{full:doFull,n:new Set(cloud.map(a=>String(a.id))).size};
+}
+function fullResync(){
+  if(!confirm('完整重新下載會讀取雲端全部評核（每筆算一次讀取），平常不需要。確定要執行？'))return;
+  syncDown(false,{full:true});
+}
+async function syncDown(silent=false,opts={}){
   const el=document.getElementById('fb-status');
   if(!silent&&el){el.textContent='⬇ 從雲端下載中...';el.className='al ai';el.classList.remove('hidden');}
   try{
-    const[assessList,resList,attList,schedDoc,cfgDoc,itemsDoc]=await Promise.all([
-      fsListDocs('assessments'),
+    const[pulled,resList,attList,schedDoc,cfgDoc,itemsDoc]=await Promise.all([
+      pullAssessments(opts.full),
       fsListDocs('residents'),
       fsListDocs('attendings'),
       fsGetDoc('config','schedule'),
@@ -1818,12 +1706,7 @@ async function syncDown(silent=false){
       fsGetDoc('config','customItems'),
     ]);
     if(!SYNC_BASE)initSyncBase();
-    // Evaluations: cloud list + anything still queued on this device
-    if(assessList.length||PENDING_ASSESS.length){
-      const cloudIds=new Set(assessList.map(a=>String(a.id)));
-      const keep=ASSESS.filter(a=>PENDING_ASSESS.includes(String(a.id))&&!cloudIds.has(String(a.id)));
-      ASSESS=[...keep,...assessList].filter(a=>!PENDING_DEL_ASSESS.includes(String(a.id)));
-    }
+    // Evaluations were merged by pullAssessments (pending uploads kept)
     // Roster: 3-way merge — unsent local edits survive, the rest follows the cloud
     const cloudRes=mergeRosterWithCloud(DEF_RES,resList);
     if(cloudRes){RES=merge3Records(SYNC_BASE.res,RES,cloudRes);SYNC_BASE.res=snapRecords(resList);}
@@ -1851,7 +1734,7 @@ async function syncDown(silent=false){
     db=true;
     const p=pendingSyncCount();
     setCst('ok',p?`⏳ ${p} 筆待上傳`:'☁️ 已連線');
-    if(!silent&&el){el.textContent='✅ 同步成功！評核 '+ASSESS.length+' 筆'+(p?`（保留本機 ${p} 筆尚未上傳的變更，稍後自動上傳）`:'');el.className='al aok';}
+    if(!silent&&el){el.textContent='✅ 同步成功！評核 '+ASSESS.length+' 筆'+(pulled.full?'（完整下載）':`（新資料 ${pulled.n} 筆）`)+(p?`（保留本機 ${p} 筆尚未上傳的變更，稍後自動上傳）`:'');el.className='al aok';}
     renderDash();
   }catch(e){
     if(!silent&&el){el.textContent='❌ 同步失敗：'+e.message;el.className='al ae';}
@@ -1998,7 +1881,6 @@ function nav(page,el){
   closeSB();
   if(page==='dashboard')renderDash();
   if(page==='assess')initAssess();
-  if(page==='imaging')initImg();
   if(page==='history')renderHistory();
   if(page==='analytics')renderAnalytics();
   if(page==='imglib')renderImgLib();
@@ -2011,13 +1893,7 @@ function nav(page,el){
   if(page==='missing'){initMissingPage();renderMissing();}
   if(page==='remind'){initRemindRange();renderRemind();}
   if(page==='admin')initAdmin();
-  if(page==='firebase'){loadFBCfg();
-    // Always fill inputs from stored config
-    setTimeout(()=>{
-      const fc=JSON.parse(localStorage.getItem('em52_fb')||'{}');
-      ['k','d','pid','a'].forEach(x=>{const el=document.getElementById('fb-'+x);if(el)el.value=fc[x]||'';});
-    },100);
-  }
+  if(page==='firebase')loadFBCfg();
 }
 function toggleSB(){document.getElementById('sb').classList.toggle('open');document.getElementById('sbo').classList.toggle('open');}
 function closeSB(){document.getElementById('sb').classList.remove('open');document.getElementById('sbo').classList.remove('open');}
@@ -2277,7 +2153,7 @@ function renderAssessPendingCard(){
     card.classList.add('hidden');
   }
 }
-function initAssess(){selEpa=[];selPcMs=[];selNpcMs=[];epaScores={};epaFb={};msScores={};embedImgType='';embedImgTab='req';embedImgStars={};embedImgSubCase='';document.getElementById('f-date').value=tod();document.getElementById('f-case').value='';const ofb=document.getElementById('f-overall-fb');if(ofb){ofb.value='';ofb.classList.remove('fil');ofb.classList.add('mf');}const ofbCnt=document.getElementById('f-overall-fb-cnt');if(ofbCnt){ofbCnt.textContent='0 字';ofbCnt.style.color='var(--t3)';}const eib=document.getElementById('embed-img-enabled');if(eib){eib.checked=true;const inner=document.getElementById('embed-img-inner');if(inner)inner.style.display='block';}['eipid','eimg-comment'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.querySelectorAll('#embed-img-inner .itbtn').forEach(b=>b.classList.remove('sel'));clearEmbedImgFlag();fDateAuto=true;['ass-ok','ass-err'].forEach(id=>document.getElementById(id).classList.add('hidden'));populateSel('f-res',false);populateSel('f-att',true);if(currentAttId)document.getElementById('f-att').value=currentAttId;onAttChange();renderAssessPendingCard();[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===0);document.getElementById('ws'+i).className='ws'+(i===0?' active':'');});syncMobBar(0);}
+function initAssess(){selEpa=[];selPcMs=[];selNpcMs=[];epaScores={};epaFb={};msScores={};embedImgType='';document.getElementById('f-date').value=tod();document.getElementById('f-case').value='';const ofb=document.getElementById('f-overall-fb');if(ofb){ofb.value='';ofb.classList.remove('fil');ofb.classList.add('mf');}const ofbCnt=document.getElementById('f-overall-fb-cnt');if(ofbCnt){ofbCnt.textContent='0 字';ofbCnt.style.color='var(--t3)';}const eib=document.getElementById('embed-img-enabled');if(eib){eib.checked=true;const inner=document.getElementById('embed-img-inner');if(inner)inner.style.display='block';}['eipid','eimg-comment'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.querySelectorAll('#embed-img-inner .itbtn').forEach(b=>b.classList.remove('sel'));clearEmbedImgFlag();fDateAuto=true;['ass-ok','ass-err'].forEach(id=>document.getElementById(id).classList.add('hidden'));populateSel('f-res',false);populateSel('f-att',true);if(currentAttId)document.getElementById('f-att').value=currentAttId;onAttChange();renderAssessPendingCard();[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===0);document.getElementById('ws'+i).className='ws'+(i===0?' active':'');});syncMobBar(0);}
 // Assessment date: today, except before 09:00 when this attending worked
 // yesterday and still owes an evaluation for it (night shift) → yesterday.
 // Only while the date hasn't been set by hand or passed in by a quick link.
@@ -2562,25 +2438,6 @@ function saveAssess(){
   lastSavedAttId=attId;nav('thankyou');
 }
 
-// ══════════════ IMAGING (Independent, Mandatory) ══════════════
-function initImg(){imgType='';imgTab='req';imgStars={};imgSubCase='';document.getElementById('im-date').value=tod();document.getElementById('im-pid').value='';document.getElementById('im-comment').value='';document.getElementById('im-comment').className='mf';populateSel('im-res',false);populateSel('im-att',true);document.querySelectorAll('.itbtn').forEach(b=>b.classList.remove('sel'));if(currentAttId)document.getElementById('im-att').value=currentAttId;renderImgCaseList();renderImgStars();renderImgPresets();['img-ok','img-err'].forEach(id=>document.getElementById(id).classList.add('hidden'));}
-function selImgType(t,btn){imgType=t;btn.closest('div').querySelectorAll('.itbtn').forEach(b=>b.classList.remove('sel'));btn.classList.add('sel');}
-function swImgTab(tab,el){imgTab=tab;document.querySelectorAll('#im-tabs .tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');imgSubCase='';document.getElementById('im-sub-wrap').classList.add('hidden');renderImgCaseList();}
-function renderImgCaseList(){const cases=imgTab==='req'?IMG_REQ:IMG_SEL;const el=document.getElementById('im-case-list');el.innerHTML=cases.map((c,i)=>`<div class="img-item"><input type="radio" name="imgcase" id="ic-${i}" value="${c}" onchange="onImgCase('${c}')"><label for="ic-${i}">${c}</label></div>`).join('');}
-function onImgCase(v){imgSubCase='';const sub=document.getElementById('im-sub-wrap');if(v==='其他'&&imgTab==='req'){sub.classList.remove('hidden');document.getElementById('im-sub-list').innerHTML=IMG_SEL.map((c,i)=>`<div class="img-item"><input type="radio" name="imgsub" id="ics-${i}" value="${c}" onchange="imgSubCase='${c.replace(/'/g,"\\'")}';"><label for="ics-${i}">${c}</label></div>`).join('');}else sub.classList.add('hidden');}
-function renderImgStars(){const el=document.getElementById('im-stars');el.innerHTML=IMG_CR.map(c=>`<div class="star-row"><div style="font-size:12.5px;color:var(--text)">${c}</div><div style="display:flex;gap:4px">${[1,2,3,4,5].map(n=>`<button class="starbtn ${(imgStars[c]||0)>=n?'on':''}" onclick="setStar('${c}',${n},this.parentElement)">★</button>`).join('')}</div></div>`).join('');}
-function setStar(c,n,grp){imgStars[c]=n;grp.querySelectorAll('.starbtn').forEach((b,i)=>b.classList.toggle('on',i<n));}
-function renderImgPresets(){const attId=document.getElementById('im-att').value;const att=getAtt(attId);document.getElementById('im-pre-tools').innerHTML=(att?.presets||[]).map(p=>`<button class="pre-btn" onclick="insPreset('im-comment','${p.c.replace(/'/g,"\\'")}')">＋${p.n}</button>`).join('');}
-function saveImg(){
-  const resId=document.getElementById('im-res').value;if(!resId){alert('請選擇住院醫師');return;}
-  const radios=document.querySelectorAll('input[name="imgcase"]');let chosen='';radios.forEach(r=>{if(r.checked)chosen=r.value;});
-  if(!chosen){showErr('img-err','⚠ 請選擇案例');return;}if(!imgType){showErr('img-err','⚠ 請選擇影像種類');return;}
-  const comment=document.getElementById('im-comment').value.trim();if(!comment){showErr('img-err','⚠ 請填寫評核意見');return;}
-  const attId=document.getElementById('im-att').value;const res=getRes(resId);const att=getAtt(attId);
-  const rec={id:Date.now(),type:'imaging',date:document.getElementById('im-date').value,resId,resName:res?.n||'',resYear:res?.y||'',attId:attId||null,attName:att?.n||'',pid:document.getElementById('im-pid').value,imgType,caseTab:imgTab,caseChosen:chosen,caseSubChosen:imgSubCase,stars:{...imgStars},comment};
-  ASSESS.unshift(rec);save();saveCloud(rec);autoSyncDebounced();updateRmBadge();nav('thankyou');
-}
-function clearImg(){initImg();}
 function showErr(id,msg){const el=document.getElementById(id);el.textContent=msg;el.classList.remove('hidden');}
 function insPreset(taId,content){const ta=document.getElementById(taId);if(!ta)return;ta.value=ta.value?(ta.value+'\n\n'+content):content;checkFb(ta);}
 
@@ -4055,7 +3912,7 @@ document.querySelectorAll('.ov').forEach(ov=>ov.addEventListener('click',e=>{if(
 
 // INIT
 // ─── EMBEDDED IMAGING STATE ───
-let embedImgType='',embedImgTab='req',embedImgStars={},embedImgSubCase='';
+let embedImgType='';
 function toggleEmbedImg(){
   const show=document.getElementById('embed-img-enabled').checked;
   document.getElementById('embed-img-inner').style.display=show?'block':'none';

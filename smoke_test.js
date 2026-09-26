@@ -38,13 +38,24 @@ global.confirm = () => CONFIRM;
 const STORE = {}; const LOG = []; let FAIL_NEXT = 0;
 function segs(p) { const out = []; let i = 0; while (i < p.length) { if (p[i] === '`') { let j = i + 1, s = ''; while (j < p.length && p[j] !== '`') { if (p[j] === '\\') { s += p[j + 1]; j += 2; } else { s += p[j]; j++; } } out.push(s); i = j + 1; if (p[i] === '.') i++; } else { let j = p.indexOf('.', i); if (j < 0) j = p.length; out.push(p.slice(i, j)); i = j + 1; } } return out; }
 const resp = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body, text: async () => JSON.stringify(body) });
+let READS = 0; // Firestore billing: one read per document returned (a query or list returning nothing still costs 1)
 global.fetch = async (url, opts = {}) => {
   const u = new URL(url); const m = (opts.method || 'GET').toUpperCase();
+  if (u.pathname.endsWith(':runQuery')) {
+    if (FAIL_NEXT > 0) { FAIL_NEXT--; return resp(503, { error: 'simulated outage' }); }
+    const q = JSON.parse(opts.body).structuredQuery, col = q.from[0].collectionId, f = q.where.fieldFilter;
+    const lim = Number(f.value.integerValue ?? f.value.doubleValue);
+    const hits = Object.entries(STORE).filter(([k]) => k.split('/')[0] === col && k.split('/').length === 2).filter(([, fl]) => {
+      const v = fl[f.field.fieldPath]; if (!v) return false; const n = Number(v.integerValue ?? v.doubleValue); return f.op === 'GREATER_THAN' && n > lim; });
+    READS += Math.max(1, hits.length);
+    return resp(200, hits.length ? hits.map(([k, fl]) => ({ document: { name: k, fields: fl } })) : [{ readTime: 'x' }]);
+  }
   const rel = decodeURIComponent(u.pathname.split('/documents/')[1] || '');
   const masks = u.searchParams.getAll('updateMask.fieldPaths');
   if (m !== 'GET') LOG.push(m + ' ' + rel + (masks.length ? ' [' + masks.join(',') + ']' : ''));
   if (FAIL_NEXT > 0) { FAIL_NEXT--; return resp(503, { error: 'simulated outage' }); }
   const parts = rel.split('/');
+  if (m === 'GET') { READS += parts.length === 1 ? Math.max(1, Object.keys(STORE).filter(k => k.split('/')[0] === parts[0] && k.split('/').length === 2).length) : 1; }
   if (m === 'GET' && parts.length === 1) return resp(200, { documents: Object.entries(STORE).filter(([k]) => k.split('/')[0] === parts[0] && k.split('/').length === 2).map(([k, f]) => ({ name: k, fields: f })) });
   if (m === 'GET') return STORE[rel] ? resp(200, { fields: STORE[rel] }) : resp(404, {});
   if (m === 'DELETE') { delete STORE[rel]; return resp(200, {}); }
@@ -66,7 +77,7 @@ global.fetch = async (url, opts = {}) => {
   }
   return resp(400, {});
 };
-global.__H = { STORE, LOG, LS, setFail: n => { FAIL_NEXT = n; }, setNow: ms => { NOW = ms; TICK = 0; } };
+global.__H = { STORE, LOG, LS, setFail: n => { FAIL_NEXT = n; }, setNow: ms => { NOW = ms; TICK = 0; }, reads: () => { const r = READS; READS = 0; return r; } };
 
 // ── Scenarios (appended so they share the page's scope) ──
 js = js.replace(/\ninit\(\);\s*$/, '\n') + `
@@ -415,7 +426,7 @@ js = js.replace(/\ninit\(\);\s*$/, '\n') + `
   T('…back on step 4 with the field flagged',document.getElementById('wp3').classList.contains('active')&&!document.getElementById('wp4').classList.contains('active')&&!document.getElementById('eimg-type-err').classList.contains('hidden')&&document.getElementById('ass-err').textContent.includes('影像種類'));
   fill('','','CT');
   T('type only → saves with image',trySave()&&ASSESS[0].imgData&&ASSESS[0].imgData.imgType==='CT');
-  T('cancel only clears embedded buttons',!/document\\.querySelectorAll\\('\\.itbtn'\\)/.test(cancelEmbedImg.toString())&&!/document\\.querySelectorAll\\('\\.itbtn'\\)/.test(selImgType.toString()));
+  T('cancel only clears embedded buttons',!/document\\.querySelectorAll\\('\\.itbtn'\\)/.test(cancelEmbedImg.toString())&&typeof selImgType==='undefined');
   // cross-year roster
   let conf=0;const realConfirm=confirm;confirm=()=>{conf++;return CONFIRM;};
   const a99=getAtt('A99').no;
@@ -433,6 +444,66 @@ js = js.replace(/\ninit\(\);\s*$/, '\n') + `
   T('same-year paste: no prompt, year/month shown',conf===0&&(SCHED['2026-09-10']||[]).some(e=>e.resId==='RE')&&out.includes('2026 年 9 月'));
   T('inferYear picks nearest',inferYear(1,5,new Date(2026,11,20))===2027&&inferYear(12,28,new Date(2027,0,3))===2026&&inferYear(6,1,new Date(2026,8,26))===2026);
   confirm=realConfirm;
+
+  // ── 20. v5.26: evaluations cached locally, only changes downloaded ──
+  at(2026,9,26,12);
+  for(let i=0;i<40;i++)put('assessments',String(1700000000000+i),{id:1700000000000+i,type:'ms',date:'2025-01-01',resId:'RE',resName:nm('RE')});
+  const cloudCount=()=>Object.keys(STORE).filter(k=>k.startsWith('assessments/')).length;
+  ASSESS_SYNC={cur:0,full:0};__H.reads();
+  let pa=await pullAssessments();
+  const fullReads=__H.reads();
+  T('first sync is a full download',pa.full&&fullReads>=cloudCount()&&ASSESS.some(a=>a.id===1700000000000));
+  pa=await pullAssessments();
+  const incReads=__H.reads();
+  const since=ASSESS_SYNC.cur-ASSESS_OVERLAP,docs=Object.keys(STORE).filter(k=>k.startsWith('assessments/')).map(k=>fsDecodeFields(STORE[k]));
+  const expReads=1+Math.max(1,docs.filter(d=>(d.upd||0)>since).length)+Math.max(1,docs.filter(d=>d.id>since).length);
+  T('next sync reads tombstones + last-hour changes only ('+incReads+' vs '+cloudCount()+' evaluations)',!pa.full&&incReads===expReads&&incReads<cloudCount()/4);
+  at(2026,9,26,13);
+  const t1=Date.now();
+  put('assessments',String(t1),{id:t1,upd:t1,type:'ms',date:'2026-09-26',resId:'RE',resName:nm('RE'),attId:'A99'});
+  const t2=t1+5;
+  put('assessments',String(t2),{id:t2,type:'ms',date:'2026-09-26',resId:'RF',resName:nm('RF')}); // older page: no upd
+  const old=get('assessments','1700000000005');old.resId='RF';old.upd=t2+5;put('assessments','1700000000005',old); // re-pointed by a merge elsewhere
+  await pullAssessments();
+  T('new evaluation from another device arrives',ASSESS.some(a=>a.id===t1));
+  T('evaluation from an older page (no upd) arrives via id',ASSESS.some(a=>a.id===t2));
+  T('edited evaluation (merge) updates locally',ASSESS.find(a=>a.id===1700000000005).resId==='RF');
+  // deletions
+  const dd=get('config','assessDel')||{data:{}};dd.data=dd.data||{};dd.data['1700000000006']=Date.now();put('config','assessDel',dd);delete STORE['assessments/1700000000006'];
+  await pullAssessments();
+  T('deletion on another device removes it here',!ASSESS.some(a=>a.id===1700000000006));
+  ASSESS=ASSESS.filter(a=>a.id!==1700000000007);await deleteAssessCloud(1700000000007);writes();
+  T('delete leaves a tombstone and removes the document',!!get('config','assessDel').data['1700000000007']&&!get('assessments','1700000000007'));
+  setFail(1);await deleteAssessCloud(1700000000008);ASSESS=ASSESS.filter(a=>a.id!==1700000000008);
+  T('failed delete is queued',PENDING_DEL_ASSESS.includes('1700000000008'));
+  await retryPendingAssess();writes();
+  T('queued delete retried: tombstone + document gone',!PENDING_DEL_ASSESS.length&&!!get('config','assessDel').data['1700000000008']&&!get('assessments','1700000000008'));
+  // pending upload survives an incremental download
+  const loc={id:Date.now(),type:'ms',date:'2026-09-26',resId:'RE',resName:nm('RE')};ASSESS.unshift(loc);save();setFail(1);await saveCloud(loc);
+  await pullAssessments();
+  T('unsent evaluation kept after incremental download',ASSESS.some(a=>a.id===loc.id)&&PENDING_ASSESS.includes(String(loc.id)));
+  await retryPendingAssess();writes();
+  T('uploads stamp upd',get('assessments',String(loc.id)).upd>=loc.id);
+  // self-repair + manual full
+  ASSESS_SYNC.full=Date.now()-8*864e5;pa=await pullAssessments();
+  T('older than 7 days → full download',pa.full);
+  __H.reads();await syncDown(false,{full:true});writes();
+  T('manual full re-download reads everything',__H.reads()>=cloudCount()&&document.getElementById('fb-status').textContent.includes('完整下載'));
+  // settings page + old imaging page
+  T('old imaging page code removed',typeof initImg==='undefined'&&typeof saveImg==='undefined'&&typeof connectFB==='undefined'&&!html.includes('id="page-imaging"'));
+  T('settings page: no open-rules / upload / file:// instructions',!/allow read, write|同步到雲端|從雲端同步|gist|githack/i.test(html.slice(html.indexOf('id="page-firebase"'),html.indexOf('</main>'))));
+  T('settings page keeps status, download, full re-download, diagnostics',['fb-conn-live','onclick="syncDown()"','onclick="fullResync()"','runFBDiagnostics()'].every(k=>html.includes(k)));
+  ASSESS.unshift({id:5,type:'imaging',date:'2024-05-01',resId:'RE',resName:nm('RE'),attName:'甲',imgData:{imgType:'CT'},stars:{[IMG_CR[0]]:4}});
+  let dcrash='';try{viewDet(5);}catch(e){dcrash=e.message;}
+  T('legacy imaging evaluation still opens ('+dcrash+')',!dcrash);
+  ASSESS=ASSESS.filter(a=>a.id!==5);
+  // EPA legend: dashed expectation lines hidden from legend, toggled with their EPA
+  const lg=epaResChartConfig([{type:'ms',date:'2026-01-01',epaScores:{EPA1:2,EPA2:3}},{type:'ms',date:'2026-02-01',epaScores:{EPA1:3}}],{grad:false,y:'R2'});
+  const dsl=lg.data.datasets,vis=dsl.map(()=>true);
+  T('legend lists EPAs only',dsl.filter((d,i)=>lg.options.plugins.legend.labels.filter({datasetIndex:i})).every(d=>!d._exp)&&dsl.some(d=>d._exp));
+  const fake={chart:{isDatasetVisible:i=>vis[i],setDatasetVisibility:(i,v)=>{vis[i]=v;},update(){}}};
+  lg.options.plugins.legend.onClick(null,{datasetIndex:dsl.findIndex(d=>d._epa==='EPA1'&&!d._exp)},fake);
+  T('clicking an EPA hides its line and dashed line together',dsl.every((d,i)=>d._epa==='EPA1'?vis[i]===false:vis[i]===true));
 
   console.log((fail?'❌':'✅')+' '+pass+' passed, '+fail+' failed');
   process.exitCode=fail?1:0;
