@@ -313,6 +313,65 @@ js = js.replace(/\ninit\(\);\s*$/, '\n') + `
   T('charts render ('+crash17+')',!crash17);
   Chart=RealChart;ASSESS=keepA;
 
+  // ── 18. v5.24 analytics: heatmap, scope, coverage, CCC radar ──
+  const pc1=MS.find(m=>m.id==='PC1').items.map(i=>i.id);
+  const HE=[
+    {id:3001,type:'ms',date:'2025-12-05',resId:'T1',attName:'甲',selMs:['PC1'],msItems:{[pc1[0]]:'stable',[pc1[1]]:'unstable',[pc1[2]]:'notobserved'}},
+    {id:3002,type:'ms',date:'2025-12-20',resId:'T1',attName:'乙',selMs:['PC1','ICS2'],msItems:{[pc1[0]]:'stable'}},
+    {id:3003,type:'ms',date:'2026-01-08',resId:'T2',attName:'甲',selMs:['PC1'],msItems:{[pc1[0]]:'notobserved'}},
+    {id:3004,type:'ms',date:'2026-01-09',resId:'T3',attName:'丙',selMs:['PC6'],epaScores:{EPA1:3}}];
+  const hm=buildMsHeatmap(HE,['2025/12','2026/01']);
+  const hPC1=hm.rows.find(r=>r.id==='PC1');
+  T('heatmap: stable/unstable summed, not-observed ignored',hPC1.cells[0].s===2&&hPC1.cells[0].u===1&&hPC1.cells[0].pct===67&&hPC1.cells[0].n===2);
+  T('heatmap: only-not-observed month → null, not 0%',hPC1.cells[1].pct===null&&hPC1.cells[1].n===1);
+  T('heatmap: unassessed cell n=0, pct null',hm.rows.find(r=>r.id==='SBP3').cells[0].n===0&&hm.rows.find(r=>r.id==='SBP3').cells[0].pct===null);
+  T('heatmap: 27 rows in MS order, teachers kept',hm.rows.length===MS.length&&hm.rows[0].id===MS[0].id&&hPC1.cells[0].atts.join()==='甲,乙');
+  T('lastMonths spans years in order',lastMonths(3,new Date(2026,0,10)).join()==='2025/11,2025/12,2026/01');
+  RES.push({id:'T1',no:'',n:'測一',y:'R2',grad:false,cccHistory:[{date:'2026/06',levels:{PC1:2,PC6:3,MK1:4,ICS2:2}}]},
+           {id:'T2',no:'',n:'測二',y:'R2',grad:false,cccHistory:[{date:'2026/06',levels:{PC1:3,MK1:2}}]},
+           {id:'T3',no:'',n:'測三',y:'R2',grad:true,cccHistory:[{date:'2026/06',levels:{PC1:5,MK1:5}}]});
+  const keepA18=ASSESS;ASSESS=[...HE,...keepA18];
+  document.getElementById('ana-r').value='';document.getElementById('ana-y').value='R2';
+  let sc=anaScope();
+  T('scope by grade = current, non-graduated cohort',sc.residents.every(r=>r.y==='R2'&&!r.grad)&&sc.list.some(a=>a.resId==='T1')&&!sc.list.some(a=>a.resId==='T3'));
+  document.getElementById('ana-r').value='T3';sc=anaScope();
+  T('resident overrides grade',sc.res.id==='T3'&&sc.list.length===1);
+  const cov=buildCoverage(HE);
+  const cv=id=>[...cov.epa,...cov.ms].find(x=>x.id===id);
+  T('coverage: never assessed → none',cv('SBP3').flag==='none'&&cv('EPA2').flag==='none');
+  T('coverage: counts per item',cv('PC1').n===3&&cv('ICS2').n===1&&cv('EPA1').n===1);
+  const cov2=buildCoverage([...Array(6)].map((_,i)=>({type:'ms',date:'2026-01-0'+(i+1),selMs:MS.map(m=>m.id).filter(id=>id!=='PC2'||i===0)})));
+  T('coverage: under half the median → low (own group median)',cov2.ms.find(x=>x.id==='PC2').flag==='low'&&cov2.medMs===6&&cov2.medEpa===0);
+  const rdr=buildCatRadar(getRes('T1'));
+  const iPC=MS_CATS.indexOf('PC'),iMK=MS_CATS.indexOf('MK'),iSBP=MS_CATS.indexOf('SBP');
+  T('radar: competency mean + n/total',rdr.mine[iPC].v===2.5&&rdr.mine[iPC].n===2&&rdr.mine[iPC].total===MS.filter(m=>m.cat==='PC').length);
+  T('radar: no CCC for a competency → null',rdr.mine[iSBP].v===null&&rdr.mine[iSBP].n===0);
+  T('radar: peer average excludes graduates',rdr.peer[iMK].v===3&&rdr.peer[iMK].n===2);
+  T('radar: graduate has no peer line',buildCatRadar(getRes('T3')).peer===null);
+  const CF=[];const RC2=Chart;Chart=function(ctx,cfg){CF.push(cfg);return{destroy(){}};};
+  const jsErr=[];const keepErr=showJsError;showJsError=m=>jsErr.push(m);
+  let crash18='';
+  try{
+    document.getElementById('ana-r').value='T1';document.getElementById('ana-y').value='';renderAnalytics();
+    const rc=CF.find(c=>c.type==='radar'&&c.data.datasets.some(d=>d._n));
+    T('CCC radar drawn with peer line + n labels',rc&&rc.data.datasets.length===2&&rc.data.labels[iPC].includes('(2/')&&rc.data.labels[iSBP].includes('—'));
+    T('CCC radar: low-n points hollow',rc.data.datasets[0].pointBackgroundColor[iPC]==='transparent');
+    const bars=CF.filter(c=>c.type==='bar'&&c.options.indexAxis==='y');
+    T('coverage: two horizontal bar charts',bars.length===2&&bars[1].data.labels.length===MS.length);
+    T('coverage: base colour for ok, flag colour + text for flagged',bars[1].data.labels.some(l=>l.includes('⚠未評'))&&new Set(bars[1].data.datasets[0].backgroundColor.filter((c,i)=>!bars[1].data.labels[i].includes('⚠')&&!bars[1].data.labels[i].includes('▼'))).size<=1);
+    CF.length=0;document.getElementById('ana-r').value='';document.getElementById('ana-y').value='R2';
+    ASSESS=[...HE.map(a=>({...a,date:tsToYMD(Date.UTC(new Date().getFullYear(),new Date().getMonth(),5)).replace(/\\//g,'-')})),...keepA18];
+    renderAnalytics();
+    const html=document.getElementById('ms-heatmap').innerHTML;
+    T('heatmap HTML: n=3 full colour, n=1 faded, unassessed hatched',/class="c" [^>]*>67%<small>n=3/.test(html)&&html.includes('class="c empty low"')&&html.includes('class="c empty"'));
+    T('no resident → CCC radar hint, no chart',!CF.some(c=>c.type==='radar'&&c.data.datasets.some(d=>d._n))&&document.getElementById('ccc-radar-note').textContent.includes('請選擇'));
+    const gl=CF.find(c=>c.type==='line');
+    T('grade monthly: low-n points hollow',!gl||gl.data.datasets.every(d=>d.data.every((p,i)=>p.cnt>=LOW_N||d.pointBackgroundColor[i]==='transparent')));
+  }catch(e){crash18=e.stack||e.message;}
+  T('v5.24 charts render ('+crash18+jsErr.join()+')',!crash18&&!jsErr.length);
+  Chart=RC2;showJsError=keepErr;ASSESS=keepA18;RES=RES.filter(r=>!['T1','T2','T3'].includes(r.id));
+  document.getElementById('ana-r').value='';document.getElementById('ana-y').value='';
+
   console.log((fail?'❌':'✅')+' '+pass+' passed, '+fail+' failed');
   process.exitCode=fail?1:0;
 })().catch(e=>{console.log('❌ CRASH',e&&e.stack||e);process.exitCode=1;});
