@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>急診醫學評核系統 v5.22</title>
+<title>急診醫學評核系統 v5.23</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <!-- Firestore accessed via REST API (no SDK needed - more reliable on mobile/file:// contexts) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -352,7 +352,7 @@ body{font-size:var(--base-font,17px)}
 <div class="sbo" id="sbo" onclick="closeSB()"></div>
 <aside class="sidebar" id="sb">
   <div class="sb-logo">
-    <div class="sb-tag">TSEM · CBME 2025 v5.22</div>
+    <div class="sb-tag">TSEM · CBME 2025 v5.23</div>
     <h1>急診醫學<br>住院醫師評核系統</h1>
   </div>
   <nav class="sb-nav">
@@ -2200,8 +2200,8 @@ function quickAssessOnDate(attId,resId,date){nav('assess');setTimeout(()=>{docum
 function renderDashCharts(){
   dC('ch-epa-c');dC('ch-ms-c');
   const msA=ASSESS.filter(a=>a.type==='ms');
-  const resIds=[...new Set(msA.map(a=>a.resId))].slice(0,6);
-  if(resIds.length){const ctx=document.getElementById('ch-epa-c').getContext('2d');const clrs=['#00c9a7','#3b82f6','#f59e0b','#ef4444','#a855f7','#ec4899'];const sorted=[...msA].sort((a,b)=>a.date.localeCompare(b.date));const labels=[...new Set(sorted.map(a=>a.date))];const ds=resIds.map((rid,i)=>({label:getRes(rid)?.n||rid,data:labels.map(d=>{const a=sorted.find(x=>x.resId===rid&&x.date===d&&x.epaAvg);return a?parseFloat(a.epaAvg):null;}),borderColor:clrs[i],tension:.3,fill:false,pointRadius:3,spanGaps:true}));charts['ch-epa-c']=new Chart(ctx,{type:'line',data:{labels,datasets:ds},options:cOpt('line',5)});}
+  if(msA.length){const ctx=document.getElementById('ch-epa-c').getContext('2d');charts['ch-epa-c']=new Chart(ctx,gradeChartConfig(msA));}
+  setChartHint('ch-epa-c','各年級每月 EPA 平均（全部學員）。個別學員請到「統計分析」選擇');
   const rd=RES.filter(r=>!r.grad).map(r=>{const as=msA.filter(a=>a.resId===r.id&&a.msPresRate!=null);return{n:r.n,p:as.length?as.reduce((s,a)=>s+a.msPresRate,0)/as.length:0};}).filter(d=>d.p>0);
   if(rd.length){const ctx2=document.getElementById('ch-ms-c').getContext('2d');charts['ch-ms-c']=new Chart(ctx2,{type:'bar',data:{labels:rd.map(d=>d.n),datasets:[{label:'可呈現%',data:rd.map(d=>Math.round(d.p)),backgroundColor:rd.map(d=>d.p>=80?'rgba(0,201,167,.7)':d.p>=60?'rgba(245,158,11,.7)':'rgba(239,68,68,.7)'),borderRadius:4}]},options:cOpt('bar',100)});}
 }
@@ -2564,12 +2564,114 @@ function renderHistory(){
 }
 function clearHF(){['hf-a','hf-r','hf-m'].forEach(id=>document.getElementById(id).value='');renderHistory();}
 
+// ══════════════ EPA TIME CHARTS ══════════════
+// x = real time (ms, UTC) on a linear axis — no date adapter needed — so
+// points are spaced by the actual gap between evaluations and ticks show
+// the year. Each EPA series holds only the evaluations that scored that
+// EPA, so the line connects instead of breaking on other EPAs' days.
+const EPA_CLRS=['#00c9a7','#3b82f6','#f59e0b','#ef4444','#a855f7','#ec4899','#14b8a6','#f97316','#84cc16','#06b6d4'];
+const GRADE_CLRS={R1:'#3b82f6',R2:'#00c9a7',R3:'#f59e0b',R4:'#ef4444'};
+function dateToTs(d){const m=String(d||'').match(/^(\d{4})[-/](\d{1,2})(?:[-/](\d{1,2}))?/);return m?Date.UTC(+m[1],+m[2]-1,+(m[3]||15)):null;}
+function tsToYM(ts){const d=new Date(ts);return d.getUTCFullYear()+'/'+String(d.getUTCMonth()+1).padStart(2,'0');}
+function tsToYMD(ts){const d=new Date(ts);return tsToYM(ts)+'/'+String(d.getUTCDate()).padStart(2,'0');}
+function fbSummary(t){t=String(t||'').replace(/\s+/g,' ').trim();return t.length>40?t.slice(0,40)+'…':t;}
+function buildEpaSeries(list){
+  return EPA.map((epa,i)=>{
+    const pts=list.filter(a=>a.type==='ms'&&a.epaScores?.[epa.id]!=null&&dateToTs(a.date)!=null)
+      .map(a=>({x:dateToTs(a.date),y:+a.epaScores[epa.id],att:a.attName||'',fb:fbSummary(a.epaFb?.[epa.id]||a.overallFb)}))
+      .sort((p,q)=>p.x-q.x);
+    return{id:epa.id,n:epa.n,color:EPA_CLRS[i%EPA_CLRS.length],pts};
+  });
+}
+// Monthly average of every EPA score, grouped by the grade the resident had
+// when evaluated (resYear). Points sit on the 15th of the month.
+function buildGradeMonthly(list){
+  const g={};
+  list.forEach(a=>{
+    if(a.type!=='ms'||!a.epaScores)return;
+    const yr=a.resYear||getRes(a.resId)?.y||'';const ts=dateToTs(a.date);
+    if(!GRADE_CLRS[yr]||ts==null)return;
+    const d=new Date(ts),mk=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),15);
+    Object.values(a.epaScores).forEach(v=>{const n=+v;if(!n)return;const b=((g[yr]=g[yr]||{})[mk]=g[yr][mk]||{s:0,c:0});b.s+=n;b.c++;});
+  });
+  return Object.keys(GRADE_CLRS).filter(y=>g[y]).map(y=>({yr:y,color:GRADE_CLRS[y],pts:Object.keys(g[y]).map(Number).sort((p,q)=>p-q).map(x=>({x,y:+(g[y][x].s/g[y][x].c).toFixed(2),cnt:g[y][x].c}))}));
+}
+// SHHER expectation for a resident's current grade — the same column the
+// matrix shows (first half of the year).
+function shherExpected(row,yr){const exp=row.slice(2,10);const i={'R1':0,'R2':2,'R3':4,'R4':6}[yr]??0;return exp[i]||exp[0];}
+// Ticks on the 1st of a month, every N months so at most ~5 labels show
+// (fits a phone width without Chart.js auto-skipping the first month).
+// Widen the range to whole months so the first month gets its label.
+function monthLimits(axis){
+  if(!isFinite(axis.min)||!isFinite(axis.max))return;
+  const a=new Date(axis.min),b=new Date(axis.max);
+  axis.min=Date.UTC(a.getUTCFullYear(),a.getUTCMonth(),1);
+  axis.max=Date.UTC(b.getUTCFullYear(),b.getUTCMonth()+1,1);
+}
+function monthTicks(axis){
+  if(!isFinite(axis.min)||!isFinite(axis.max))return;
+  const a=new Date(axis.min),b=new Date(axis.max);
+  let y=a.getUTCFullYear(),m=a.getUTCMonth();
+  const span=(b.getUTCFullYear()-y)*12+b.getUTCMonth()-m+1,step=Math.max(1,Math.ceil(span/5));
+  const t=[];
+  for(let i=0;i<=span+1;i+=step){const v=Date.UTC(y,m+i,1);if(v>=axis.min&&v<=axis.max)t.push({value:v});}
+  if(!t.length)t.push({value:Date.UTC(y,m,1)});
+  axis.ticks=t;
+}
+function epaTimeChartOpts(){
+  const o=cOpt('line',5);
+  o.scales.y.min=1;o.scales.y.ticks.stepSize=1;
+  o.scales.x={type:'linear',bounds:'data',ticks:{color:'#94a3b8',autoSkip:false,maxRotation:0,callback:v=>tsToYM(v)},grid:{color:'#1e2d45'},afterDataLimits:monthLimits,afterBuildTicks:monthTicks};
+  o.interaction={mode:'nearest',intersect:true};
+  o.plugins.tooltip={callbacks:{
+    title:items=>{const r=items[0]?.raw||{};return r.cnt!=null?tsToYM(r.x):tsToYMD(r.x);},
+    label:c=>{const r=c.raw||{};const ds=c.dataset;
+      if(ds._exp)return`${ds._epa} 期望：${r.y}`;
+      if(r.cnt!=null)return`${ds.label} 平均 ${r.y}（${r.cnt} 筆）`;
+      return`${ds.label}：${r.y} 分`;},
+    afterLabel:c=>{const r=c.raw||{};if(c.dataset._exp||r.cnt!=null)return'';const out=[];if(r.att)out.push('評核：'+r.att);if(r.fb)out.push('回饋：'+r.fb);return out;}
+  }};
+  return o;
+}
+// Per-resident chart: one line per EPA (+ dashed expectation in the same
+// colour, spanning the whole time range). Legend lists EPAs only; toggling one also toggles its dashed line.
+function epaResChartConfig(list,res){
+  const series=buildEpaSeries(list).filter(s=>s.pts.length);
+  const ds=[];
+  const allX=series.flatMap(s=>s.pts.map(p=>p.x));
+  const x0=Math.min(...allX),x1=Math.max(...allX);
+  series.forEach(s=>{
+    ds.push({label:s.id+' '+s.n.slice(0,6),data:s.pts,borderColor:s.color,backgroundColor:s.color,tension:.25,fill:false,pointRadius:4,_epa:s.id});
+    const row=SHHER_EPA.find(r=>r[0]===s.id);
+    if(res&&!res.grad&&res.y&&row&&s.pts.length){
+      const e=shherExpected(row,res.y);
+      ds.push({label:s.id+' 期望',data:[{x:x0,y:e},{x:x1===x0?x0+86400000:x1,y:e}],borderColor:s.color,borderDash:[6,4],borderWidth:1.5,pointRadius:0,pointHitRadius:6,fill:false,_exp:true,_epa:s.id});
+    }
+  });
+  const o=epaTimeChartOpts();
+  o.plugins.legend={labels:{color:'#94a3b8',font:{size:10},boxWidth:10,filter:it=>!ds[it.datasetIndex]?._exp},
+    onClick:(e,it,legend)=>{const ch=legend.chart,id=ds[it.datasetIndex]._epa,show=!ch.isDatasetVisible(it.datasetIndex);
+      ds.forEach((d,i)=>{if(d._epa===id)ch.setDatasetVisibility(i,show);});ch.update();}};
+  return{type:'line',data:{datasets:ds},options:o};
+}
+function gradeChartConfig(list){
+  const ds=buildGradeMonthly(list).map(g=>({label:g.yr,data:g.pts,borderColor:g.color,backgroundColor:g.color,tension:.25,fill:false,pointRadius:3}));
+  return{type:'line',data:{datasets:ds},options:epaTimeChartOpts()};
+}
+function setChartHint(canvasId,text){
+  const cv=document.getElementById(canvasId);const card=cv&&cv.closest&&cv.closest('.card');if(!card)return;
+  let h=card.querySelector('.chart-hint');
+  if(!h){h=document.createElement('div');h.className='chart-hint';h.style.cssText='font-size:10.5px;color:var(--t3);margin-top:6px';card.appendChild(h);}
+  h.textContent=text;
+}
+
 // ══════════════ ANALYTICS ══════════════
 function renderAnalytics(){
   populateSel('ana-r',false);const fR=document.getElementById('ana-r').value;
   const msD=(fR?ASSESS.filter(a=>a.resId===fR):visA()).filter(a=>a.type==='ms');
   dC('ch-epa-l');const sorted=[...msD].sort((a,b)=>a.date.localeCompare(b.date));
-  if(sorted.length>=2){const ctx=document.getElementById('ch-epa-l').getContext('2d');const ds=EPA.slice(0,4).map((epa,i)=>({label:epa.id,data:sorted.map(a=>a.epaScores?.[epa.id]||null),borderColor:['#00c9a7','#3b82f6','#f59e0b','#ef4444'][i],tension:.3,fill:false,pointRadius:3}));charts['ch-epa-l']=new Chart(ctx,{type:'line',data:{labels:sorted.map(a=>a.date.slice(5)),datasets:ds},options:cOpt('line',5)});}
+  if(sorted.length){const ctx=document.getElementById('ch-epa-l').getContext('2d');charts['ch-epa-l']=new Chart(ctx,fR?epaResChartConfig(sorted,getRes(fR)):gradeChartConfig(sorted));}
+  setChartHint('ch-epa-l',fR?'點圖例可顯示/隱藏；虛線＝目前年級的 SHHER 期望值；點資料點看日期、老師與回饋':'各年級每月 EPA 平均。選擇住院醫師可看各 EPA 曲線與期望值');
   dC('ch-ms-r');const cpct=MS_CATS.map(cat=>{let t=0,s=0;msD.forEach(a=>{MS.filter(m=>m.cat===cat).forEach(ms=>{ms.items.forEach(i=>{const v=a.msItems?.[i.id];if(v){t++;if(v==='stable')s++;}});});});return t?s/t*100:0;});
   const ctx1=document.getElementById('ch-ms-r').getContext('2d');charts['ch-ms-r']=new Chart(ctx1,{type:'radar',data:{labels:MS_CATS.map(c=>MS_CAT_LBL[c]),datasets:[{label:'可穩定呈現%',data:cpct,backgroundColor:'rgba(0,201,167,.15)',borderColor:'#00c9a7',pointBackgroundColor:'#00c9a7'}]},options:{...cOpt('radar',100),scales:{r:{min:0,max:100,ticks:{color:'#475569',stepSize:25,callback:v=>v+'%'},grid:{color:'#1e2d45'},pointLabels:{color:'#94a3b8',font:{size:11,weight:'bold'}}}}}});
   const ep=document.getElementById('epa-prog');ep.innerHTML='';EPA.forEach(epa=>{const vs=msD.filter(a=>a.epaScores?.[epa.id]).map(a=>a.epaScores[epa.id]);const avg=vs.length?vs.reduce((a,b)=>a+b,0)/vs.length:0;const col=avg>=4?'var(--acc)':avg>=3?'var(--a2)':avg>=2?'var(--a3)':'var(--danger)';ep.innerHTML+=`<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;margin-bottom:2px"><span style="font-size:12px"><span style="color:var(--a2);font-size:9.5px;font-family:'DM Mono'">${epa.id}</span> ${epa.n}</span><span style="font-family:'DM Mono';font-size:12px;color:${col}">${vs.length?avg.toFixed(1):'—'}</span></div><div class="prog-wrap"><div class="prog-bar" style="width:${(avg/5)*100}%;background:${col}"></div></div></div>`;});
@@ -2683,9 +2785,7 @@ function buildShherSection(title,rows,activeRes,getScore,getSub){
       ${activeRes.map(res=>{
         const score=getScore(res,id);
         // Use year-based expectation from R1h1 position (rest[0]=R1早, [1]=R1晚 etc)
-        const expCols=rest.slice(0,8);
-        const yrI={'R1':0,'R2':2,'R3':4,'R4':6}[res.y]??0;
-        const expScore=expCols[yrI]||expCols[0];
+        const expScore=shherExpected(row,res.y);
         const sub=getSub?`<br><small style="opacity:.55;font-size:9.5px">${getSub(res,id)}</small>`:'';
         if(score==null)return`<td style="font-size:12px;color:var(--t3)">—<br><small style="opacity:.65">/${expScore}</small>${sub}</td>`;
         const pass=score>=expScore;
@@ -3225,7 +3325,7 @@ function renderSched(){
 
 // ══════════════ GRADUATED ══════════════
 function renderGrad(){const grad=RES.filter(r=>r.grad);const list=document.getElementById('grad-list');document.getElementById('grad-detail').classList.add('hidden');if(!grad.length){list.innerHTML='<div style="text-align:center;color:var(--t3);padding:16px">尚無已畢業住院醫師</div>';return;}list.innerHTML=grad.map(r=>{const as=ASSESS.filter(a=>a.resId===r.id&&a.type==='ms');const pcts=as.filter(a=>a.msPresRate!=null).map(a=>a.msPresRate);const avg=pcts.length?(pcts.reduce((a,b)=>a+b,0)/pcts.length).toFixed(0)+'%':'—';return`<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(30,45,69,.5)"><div style="display:flex;align-items:center;gap:9px"><div class="dav" style="background:linear-gradient(135deg,var(--purple),var(--acc))">${r.n[0]}</div><div><div style="font-weight:600">${r.n} <span class="grad-badge">🎓 已畢業</span></div><div style="font-size:10.5px;color:var(--t3)">評核 ${as.length} 次　MS可呈現 ${avg}</div></div></div><div class="ifl" style="gap:6px"><button class="btn bs bsm" onclick="showGrad('${r.id}')">查看報告</button><button class="btn bsm" style="border:1px solid var(--a3);color:var(--a3);background:rgba(245,158,11,.08)" onclick="restoreRes('${r.id}')">↩ 恢復現役</button></div></div>`;}).join('');}
-function showGrad(id){const res=getRes(id);if(!res)return;document.getElementById('grad-list').classList.add('hidden');const det=document.getElementById('grad-detail');det.classList.remove('hidden');document.getElementById('grad-name').textContent=`🎓 ${res.n} — 畢業評核總覽`;const data=ASSESS.filter(a=>a.resId===id&&a.type==='ms');dC('grad-epa');dC('grad-ms');const sorted=[...data].sort((a,b)=>a.date.localeCompare(b.date));if(sorted.length>=2){const ctx=document.getElementById('grad-epa').getContext('2d');const ds=EPA.slice(0,4).map((epa,i)=>({label:epa.id,data:sorted.map(a=>a.epaScores?.[epa.id]||null),borderColor:['#00c9a7','#3b82f6','#f59e0b','#ef4444'][i],tension:.3,fill:false,pointRadius:3}));charts['grad-epa']=new Chart(ctx,{type:'line',data:{labels:sorted.map(a=>a.date.slice(5)),datasets:ds},options:cOpt('line',5)});}const rd=data.filter(a=>a.msPresRate!=null).sort((a,b)=>a.date.localeCompare(b.date));if(rd.length){const ctx2=document.getElementById('grad-ms').getContext('2d');charts['grad-ms']=new Chart(ctx2,{type:'line',data:{labels:rd.map(a=>a.date.slice(5)),datasets:[{label:'MS可呈現%',data:rd.map(a=>a.msPresRate),borderColor:'#00c9a7',tension:.3,fill:true,backgroundColor:'rgba(0,201,167,.07)'}]},options:cOpt('line',100)});}document.getElementById('grad-tbody').innerHTML=data.map(a=>`<tr><td>${a.date}</td><td>${a.attName||'—'}</td><td>${a.msPresRate!=null?`<span class="pill ${a.msPresRate>=80?'p4':'p2'}">${a.msPresRate}%</span>`:'—'}</td><td>${a.epaAvg?`<span class="pill p${Math.round(a.epaAvg)}">${a.epaAvg}</span>`:'—'}</td><td><button class="btn bs bxs" onclick="viewDet(${a.id})">詳情</button></td></tr>`).join('')||'<tr><td colspan="5" style="color:var(--t3);padding:14px">尚無紀錄</td></tr>';}
+function showGrad(id){const res=getRes(id);if(!res)return;document.getElementById('grad-list').classList.add('hidden');const det=document.getElementById('grad-detail');det.classList.remove('hidden');document.getElementById('grad-name').textContent=`🎓 ${res.n} — 畢業評核總覽`;const data=ASSESS.filter(a=>a.resId===id&&a.type==='ms');dC('grad-epa');dC('grad-ms');const sorted=[...data].sort((a,b)=>a.date.localeCompare(b.date));if(sorted.length){const ctx=document.getElementById('grad-epa').getContext('2d');charts['grad-epa']=new Chart(ctx,epaResChartConfig(sorted,null));}const rd=data.filter(a=>a.msPresRate!=null).sort((a,b)=>a.date.localeCompare(b.date));if(rd.length){const ctx2=document.getElementById('grad-ms').getContext('2d');charts['grad-ms']=new Chart(ctx2,{type:'line',data:{labels:rd.map(a=>a.date.slice(5)),datasets:[{label:'MS可呈現%',data:rd.map(a=>a.msPresRate),borderColor:'#00c9a7',tension:.3,fill:true,backgroundColor:'rgba(0,201,167,.07)'}]},options:cOpt('line',100)});}document.getElementById('grad-tbody').innerHTML=data.map(a=>`<tr><td>${a.date}</td><td>${a.attName||'—'}</td><td>${a.msPresRate!=null?`<span class="pill ${a.msPresRate>=80?'p4':'p2'}">${a.msPresRate}%</span>`:'—'}</td><td>${a.epaAvg?`<span class="pill p${Math.round(a.epaAvg)}">${a.epaAvg}</span>`:'—'}</td><td><button class="btn bs bxs" onclick="viewDet(${a.id})">詳情</button></td></tr>`).join('')||'<tr><td colspan="5" style="color:var(--t3);padding:14px">尚無紀錄</td></tr>';}
 function closeGrad(){document.getElementById('grad-detail').classList.add('hidden');document.getElementById('grad-list').classList.remove('hidden');}
 function restoreRes(id){
   const r=getRes(id);if(!r)return;
