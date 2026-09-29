@@ -505,6 +505,79 @@ js = js.replace(/\ninit\(\);\s*$/, '\n') + `
   lg.options.plugins.legend.onClick(null,{datasetIndex:dsl.findIndex(d=>d._epa==='EPA1'&&!d._exp)},fake);
   T('clicking an EPA hides its line and dashed line together',dsl.every((d,i)=>d._epa==='EPA1'?vis[i]===false:vis[i]===true));
 
+  // ── 21. v5.27: required picks follow what the resident can still be assessed on ──
+  at(2026,9,26,13);
+  const allEpa=EPA.map(e=>e.id),allPc=MS.filter(m=>m.cat==='PC').map(m=>m.id),allNpc=MS.filter(m=>m.cat!=='PC').map(m=>m.id);
+  EPA.forEach(e=>CFG.enEpa[e.id]=true);MS.forEach(m=>CFG.enMs[m.id]=true);
+  const mkRes=(id,locks,extra)=>{RES=RES.filter(r=>r.id!==id);RES.push({id,no:'',n:'測試'+id,y:'R2',grad:false,itemLocks:Object.fromEntries(locks.map(k=>[k,true])),cccLevels:{},cccHistory:[],ward:{ind:'',obs:'',er:''},...(extra||{})});};
+  // walk the wizard like a teacher: pick what is required, score, save
+  const walk=(resId,pick)=>{
+    ALERTS.length=0;selEpa=[];selPcMs=[];selNpcMs=[];epaScores={};epaFb={};msScores={};embedImgType='';
+    ['eipid','eimg-comment'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('f-res').value=resId;document.getElementById('f-att').value='A99';curStep=0;
+    const path=[];goStep(1);path.push(curStep);
+    if(curStep===1){(pick.epa||[]).forEach(togEpa);(pick.pc||[]).forEach(togPc);(pick.npc||[]).forEach(togNpc);goStep(2);path.push(curStep);}
+    if(curStep===2){selEpa.forEach(id=>epaScores[id]=3);goStep(3);path.push(curStep);}
+    if(curStep===3){goStep(4);path.push(curStep);}
+    const n=ASSESS.length;document.getElementById('f-overall-fb').value='回饋內容至少十個字以上喔';if(curStep===4)saveAssess(); // save button lives on step 5
+    return{path,saved:ASSESS.length===n+1,rec:ASSESS[0]};
+  };
+  // 1) every EPA locked
+  mkRes('SX1',allEpa);
+  let rr=selRules('SX1');
+  T('EPA all locked → EPA required 0 with reason',rr.epa.req===0&&rr.epa.why==='已全部完成'&&rr.pc.req===2&&rr.npc.req===2);
+  let w=walk('SX1',{pc:allPc.slice(0,2),npc:allNpc.slice(0,2)});
+  T('EPA all locked → EPA scoring step skipped, saves',w.path.join()==='1,3,4'&&w.saved&&Object.keys(w.rec.epaScores).length===0&&w.rec.epaAvg==null);
+  T('step bar says skipped + why',document.getElementById('ws2-skip').textContent.includes('本次略過')&&document.getElementById('ws2-skip').textContent.includes('已全部完成'));
+  goStep(1);T('EPA counter shows 0/0 + reason',document.getElementById('ec').textContent.includes('0/0')&&document.getElementById('ec').textContent.includes('已全部完成'));
+  // 2) only one PC left
+  mkRes('SX2',allPc.slice(1));
+  rr=selRules('SX2');
+  T('one PC available → PC required 1',rr.pc.req===1&&rr.pc.avail.join()===allPc[0]&&rr.pc.why==='已全部完成');
+  w=walk('SX2',{epa:[allEpa[0]],pc:[],npc:allNpc.slice(0,2)});
+  T('picking 0 of 1 PC is blocked',!w.saved&&curStep===1&&ALERTS.some(m=>m.includes('PC Milestone')&&m.includes('1 項')));
+  w=walk('SX2',{epa:[allEpa[0]],pc:[allPc[0]],npc:allNpc.slice(0,2)});
+  T('one PC picked → passes all steps, saves',w.path.join()==='1,2,3,4'&&w.saved&&w.rec.selPcMs.length===1);
+  goStep(1);T('PC counter shows x/1 + reason',/\\/1（已全部完成）/.test(document.getElementById('pc-cnt').textContent));
+  // 3) everything locked → straight to feedback; imaging card follows
+  mkRes('SX3',[...allEpa,...allPc,...allNpc]);
+  const card=document.getElementById('embed-img-card'),home=document.getElementById('embed-img-home'),alt=document.getElementById('embed-img-alt');
+  card.parentNode=home;[home,alt].forEach(p=>p.appendChild=c=>{c.parentNode=p;});
+  w=walk('SX3',{});
+  T('all locked → jumps from step 1 to feedback, saves',w.path.join()==='4'&&w.saved&&w.rec.selMs.length===0&&w.rec.msPresRate==null);
+  T('imaging card moved to feedback step',card.parentNode===alt);
+  goStep(3);T('back from feedback skips empty steps',curStep===0);
+  mkRes('SX4',[]);walk('SX4',{epa:[allEpa[0]],pc:allPc.slice(0,2),npc:allNpc.slice(0,2)});
+  T('imaging card returns to Milestone step when it is not skipped',card.parentNode===home);
+  // 4) this month's limits reached
+  mkRes('SX5',[],{epaMonthLimits:Object.fromEntries(allEpa.map(k=>[k,1])),msMonthLimits:Object.fromEntries(allNpc.map(k=>[k,1]))});
+  ASSESS.unshift({id:Date.now(),type:'ms',date:'2026-09-10',resId:'SX5',selEpa:allEpa,selMs:allNpc,selPcMs:[],selNpcMs:allNpc,epaScores:{}});
+  rr=selRules('SX5');
+  T('limits reached → reason "本月次數已滿"',rr.epa.req===0&&rr.epa.why==='本月次數已滿'&&rr.npc.req===0&&rr.pc.req===2);
+  w=walk('SX5',{pc:allPc.slice(0,2)});
+  T('limits reached → saves with PC only',w.path.join()==='1,3,4'&&w.saved&&w.rec.selNpcMs.length===0);
+  // 5) switch removed: old flag ignored
+  mkRes('SX6',allPc.slice(2),{msSelRelax:true});
+  w=walk('SX6',{epa:[allEpa[0]],pc:[allPc[0]],npc:allNpc.slice(0,2)});
+  T('old relax flag no longer lets teachers under-pick',!w.saved&&ALERTS.some(m=>m.includes('請選擇 2 項')));
+  T('relax switch gone from the page',!html.includes('r-ms-relax')&&!html.includes('Milestone 選擇免強制'));
+  // 6) statistics cope with evaluations without EPA / Milestones
+  const bare=ASSESS.filter(a=>['SX1','SX3'].includes(a.resId));
+  const RC3=Chart;const CF3=[];Chart=function(ctx,cfg){CF3.push(cfg);return{destroy(){}};};
+  const jsE=[];const keepE=showJsError;showJsError=m=>jsE.push(m);let crash21='';
+  try{
+    renderDash();
+    document.getElementById('ana-y').value='';document.getElementById('ana-r').value='SX3';renderAnalytics();
+    document.getElementById('ana-r').value='';renderAnalytics();
+    renderHistory();bare.forEach(a=>viewDet(a.id));renderMissing();
+    getRes('SX3').grad=true;showGrad('SX3');getRes('SX3').grad=false;
+  }catch(e){crash21=e.stack||e.message;}
+  Chart=RC3;showJsError=keepE;
+  const outs=['st-epa','dash-tbody','hist-tbody','ms-heatmap','cov-note','epa-prog'].map(i=>document.getElementById(i).innerHTML+document.getElementById(i).textContent).join('');
+  T('stats pages render evaluations with no EPA/Milestones ('+crash21+jsE.join()+')',!crash21&&!jsE.length&&bare.length>=2);
+  T('no NaN in stats output',!/NaN/.test(outs)&&!JSON.stringify(CF3.map(c=>c.data.datasets.map(d=>d.data))).includes('NaN'));
+  RES=RES.filter(r=>!/^SX/.test(r.id));ASSESS=ASSESS.filter(a=>!/^SX/.test(a.resId));
+
   console.log((fail?'❌':'✅')+' '+pass+' passed, '+fail+' failed');
   process.exitCode=fail?1:0;
 })().catch(e=>{console.log('❌ CRASH',e&&e.stack||e);process.exitCode=1;});
