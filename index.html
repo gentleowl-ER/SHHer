@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>急診醫學評核系統 v5.26</title>
+<title>急診醫學評核系統 v5.27</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <!-- Firestore accessed via REST API (no SDK needed - more reliable on mobile/file:// contexts) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -159,6 +159,8 @@ textarea{resize:vertical;min-height:68px}
 .img-item label{font-size:12px;color:var(--text);cursor:pointer}
 .img-type-row{display:flex;gap:7px;flex-wrap:wrap}
 .itbtn{padding:5px 13px;border:1.5px solid var(--border);border-radius:18px;background:var(--bg3);color:var(--t2);cursor:pointer;font-size:11.5px;transition:all .2s;font-family:inherit}
+.ws-skip{display:block;font-size:9.5px;font-weight:600;color:var(--a3);line-height:1.3}
+.ws.skipped{opacity:.55}
 .need-fix{outline:2px solid var(--danger);outline-offset:3px;border-radius:10px;animation:needfix 1s ease-in-out 3}
 @keyframes needfix{50%{outline-color:transparent}}
 .itbtn.sel{border-color:var(--acc);background:rgba(0,201,167,.08);color:var(--acc)}
@@ -367,7 +369,7 @@ body{font-size:var(--base-font,17px)}
 <div class="sbo" id="sbo" onclick="closeSB()"></div>
 <aside class="sidebar" id="sb">
   <div class="sb-logo">
-    <div class="sb-tag">TSEM · CBME 2025 v5.26</div>
+    <div class="sb-tag">TSEM · CBME 2025 v5.27</div>
     <h1>急診醫學<br>住院醫師評核系統</h1>
   </div>
   <nav class="sb-nav">
@@ -487,9 +489,9 @@ body{font-size:var(--base-font,17px)}
   <div id="ass-err" class="al ae hidden"></div>
   <div class="wiz-steps mb4">
     <div class="ws active" id="ws0">1. 基本資料</div>
-    <div class="ws" id="ws1">2. 選擇項目</div>
-    <div class="ws" id="ws2">3. EPA 評分</div>
-    <div class="ws" id="ws3">4. Milestone</div>
+    <div class="ws" id="ws1">2. 選擇項目<span class="ws-skip" id="ws1-skip"></span></div>
+    <div class="ws" id="ws2">3. EPA 評分<span class="ws-skip" id="ws2-skip"></span></div>
+    <div class="ws" id="ws3">4. Milestone<span class="ws-skip" id="ws3-skip"></span></div>
     <div class="ws" id="ws4">5. 質性回饋</div>
   </div>
   <div class="wpane active" id="wp0">
@@ -516,7 +518,7 @@ body{font-size:var(--base-font,17px)}
   </div>
   <div class="wpane" id="wp1">
     <div class="card mb4">
-      <div class="ct"><span class="dot" style="background:var(--a2)"></span>選擇 EPA（<span id="ec">0</span>/1）— 每次選 1 項</div>
+      <div class="ct"><span class="dot" style="background:var(--a2)"></span>選擇 EPA <span class="ms-grp-cnt" id="ec" style="margin-left:6px">0/1</span></div>
       <div class="epa-grid" id="epa-grid"></div>
     </div>
     <div class="card mb4">
@@ -543,7 +545,7 @@ body{font-size:var(--base-font,17px)}
     <div class="al ai mb4">請針對選取的每個 Milestone 細項，選擇「未穩定呈現 / 未觀察 / 可穩定呈現」，並可填寫各項質性回饋。</div>
     <div id="ms-form"></div>
     <!-- 影像醫學評核 - 整合於此，選填 -->
-    <div class="card mt4">
+    <div id="embed-img-home"><div class="card mt4" id="embed-img-card">
       <div class="ct"><span class="dot" style="background:var(--purple)"></span>🩻 影像資料庫（選填）</div>
       <p style="font-size:12px;color:var(--t2);margin:6px 0 10px">請把有教學意義或有趣的影像放在這邊，若無可以點選取消。</p>
       <div class="ifl mb4" style="gap:10px;flex-wrap:wrap">
@@ -568,13 +570,14 @@ body{font-size:var(--base-font,17px)}
           <textarea id="eimg-comment" oninput="checkFb(this)" placeholder="請簡要說明以便後續整理" style="width:100%;min-height:70px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;font-size:13px;font-family:inherit;outline:none;resize:vertical"></textarea>
         </div>
       </div>
-    </div>
+    </div></div>
     <div class="ifl mt4 wiz-nav" style="justify-content:space-between">
       <button class="btn bs bsm" onclick="goStep(2)">← 上一步</button>
       <button class="btn bp bsm" onclick="goStep(4)">下一步：質性回饋 →</button>
     </div>
   </div>
   <div class="wpane" id="wp4">
+    <div id="embed-img-alt" class="mb4"></div>
     <div class="card mb4" style="border:1.5px solid var(--acc);background:rgba(0,201,167,.05)">
       <div style="display:flex;gap:10px;align-items:flex-start">
         <span style="font-size:22px;flex-shrink:0">💚</span>
@@ -985,10 +988,6 @@ body{font-size:var(--base-font,17px)}
       <div class="fg"><label>PC Milestone<br><span style="font-size:11px;color:var(--t3)">空白=套用全域，0=不限</span></label><input type="number" id="r-qpc" min="0" max="99" placeholder="空白"></div>
       <div class="fg"><label>非PC Milestone<br><span style="font-size:11px;color:var(--t3)">空白=套用全域，0=不限</span></label><input type="number" id="r-qnpc" min="0" max="99" placeholder="空白"></div>
     </div>
-    <div class="tw" style="margin-top:10px">
-      <div><div class="tl" style="font-size:12px">Milestone 選擇免強制</div><div class="tsb">子項目全鎖定時可不選滿 PC/非PC 各2項</div></div>
-      <label class="tog"><input type="checkbox" id="r-ms-relax"><span class="tsl"></span></label>
-    </div>
   </div>
   <div class="ifl fe mt3" style="flex-wrap:wrap;gap:6px"><button class="btn bs bsm" onclick="closeM('m-res')">取消</button><button class="btn bs bxs" onclick="manualSaveAll()" title="若儲存按鈕沒反應，可點此手動強制儲存全部資料">🛟 手動儲存</button><button class="btn bp bsm" onclick="saveRes()">儲存</button></div>
 </div></div>
@@ -1244,7 +1243,7 @@ let RES=JSON.parse(localStorage.getItem('em52_res')||'null');
 let ATT=JSON.parse(localStorage.getItem('em52_att')||'null');
 let ASSESS=JSON.parse(localStorage.getItem('em52_assess')||'[]');
 let SCHED=JSON.parse(localStorage.getItem('em52_sched')||'{}'); // {dateStr:[{attId,resId},...]}
-let CFG=JSON.parse(localStorage.getItem('em52_cfg')||'null')||{pw:'admin123',qEpaM:10,qMsM:8,msSelRelax:false,enEpa:Object.fromEntries(EPA.map(e=>[e.id,true])),enMs:Object.fromEntries(MS.map(m=>[m.id,true]))};
+let CFG=JSON.parse(localStorage.getItem('em52_cfg')||'null')||{pw:'admin123',qEpaM:10,qMsM:8,enEpa:Object.fromEntries(EPA.map(e=>[e.id,true])),enMs:Object.fromEntries(MS.map(m=>[m.id,true]))};
 if(!RES)RES=DEF_RES.map(r=>({...r}));
 if(!ATT)ATT=DEF_ATT.map(a=>({...a}));
 // ── Roster protection ──
@@ -2153,7 +2152,7 @@ function renderAssessPendingCard(){
     card.classList.add('hidden');
   }
 }
-function initAssess(){selEpa=[];selPcMs=[];selNpcMs=[];epaScores={};epaFb={};msScores={};embedImgType='';document.getElementById('f-date').value=tod();document.getElementById('f-case').value='';const ofb=document.getElementById('f-overall-fb');if(ofb){ofb.value='';ofb.classList.remove('fil');ofb.classList.add('mf');}const ofbCnt=document.getElementById('f-overall-fb-cnt');if(ofbCnt){ofbCnt.textContent='0 字';ofbCnt.style.color='var(--t3)';}const eib=document.getElementById('embed-img-enabled');if(eib){eib.checked=true;const inner=document.getElementById('embed-img-inner');if(inner)inner.style.display='block';}['eipid','eimg-comment'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.querySelectorAll('#embed-img-inner .itbtn').forEach(b=>b.classList.remove('sel'));clearEmbedImgFlag();fDateAuto=true;['ass-ok','ass-err'].forEach(id=>document.getElementById(id).classList.add('hidden'));populateSel('f-res',false);populateSel('f-att',true);if(currentAttId)document.getElementById('f-att').value=currentAttId;onAttChange();renderAssessPendingCard();[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===0);document.getElementById('ws'+i).className='ws'+(i===0?' active':'');});syncMobBar(0);}
+function initAssess(){selEpa=[];selPcMs=[];selNpcMs=[];epaScores={};epaFb={};msScores={};embedImgType='';document.getElementById('f-date').value=tod();document.getElementById('f-case').value='';const ofb=document.getElementById('f-overall-fb');if(ofb){ofb.value='';ofb.classList.remove('fil');ofb.classList.add('mf');}const ofbCnt=document.getElementById('f-overall-fb-cnt');if(ofbCnt){ofbCnt.textContent='0 字';ofbCnt.style.color='var(--t3)';}const eib=document.getElementById('embed-img-enabled');if(eib){eib.checked=true;const inner=document.getElementById('embed-img-inner');if(inner)inner.style.display='block';}['eipid','eimg-comment'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.querySelectorAll('#embed-img-inner .itbtn').forEach(b=>b.classList.remove('sel'));clearEmbedImgFlag();fDateAuto=true;['ass-ok','ass-err'].forEach(id=>document.getElementById(id).classList.add('hidden'));populateSel('f-res',false);populateSel('f-att',true);if(currentAttId)document.getElementById('f-att').value=currentAttId;onAttChange();renderAssessPendingCard();[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===0);document.getElementById('ws'+i).className='ws'+(i===0?' active':'');const t=document.getElementById('ws'+i+'-skip');if(t)t.textContent='';});curStep=0;placeEmbedImg(false);syncMobBar(0);}
 // Assessment date: today, except before 09:00 when this attending worked
 // yesterday and still owes an evaluation for it (night shift) → yesterday.
 // Only while the date hasn't been set by hand or passed in by a quick link.
@@ -2177,8 +2176,25 @@ function onAttChange(){
   else if(fDateAuto&&ds===addDays(today,-1))si.textContent=`🌙 夜班：已帶入昨天（${md}）日期${names?'，需評：'+names:''}`;
   else si.textContent=names?`${md} 需評：${names}`:`${md} 值班`;
 }
-function showStepOnly(s){[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===s);document.getElementById('ws'+i).className='ws'+(i===s?' active':i<s?' done':'');});syncMobBar(s);}
-function goStep(s){if(s===1&&!v0())return;if(s===2&&!v1())return;if(s===3&&!v2())return;[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===s);document.getElementById('ws'+i).className='ws'+(i===s?' active':i<s?' done':'');});window.scrollTo(0,0);if(s===1)renderSelStep();if(s===2)renderEpaStep();if(s===3)renderMsStep();syncMobBar(s);}
+function showStepOnly(s){curStep=s;[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===s);document.getElementById('ws'+i).className='ws'+(i===s?' active':i<s?' done':'');});syncMobBar(s);}
+let curStep=0;
+function goStep(s){
+  const resId=document.getElementById('f-res')?.value;
+  if(s>curStep){if(s>=1&&!v0())return;if(s>=2&&curStep<2&&!skippedSteps(resId)[1]&&!v1())return;if(s>=3&&curStep<3&&!v2())return;}
+  const sk=resId?skippedSteps(resId):{};const dir=s>=curStep?1:-1;
+  while(sk[s]&&s>0&&s<4)s+=dir;
+  curStep=s;
+  [0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===s);const w=document.getElementById('ws'+i);w.className='ws'+(i===s?' active':i<s?' done':'')+(sk[i]?' skipped':'');const t=document.getElementById('ws'+i+'-skip');if(t)t.textContent=sk[i]?'本次略過'+sk[i]:'';});
+  placeEmbedImg(!!sk[3]);
+  window.scrollTo(0,0);if(s===1)renderSelStep();if(s===2)renderEpaStep();if(s===3)renderMsStep();syncMobBar(s);
+}
+// The imaging card lives in the Milestone step; when that step is skipped it
+// moves to the feedback step so the teacher can still add an image.
+function placeEmbedImg(toFeedback){
+  const card=document.getElementById('embed-img-card');if(!card||!card.parentNode)return;
+  const home=document.getElementById('embed-img-home'),alt=document.getElementById('embed-img-alt');
+  const target=toFeedback?alt:home;if(target&&card.parentNode!==target)target.appendChild(card);
+}
 function syncMobBar(s){
   const bar=document.getElementById('mob-bar');if(!bar)return;
   const isMobile=window.innerWidth<=768;
@@ -2191,19 +2207,38 @@ function syncMobBar(s){
   else{next.textContent='💾 儲存評核';next.className='btn bp';next.onclick=()=>saveAssess();}
 }
 function v0(){if(!document.getElementById('f-res').value){alert('請選擇住院醫師');return false;}return true;}
+// How many items the teacher must pick = the usual rule (EPA 1, PC 2, non-PC 2)
+// capped by what this resident can still be assessed on: enabled, not locked
+// by CCC, and under this month's limit. Replaces the per-resident relax switch.
+const SEL_RULE={epa:1,pc:2,npc:2};
+function selRules(resId){
+  const why=(lk,ol)=>lk&&!ol?'已全部完成':ol&&!lk?'本月次數已滿':'其餘已完成或本月已滿';
+  const one=(key,ids,locked,over)=>{
+    const avail=ids.filter(id=>!locked(id)&&!over(id));
+    const req=Math.min(SEL_RULE[key],avail.length);
+    const blocked=ids.filter(id=>!avail.includes(id));
+    return{avail,req,why:req<SEL_RULE[key]?(ids.length?why(blocked.some(locked),blocked.some(id=>!locked(id)&&over(id))):'未啟用任何項目'):''};
+  };
+  const epaIds=EPA.filter(e=>CFG.enEpa[e.id]).map(e=>e.id);
+  const msLocked=id=>isMsLkd(resId,id)||isMsAllItemsLocked(resId,id);
+  const msOver=id=>isMsOverMonthLimit(resId,id);
+  return{
+    epa:one('epa',epaIds,id=>isEpaLkd(resId,id),id=>isEpaOverMonthLimit(resId,id)),
+    pc:one('pc',MS.filter(m=>m.cat==='PC'&&CFG.enMs[m.id]).map(m=>m.id),msLocked,msOver),
+    npc:one('npc',MS.filter(m=>m.cat!=='PC'&&CFG.enMs[m.id]).map(m=>m.id),msLocked,msOver)};
+}
+// Steps with nothing to do this time: 1 = choose items, 2 = EPA scoring, 3 = Milestones
+function skippedSteps(resId){
+  const r=selRules(resId),sk={};
+  if(!r.epa.req)sk[2]='・'+r.epa.why;
+  if(!r.pc.req&&!r.npc.req)sk[3]='・'+(r.pc.why===r.npc.why?r.pc.why:'已完成或本月已滿');
+  if(sk[2]&&sk[3])sk[1]='・沒有可評項目';
+  return sk;
+}
 function v1(){
-  if(selEpa.length!==1){alert(`請選擇 1 項 EPA（目前 ${selEpa.length}）`);return false;}
-  const resId=document.getElementById('f-res').value;
-  const res=getRes(resId);
-  const relax=res?.msSelRelax||false;
-  if(relax){
-    if(selPcMs.length>2){alert(`PC Milestone 最多選擇 2 項（目前 ${selPcMs.length}）`);return false;}
-    if(selNpcMs.length>2){alert(`非PC Milestone 最多選擇 2 項（目前 ${selNpcMs.length}）`);return false;}
-    return true;
-  }
-  if(selPcMs.length!==2){alert(`PC Milestone 請選擇 2 項（目前 ${selPcMs.length}）`);return false;}
-  if(selNpcMs.length!==2){alert(`非PC Milestone 請選擇 2 項（目前 ${selNpcMs.length}）`);return false;}
-  return true;
+  const r=selRules(document.getElementById('f-res').value);
+  const chk=(sel,rule,lbl)=>{if(sel.length===rule.req)return true;alert(`${lbl}請選擇 ${rule.req} 項（目前 ${sel.length}）${rule.why?'；'+rule.why:''}`);return false;};
+  return chk(selEpa,r.epa,'EPA ')&&chk(selPcMs,r.pc,'PC Milestone ')&&chk(selNpcMs,r.npc,'非PC Milestone ');
 }
 function v2(){for(const id of selEpa){if(!epaScores[id]){alert(`EPA ${id} 尚未評分`);return false;}}return true;}
 function getMsUseCnt(resId,msId){if(!resId)return 0;return ASSESS.filter(a=>a.resId===resId&&a.type==='ms'&&a.selMs&&a.selMs.includes(msId)).length;}
@@ -2247,7 +2282,10 @@ function isEpaOverMonthLimit(resId,epaId){
   return getEpaMonthCnt(resId,epaId)>=limit;
 }
 function renderSelStep(){
-  const resId=document.getElementById('f-res').value;updSelCnt();
+  const resId=document.getElementById('f-res').value;
+  // drop picks that are no longer available (e.g. the resident was changed)
+  const rr=selRules(resId);selEpa=selEpa.filter(id=>rr.epa.avail.includes(id));selPcMs=selPcMs.filter(id=>rr.pc.avail.includes(id));selNpcMs=selNpcMs.filter(id=>rr.npc.avail.includes(id));
+  updSelCnt();
   const eg=document.getElementById('epa-grid');eg.innerHTML='';
   EPA.forEach(epa=>{if(!CFG.enEpa[epa.id])return;
     const lkd=isEpaLkd(resId,epa.id),isSel=selEpa.includes(epa.id);
@@ -2279,7 +2317,7 @@ function renderSelStep(){
 function togEpa(id){
   if(selEpa.includes(id)){selEpa=selEpa.filter(x=>x!==id);}
   else{
-    if(selEpa.length>=1){alert('每次最多選 2 項 EPA');return;}
+    if(selEpa.length>=1){alert('每次選 1 項 EPA（請先取消已選的項目）');return;}
     const resId=document.getElementById('f-res').value;
     if(isEpaOverMonthLimit(resId,id)){
       const lim=getEpaLimit(resId,id);const cnt=getEpaMonthCnt(resId,id);
@@ -2315,7 +2353,13 @@ function togNpc(id){
   }
   updSelCnt();renderSelStep();
 }
-function updSelCnt(){document.getElementById('ec').textContent=selEpa.length;const resId=document.getElementById('f-res')?.value;const res=getRes(resId);const relaxTag=(res?.msSelRelax)?'（可不選）':'';document.getElementById('pc-cnt').textContent=selPcMs.length+'/2'+relaxTag;document.getElementById('npc-cnt').textContent=selNpcMs.length+'/2'+relaxTag;}
+function updSelCnt(){
+  const resId=document.getElementById('f-res')?.value;const r=selRules(resId);
+  const fmt=(sel,rule)=>`${sel.length}/${rule.req}`+(rule.why?(rule.req?`（${rule.why}）`:` 本次免選（${rule.why}）`):'');
+  document.getElementById('ec').textContent=fmt(selEpa,r.epa);
+  document.getElementById('pc-cnt').textContent=fmt(selPcMs,r.pc);
+  document.getElementById('npc-cnt').textContent=fmt(selNpcMs,r.npc);
+}
 function renderEpaStep(){
   const form=document.getElementById('epa-form');form.innerHTML='';
   const attId=document.getElementById('f-att').value;const att=getAtt(attId);
@@ -3193,8 +3237,8 @@ function renderRes(){
   if(!active.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:16px">尚無資料</td></tr>';return;}
   tb.innerHTML=active.map(r=>{const as=ASSESS.filter(a=>a.resId===r.id&&a.type==='ms');const pcts=as.filter(a=>a.msPresRate!=null).map(a=>a.msPresRate);const msPct=pcts.length?(pcts.reduce((a,b)=>a+b,0)/pcts.length).toFixed(0)+'%':'—';const ev=as.filter(a=>a.epaAvg).map(a=>parseFloat(a.epaAvg));const epaAvg=ev.length?(ev.reduce((a,b)=>a+b,0)/ev.length).toFixed(1):'—';return`<tr><td style="font-family:'DM Mono';font-size:10.5px;color:var(--t3)">${r.no||'—'}</td><td>${r.n}</td><td style="color:var(--a2)">${r.y}</td><td>${as.length}</td><td>${msPct!=='—'?`<span class="pill ${parseInt(msPct)>=80?'p4':parseInt(msPct)>=60?'p3':'p1'}">${msPct}</span>`:'—'}</td><td>${epaAvg!=='—'?`<span class="pill p${Math.round(epaAvg)}">${epaAvg}</span>`:'—'}</td><td class="ifl" style="gap:4px"><button class="btn bs bxs" onclick="editRes('${r.id}')">編輯</button><button class="btn bxs bd" onclick="delRes('${r.id}')">刪除</button></td></tr>`;}).join('');
 }
-function openResM(){document.getElementById('r-id').value='';['r-no','r-n','r-qpc','r-qnpc'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('r-y').value='R1';document.getElementById('r-grad').checked=false;document.getElementById('r-ms-relax').checked=false;document.getElementById('m-res-t').textContent='新增住院醫師';openM('m-res');}
-function editRes(id){const r=getRes(id);if(!r)return;document.getElementById('r-id').value=id;document.getElementById('r-no').value=r.no||'';document.getElementById('r-n').value=r.n;document.getElementById('r-y').value=r.y;document.getElementById('r-grad').checked=r.grad||false;document.getElementById('r-ms-relax').checked=r.msSelRelax||false;
+function openResM(){document.getElementById('r-id').value='';['r-no','r-n','r-qpc','r-qnpc'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.getElementById('r-y').value='R1';document.getElementById('r-grad').checked=false;document.getElementById('m-res-t').textContent='新增住院醫師';openM('m-res');}
+function editRes(id){const r=getRes(id);if(!r)return;document.getElementById('r-id').value=id;document.getElementById('r-no').value=r.no||'';document.getElementById('r-n').value=r.n;document.getElementById('r-y').value=r.y;document.getElementById('r-grad').checked=r.grad||false;
   const rqpc=document.getElementById('r-qpc');const rqnpc=document.getElementById('r-qnpc');
   if(rqpc)rqpc.value=r.qPcOverride!=null?r.qPcOverride:'';
   if(rqnpc)rqnpc.value=r.qNpcOverride!=null?r.qNpcOverride:'';document.getElementById('m-res-t').textContent='編輯住院醫師';openM('m-res');}
@@ -3230,7 +3274,6 @@ function saveRes(){
       const qnpc=document.getElementById('r-qnpc')?.value;
       r.qPcOverride=(!qpc||qpc==='')?null:parseInt(qpc);
       r.qNpcOverride=(!qnpc||qnpc==='')?null:parseInt(qnpc);
-      r.msSelRelax=document.getElementById('r-ms-relax')?.checked||false;
     }else{
       RES.push({id:Date.now().toString(),no,n,y,grad:false,ward:{ind:'',obs:'',er:''},cccLevels:{},cccHistory:[],itemLocks:{}});
     }
@@ -3944,7 +3987,7 @@ function getEmbedImgData(){
   return{imgType:embedImgType,pid,comment};
 }
 function flagEmbedImgType(){
-  showStepOnly(3);
+  showStepOnly(skippedSteps(document.getElementById('f-res')?.value)[3]?4:3); // card sits in step 5 when step 4 is skipped
   const inner=document.getElementById('embed-img-inner');if(inner)inner.style.display='block';
   document.getElementById('eimg-type-err')?.classList.remove('hidden');
   const btns=document.getElementById('eimg-type-btns');
