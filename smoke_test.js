@@ -37,9 +37,10 @@ global.confirm = () => CONFIRM;
 // ── In-memory Firestore REST emulator ──
 const STORE = {}; const LOG = []; let FAIL_NEXT = 0;
 function segs(p) { const out = []; let i = 0; while (i < p.length) { if (p[i] === '`') { let j = i + 1, s = ''; while (j < p.length && p[j] !== '`') { if (p[j] === '\\') { s += p[j + 1]; j += 2; } else { s += p[j]; j++; } } out.push(s); i = j + 1; if (p[i] === '.') i++; } else { let j = p.indexOf('.', i); if (j < 0) j = p.length; out.push(p.slice(i, j)); i = j + 1; } } return out; }
-const resp = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body, text: async () => JSON.stringify(body) });
+const resp = (status, body) => ({ ok: status >= 200 && status < 300, status, body, json: async () => body, text: async () => JSON.stringify(body) });
 let READS = 0; // Firestore billing: one read per document returned (a query or list returning nothing still costs 1)
-global.fetch = async (url, opts = {}) => {
+// Synchronous core, shared by the page's fetch() and the Apps Script UrlFetchApp mock.
+function fsHandle(url, opts = {}) {
   const u = new URL(url); const m = (opts.method || 'GET').toUpperCase();
   if (u.pathname.endsWith(':runQuery')) {
     if (FAIL_NEXT > 0) { FAIL_NEXT--; return resp(503, { error: 'simulated outage' }); }
@@ -76,7 +77,39 @@ global.fetch = async (url, opts = {}) => {
     return resp(200, { fields: STORE[rel] });
   }
   return resp(400, {});
+}
+let HOOK = null; // Apps Script web app (doPost) reached by the page's fetch
+global.fetch = async (url, opts = {}) => {
+  if (new URL(url).host === 'script.google.com') { const out = HOOK(opts.body); return { ok: true, status: 200, json: async () => out }; }
+  return fsHandle(url, opts);
 };
+
+// ── Google Apps Script sync program, loaded with fake Google services ──
+const path = require('path');
+const gasFile = path.join(path.dirname(path.resolve(file)), 'automation', 'schedule_sync.gs');
+const gasSrc = fs.readFileSync(gasFile, 'utf8');
+// env: { sheets: {url: {title, tabs: {name: grid}}}, deny: Set(url), props: {} , reads: [] }
+function makeGAS(env) {
+  const props = env.props, triggers = env.triggers = [];
+  const sheetMock = (tab, grid) => ({
+    getDataRange: () => { env.reads.push({ tab, r: 1, c: 1, nr: grid.length, nc: Math.max(...grid.map(r => r.length)) }); return { getDisplayValues: () => grid.map(r => r.map(v => String(v ?? ''))) }; },
+    getLastRow: () => grid.length, getLastColumn: () => Math.max(...grid.map(r => r.length)),
+    getRange: (r, c, nr, nc) => { env.reads.push({ tab, r, c, nr, nc }); return { getDisplayValues: () => [...Array(nr)].map((_, i) => [...Array(nc)].map((_, j) => String((grid[r - 1 + i] || [])[c - 1 + j] ?? ''))) }; } });
+  const SpreadsheetApp = { openByUrl: url => { if (env.deny.has(url) || !env.sheets[url]) throw new Error('You do not have permission'); const sh = env.sheets[url];
+    return { getName: () => sh.title, getSheetByName: n => sh.tabs[n] ? sheetMock(n, sh.tabs[n]) : null }; } };
+  const UrlFetchApp = { fetch: (url, o) => { const r = fsHandle(url, { method: (o.method || 'get').toUpperCase(), body: o.payload }); return { getResponseCode: () => r.status, getContentText: () => JSON.stringify(r.body) }; } };
+  const PropertiesService = { getScriptProperties: () => ({ getProperty: k => props[k] ?? null, setProperty: (k, v) => { props[k] = String(v); } }) };
+  const ScriptApp = { getProjectTriggers: () => triggers, deleteTrigger: t => triggers.splice(triggers.indexOf(t), 1),
+    newTrigger: fn => ({ timeBased: () => ({ everyHours: n => ({ create: () => triggers.push({ fn, n, getHandlerFunction: () => fn }) }) }) }) };
+  const ContentService = { MimeType: { JSON: 'json' }, createTextOutput: t => ({ setMimeType: () => JSON.parse(t) }) };
+  const pad = n => String(n).padStart(2, '0');
+  const Utilities = { formatDate: (d, tz, f) => f.replace('yyyy', d.getFullYear()).replace('MM', pad(d.getMonth() + 1)).replace('dd', pad(d.getDate())).replace('HH', pad(d.getHours())).replace('mm', pad(d.getMinutes())).replace(/^H$/, String(d.getHours())) };
+  const Logger = { log: m => { env.logged = m; } };
+  return new Function('SpreadsheetApp', 'UrlFetchApp', 'PropertiesService', 'ScriptApp', 'ContentService', 'Utilities', 'Logger',
+    gasSrc + '\nreturn {buildMonthSchedule, ssParseNameTable, ssMatchName, ssTitleMonth, syncMonths, hourly, doPost, setup, monthAdd};')(
+    SpreadsheetApp, UrlFetchApp, PropertiesService, ScriptApp, ContentService, Utilities, Logger);
+}
+global.__GASX = { makeGAS, gasSrc, setHook: h => { HOOK = h; } };
 global.__H = { STORE, LOG, LS, setFail: n => { FAIL_NEXT = n; }, setNow: ms => { NOW = ms; TICK = 0; }, reads: () => { const r = READS; READS = 0; return r; } };
 
 // ── Scenarios (appended so they share the page's scope) ──
@@ -577,6 +610,95 @@ js = js.replace(/\ninit\(\);\s*$/, '\n') + `
   T('stats pages render evaluations with no EPA/Milestones ('+crash21+jsE.join()+')',!crash21&&!jsE.length&&bare.length>=2);
   T('no NaN in stats output',!/NaN/.test(outs)&&!JSON.stringify(CF3.map(c=>c.data.datasets.map(d=>d.data))).includes('NaN'));
   RES=RES.filter(r=>!/^SX/.test(r.id));ASSESS=ASSESS.filter(a=>!/^SX/.test(a.resId));
+
+  // ── 22. v5.28: monthly roster from Google Sheets (Apps Script) — attendings BY NAME ──
+  const {makeGAS,gasSrc,setHook}=__GASX;
+  const core=t=>t.slice(t.indexOf('// ==SCHED-CORE-BEGIN=='),t.indexOf('// ==SCHED-CORE-END=='));
+  T('page and Apps Script share the identical parsing core',core(html).length>500&&core(html)===core(gasSrc));
+  const attBy=n=>ATT.find(a=>a.n===n);
+  const A_ZENG=attBy('曾孟元'),A_WANG=attBy('王鎮珄');
+  T('fixture: system code 20 is 王鎮珄, not 曾孟元',A_WANG&&A_WANG.no==='20'&&A_ZENG&&A_ZENG.no!=='20');
+  getRes('RG').grad=false;const rfNo=getRes('RF').no;
+  const SC=[['','E',rfNo,'X','Y','','','','','',''],
+            ['',nm('RE'),'',nm('RG'),'外院學員','','','','','',''],
+            ['已填數量','0','0','0','0'],
+            ['10/1','20','-','26','3','','1','','20','王鎮珄'],   // right side = old code table, must be ignored
+            ['10/2','55','20','-','-','','2','','26','某人'],
+            ['10/3','-','-','-','-'],
+            ['10/15','26','-','-','-'],
+            ['','白','白','夜','白'],
+            ['自動-白','-','-','-','-']];
+  const BT=[[],[],[]];const put2=(r,c,v)=>{(BT[r]=BT[r]||[])[c]=v;};
+  put2(1,0,'日 期');put2(1,47,'醫師姓名');put2(1,49,'聯絡電話');put2(2,47,'主治醫師');
+  [['20','曾孟元'],['26','王鎮珄(西園)'],['55','蔡行瀚'],['3','葉俊廷'],['',''],['','住院醫師'],['A',nm('RE')]].forEach((p,i)=>{put2(3+i,46,p[0]);put2(3+i,47,p[1]);if(p[0])put2(3+i,49,'PHONE');});
+  for(let i=0;i<BT.length;i++)BT[i]=BT[i]||[];
+  // pure core first
+  const nt=ssParseNameTable(BT.map(r=>[...Array(60)].map((_,i)=>r[i]||'')));
+  T('name table: codes from the 醫師姓名 table only, stops at the blank row',nt['20']==='曾孟元'&&nt['26']==='王鎮珄(西園)'&&!nt['A']&&Object.keys(nt).length===4);
+  const res10=buildMonthSchedule({month:'2026-10',grid:SC,nameTable:nt,residents:RES,attendings:ATT});
+  const d1=res10.dates['2026-10-01']||[],d2=res10.dates['2026-10-02']||[];
+  T('October: code 20 = 曾孟元 (not system 20 = 王鎮珄)',d1.some(e=>e.resId==='RE'&&e.attId===A_ZENG.id)&&!d1.some(e=>e.resId==='RE'&&e.attId===A_WANG.id));
+  T('王鎮珄(西園) matches 王鎮珄 by name',d1.some(e=>e.resId==='RG'&&e.attId===A_WANG.id));
+  T('code-only resident column (empty name) uses row-1 code',d2.some(e=>e.resId==='RF'&&e.attId===A_ZENG.id));
+  T('unknown attending skipped + recorded, never guessed',!d2.some(e=>e.resId==='RE')&&res10.skippedCodes.some(x=>x.code==='55'&&x.name==='蔡行瀚'&&x.n===1));
+  T('unknown resident column skipped + recorded',res10.skippedRes.some(x=>x.label==='外院學員')&&!Object.values(res10.dates).flat().some(e=>e.attId===attBy('葉俊廷').id));
+  T('only the sheet dates, empty day kept as empty',res10.days===4&&Array.isArray(res10.dates['2026-10-03'])&&res10.dates['2026-10-03'].length===0&&res10.first==='2026-10-01'&&res10.last==='2026-10-15');
+  T('year from the source month',Object.keys(buildMonthSchedule({month:'2027-01',grid:[[],[],[],['1/5']],nameTable:{},residents:RES,attendings:ATT}).dates)[0]==='2027-01-05'
+    &&Object.keys(buildMonthSchedule({month:'2026-12',grid:[[],[],[],['12/31'],['1/1']],nameTable:{},residents:RES,attendings:ATT}).dates).join()==='2026-12-31,2027-01-01');
+  T('ROC title month',ssTitleMonth('雙和115-10急診值班表')==='2026-10');
+  // Apps Script end-to-end on the emulator
+  const OCT='https://docs.google.com/spreadsheets/d/oct',NOV='https://docs.google.com/spreadsheets/d/nov';
+  const env={sheets:{[OCT]:{title:'雙和115-10急診值班表',tabs:{Shiftcard:SC,'班表':BT}}},deny:new Set([NOV]),props:{FB_PROJECT:'p',FB_API_KEY:'k',SYNC_TOKEN:'tok123'},reads:[]};
+  const G=makeGAS(env);
+  put('config','schedule',{data:{'2026-09-30':[{attId:'A99',resId:'RE'}],'2026-10-15':[{attId:'A99',resId:'RE'}],'2026-11-01':[{attId:'A88',resId:'RE'}]}});
+  const cfg0=get('config','cfg')||{};cfg0.schedSrc={'2026-10':OCT,'2026-11':NOV};cfg0.schedHour=5;put('config','cfg',cfg0);
+  at(2026,10,20,10);writes();
+  let logs=G.syncMonths(['2026-10','2026-11'],'manual');
+  const sch=get('config','schedule').data;
+  T('sync writes October dates only; other dates untouched',sch['2026-09-30'][0].attId==='A99'&&sch['2026-11-01'][0].attId==='A88'&&sch['2026-10-15'][0].attId===A_WANG.id&&sch['2026-10-01'].some(e=>e.attId===A_ZENG.id));
+  const w22=writes();
+  T('one schedule write per month + one log write',w22.filter(x=>x.startsWith('PATCH config/schedule')).length===1&&w22.filter(x=>x.startsWith('PATCH config/schedLog')).length===1);
+  T('log: month, title, days, entries, skipped codes',logs[0].ok&&logs[0].month==='2026-10'&&logs[0].days===4&&logs[0].titleMonth==='2026-10'&&logs[0].skippedCodes.some(x=>x.code==='55'));
+  T('unshared sheet: log names the month',!logs[1].ok&&logs[1].error.includes('2026-11')&&logs[1].error.includes('沒有共用'));
+  T('phone column never read',!env.reads.some(r=>r.tab==='班表'&&r.c<=50&&r.c+r.nc-1>=50&&r.r+r.nr-1>=4));
+  T('log stored in config/schedLog',(get('config','schedLog').entries||[]).length===2);
+  // daily schedule: only at the configured hour, once a day, this month (+ next if set)
+  env.deny.delete(NOV);env.sheets[NOV]={title:'雙和115-11急診值班表',tabs:{Shiftcard:[[],[],[],['11/1','20']],'班表':BT}};
+  at(2026,10,20,4,30);T('before the hour → nothing',G.hourly()===null);
+  at(2026,10,20,5,10);let hr=G.hourly();
+  T('at the hour → this month + next month',hr&&hr.map(x=>x.month).join()==='2026-10,2026-11'&&hr.every(x=>x.ok));
+  at(2026,10,20,5,40);T('same day → not again',G.hourly()===null);
+  const cfg1=get('config','cfg');delete cfg1.schedSrc['2026-11'];cfg1.schedSrc['2026-10']=OCT;put('config','cfg',cfg1);
+  at(2026,11,1,5,5);hr=G.hourly();
+  T('new month without a URL → logged reminder; past month not re-read',hr.length===1&&hr[0].month==='2026-11'&&!hr[0].ok&&hr[0].error.includes('尚未設定'));
+  writes();
+  // web app: pass-code required
+  const bad=G.doPost({postData:{contents:JSON.stringify({token:'nope',action:'sync'})}});
+  T('wrong pass-code refused, nothing written',bad.ok===false&&writes().length===0);
+  T('setup installs one hourly trigger',(G.setup(),G.setup(),env.triggers.length===1&&env.triggers[0].fn==='hourly'));
+  // admin page: paste a URL → immediate sync through the web app → schedule refreshed
+  setHook(body=>G.doPost({postData:{contents:body}}));
+  CFG.schedSrc={};CFG.schedHookUrl='https://script.google.com/macros/s/x/exec';saveSchedToken('tok123');
+  at(2026,10,26,10);
+  T('admin reminder when this month has no source',schedSrcWarn().level==='err');
+  document.getElementById('ss-month').value='2026-10';document.getElementById('ss-url').value=OCT;
+  await addSchedSrc();writes();
+  T('paste URL → synced now, months shown for confirmation',CFG.schedSrc['2026-10']===OCT&&document.getElementById('ss-result').innerHTML.includes('115-10')&&document.getElementById('ss-result').innerHTML.includes('10/1–10/15'));
+  T('schedule on the page refreshed from the cloud',(SCHED['2026-10-01']||[]).some(e=>e.attId===A_ZENG.id));
+  T('after the 25th, missing next month → gentle reminder',schedSrcWarn().level==='warn');
+  CFG.schedSrc['2026-11']=NOV;T('both months set → no reminder',schedSrcWarn()===null);
+  env.sheets[OCT].title='雙和115-09急診值班表';await syncSchedMonth('2026-10');writes();
+  T('title month ≠ configured month → red warning',document.getElementById('ss-result').innerHTML.includes('不同'));
+  env.sheets[OCT].title='雙和115-10急診值班表';
+  // manual paste: optional name table → attendings by name; Shiftcard block → names row
+  // codes row has an unknown code (X) → only the names row can identify all three residents
+  const block=[['','E',rfNo,'X'],['',nm('RE'),nm('RF'),nm('RG')],['10/1','20','-','26']].map(r=>r.join('\\t')).join('\\n');
+  document.getElementById('sched-paste').value=block;document.getElementById('sched-names').value='20\\t曾孟元\\n26\\t王鎮珄(西園)';
+  delete SCHED['2026-10-01'];parsePaste();
+  T('manual paste uses the names row + name table: 20 → 曾孟元, 26 → 王鎮珄',(SCHED['2026-10-01']||[]).some(e=>e.resId==='RE'&&e.attId===A_ZENG.id)&&(SCHED['2026-10-01']||[]).some(e=>e.resId==='RG'&&e.attId===A_WANG.id)&&document.getElementById('paste-result').innerHTML.includes('以姓名對應'));
+  document.getElementById('sched-names').value='';delete SCHED['2026-10-01'];parsePaste();
+  T('manual paste without table: system codes + warning',(SCHED['2026-10-01']||[]).some(e=>e.resId==='RE'&&e.attId===A_WANG.id)&&document.getElementById('paste-result').innerHTML.includes('未提供醫師姓名表'));
+  await autoSync();writes();
 
   console.log((fail?'❌':'✅')+' '+pass+' passed, '+fail+' failed');
   process.exitCode=fail?1:0;
