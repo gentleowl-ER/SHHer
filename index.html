@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>急診醫學評核系統 v5.27</title>
+<title>急診醫學評核系統 v5.28</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <!-- Firestore accessed via REST API (no SDK needed - more reliable on mobile/file:// contexts) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -369,7 +369,7 @@ body{font-size:var(--base-font,17px)}
 <div class="sbo" id="sbo" onclick="closeSB()"></div>
 <aside class="sidebar" id="sb">
   <div class="sb-logo">
-    <div class="sb-tag">TSEM · CBME 2025 v5.27</div>
+    <div class="sb-tag">TSEM · CBME 2025 v5.28</div>
     <h1>急診醫學<br>住院醫師評核系統</h1>
   </div>
   <nav class="sb-nav">
@@ -774,6 +774,8 @@ body{font-size:var(--base-font,17px)}
     <div class="ct"><span class="dot" style="background:var(--purple)"></span>貼上班表</div>
     <p style="font-size:11px;color:var(--t3);margin-bottom:8px">請將班表資料（Tab分隔格式）貼至下方，格式如：日期欄位在第一欄，住院醫師代號在第一列，數字代表主治醫師編號，- 代表未上班。</p>
     <textarea class="paste-area" id="sched-paste" placeholder="貼上班表資料...&#10;&#9;A&#9;B&#9;C&#9;...&#10;4/1&#9;4&#9;-&#9;-&#9;..."></textarea>
+    <div style="font-size:11.5px;color:var(--t2);margin:8px 0 4px">醫師姓名表（選填，建議）：貼上該月「班表」分頁「醫師姓名」的代碼與姓名兩欄，主治醫師就會用姓名對應，不受各月代碼不同影響。</div>
+    <textarea class="paste-area" id="sched-names" style="min-height:70px" placeholder="20&#9;曾孟元&#10;21&#9;陳天恩&#10;..."></textarea>
     <div class="ifl mt3" style="flex-wrap:wrap;gap:6px">
       <button class="btn bp bsm" onclick="parsePaste()">📊 解析班表</button>
       <button class="btn bs bsm" onclick="document.getElementById('sched-paste').value=''">清除</button>
@@ -898,6 +900,30 @@ body{font-size:var(--base-font,17px)}
 <!-- ═══ ADMIN ═══ -->
 <div class="page" id="page-admin">
   <div class="sh mb4"><div><div class="st">⚙️ 系統管理員</div></div><span class="badge bdp">管理員</span></div>
+  <div class="card mb4" id="sched-src-card">
+    <div class="ah">📅 班表來源（Google 試算表每天自動同步）</div>
+    <div id="ss-warn"></div>
+    <div id="ss-list" style="font-size:12.5px;margin-bottom:8px"></div>
+    <div class="ifl" style="gap:6px;flex-wrap:wrap;align-items:flex-end">
+      <div class="fg" style="margin:0"><label style="font-size:11px">月份</label><input type="month" id="ss-month" style="width:150px"></div>
+      <div class="fg" style="margin:0;flex:1;min-width:200px"><label style="font-size:11px">Google 試算表網址</label><input type="url" id="ss-url" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
+      <button class="btn bp bsm" onclick="addSchedSrc()">💾 儲存並同步</button>
+    </div>
+    <div id="ss-result" class="mt3" style="font-size:12.5px"></div>
+    <div class="ifl mt3" style="gap:8px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:12px;color:var(--t2)">每天同步時間</span>
+      <select id="ss-hour" style="width:90px" onchange="saveSchedHour(this.value)"></select>
+      <button class="btn bs bsm" onclick="syncSchedNow()">🔄 立即同步（本月＋下月）</button>
+    </div>
+    <details class="mt3"><summary style="font-size:12px;color:var(--t2);cursor:pointer">⚙ 同步程式設定（Apps Script）</summary>
+      <div class="fg mt3"><label style="font-size:11px">同步程式網址（網頁應用程式）</label><input type="url" id="ss-hook" placeholder="https://script.google.com/macros/s/.../exec" onchange="saveSchedHook(this.value)"></div>
+      <div class="fg"><label style="font-size:11px">通關碼（只存在這台裝置）</label><input type="password" id="ss-token" onchange="saveSchedToken(this.value)"></div>
+      <button class="btn bs bsm" onclick="pingSchedHook()">🔌 測試連線</button>
+      <div style="font-size:11px;color:var(--t3);margin-top:6px">設定步驟見 repo 的 automation/README.md。</div>
+    </details>
+    <div class="ah mt4" style="font-size:13px">🧾 同步紀錄 <button class="btn bs bxs" style="margin-left:6px" onclick="loadSchedLog()">重新整理</button></div>
+    <div id="ss-log" style="font-size:12px"></div>
+  </div>
   <div class="g2 mb4">
     <div class="card">
       <div class="ah">🎯 評核上限</div>
@@ -1898,6 +1924,77 @@ function toggleSB(){document.getElementById('sb').classList.toggle('open');docum
 function closeSB(){document.getElementById('sb').classList.remove('open');document.getElementById('sbo').classList.remove('open');}
 
 // ══════════════ SCHEDULE PASTE PARSER ══════════════
+// ==SCHED-CORE-BEGIN== (identical copy in index.html and automation/schedule_sync.gs; smoke_test checks they match)
+// Monthly roster parsing shared by the web page and the Apps Script sync.
+// Residents: Shiftcard row 2 = name (identity), row 1 = code (fallback, active residents only).
+// Attendings: the month's own code→name table, then matched to the system BY NAME; never by code.
+function ssNorm(s){return String(s==null?'':s).normalize('NFKC').replace(/\s+/g,'').toLowerCase();}
+function ssStripParen(s){return ssNorm(s).replace(/\([^)]*\)/g,'');}
+// One person by name: exact (normalized) match first, then ignoring "(…)" — e.g. 王鎮珄(西園) = 王鎮珄.
+function ssMatchName(name,list){
+  const k=ssNorm(name);if(!k)return{why:'無姓名'};
+  let hit=list.filter(p=>ssNorm(p.n)===k);
+  if(!hit.length){const k2=ssStripParen(name);hit=k2?list.filter(p=>ssStripParen(p.n)===k2):[];}
+  if(hit.length===1)return{hit:hit[0]};
+  return{why:hit.length?'同時符合 '+hit.map(p=>p.n).join('、'):'系統內找不到「'+String(name).trim()+'」'};
+}
+// Code→name table. Accepts the 班表 tab (finds the 「醫師姓名」 header: names in that column,
+// codes in the column to its left, until the first blank row) or plain "code<TAB>name" rows.
+function ssParseNameTable(rows){
+  const out={};let hr=-1,nc=-1;
+  for(let r=0;r<Math.min(rows.length,8)&&hr<0;r++)(rows[r]||[]).forEach((c,i)=>{if(hr<0&&ssNorm(c)==='醫師姓名'){hr=r;nc=i;}});
+  if(hr>=0&&nc<1)return out;
+  const start=hr>=0?hr+1:0,cc=hr>=0?nc-1:0,ncol=hr>=0?nc:1;
+  for(let r=start;r<rows.length;r++){
+    const code=String((rows[r]||[])[cc]==null?'':rows[r][cc]).normalize('NFKC').replace(/\s+/g,'').toUpperCase();
+    const name=String((rows[r]||[])[ncol]==null?'':rows[r][ncol]).trim();
+    if(!code&&!name)break;          // table ends at the first blank row
+    if(code&&name)out[code]=name;   // sub-headers such as 「主治醫師」 have no code
+  }
+  return out;
+}
+// "M/D" belongs to the source month's year; a December sheet's 1/x rows are next year.
+function ssYearFor(month,m){const y=+month.slice(0,4),sm=+month.slice(5,7);return m-sm>6?y-1:sm-m>6?y+1:y;}
+function buildMonthSchedule(o){
+  const grid=o.grid||[],month=o.month,nt=o.nameTable||{};
+  const active=(o.residents||[]).filter(r=>!r.grad);
+  const codes=grid[0]||[],names=grid[1]||[];
+  const dateRows=[];
+  for(let r=2;r<grid.length;r++){const m=String((grid[r]||[])[0]||'').trim().match(/^(\d{1,2})[\/\-](\d{1,2})$/);
+    if(m&&+m[1]>=1&&+m[1]<=12&&+m[2]>=1&&+m[2]<=31)dateRows.push({r,m:+m[1],d:+m[2]});else if(dateRows.length)break;}
+  const hasData=c=>dateRows.some(x=>{const v=String((grid[x.r]||[])[c]||'').trim();return v&&v!=='-';});
+  const cols=[],skippedRes=[];
+  for(let c=1;c<Math.max(codes.length,names.length);c++){
+    const nm=String(names[c]||'').trim(),cd=String(codes[c]||'').normalize('NFKC').replace(/\s+/g,'').toUpperCase();
+    if(!nm&&!cd)break;                                   // resident block ends at the first empty column
+    if(nm){const h=ssMatchName(nm,active);
+      if(h.hit)cols.push({c,resId:h.hit.id});
+      else{const g=ssMatchName(nm,(o.residents||[]).filter(r=>r.grad)).hit;skippedRes.push({col:c,label:nm,why:g?'已畢業':h.why});}
+      continue;}
+    if(!/^[A-Z]$/.test(cd)||!hasData(c))continue;        // code-only columns: letters with data only
+    const byCode=active.filter(r=>String(r.no||'').normalize('NFKC').replace(/\s+/g,'').toUpperCase()===cd);
+    if(byCode.length===1)cols.push({c,resId:byCode[0].id});
+    else skippedRes.push({col:c,label:cd,why:byCode.length?'代碼重複':'找不到在職學員'});
+  }
+  const dates={},skipped={};let entries=0;
+  dateRows.forEach(x=>{
+    const ds=ssYearFor(month,x.m)+'-'+String(x.m).padStart(2,'0')+'-'+String(x.d).padStart(2,'0');
+    const list=dates[ds]=dates[ds]||[];
+    cols.forEach(col=>{
+      const cell=String((grid[x.r]||[])[col.c]||'').normalize('NFKC').replace(/\s+/g,'').toUpperCase();
+      if(!cell||cell==='-'||cell==='0'||cell==='S')return;
+      const name=nt[cell];let why='';let att=null;
+      if(!name)why='代碼不在醫師姓名表';else{const h=ssMatchName(name,o.attendings||[]);att=h.hit;why=h.why||'';}
+      if(!att){const k=cell+(name?'='+name:'');(skipped[k]=skipped[k]||{code:cell,name:name||'',why,n:0}).n++;return;}
+      if(!list.some(e=>e.attId===att.id&&e.resId===col.resId)){list.push({attId:att.id,resId:col.resId});entries++;}
+    });
+  });
+  const ds=Object.keys(dates).sort();
+  return{dates,days:ds.length,entries,first:ds[0]||'',last:ds[ds.length-1]||'',skippedCodes:Object.values(skipped),skippedRes};
+}
+// Sheet titles such as 「雙和115-10急診值班表」 carry the ROC year-month: 115-10 → 2026-10.
+function ssTitleMonth(title){const m=String(title||'').match(/(1\d\d)\s*[-年\/.]\s*(\d{1,2})/);return m?(+m[1]+1911)+'-'+String(+m[2]).padStart(2,'0'):'';}
+// ==SCHED-CORE-END==
 // A pasted "M/D" has no year: pick last/this/next year, whichever puts the
 // date closest to today (Dec pasting 1/5 → next year; Jan pasting 12/28 → last).
 function inferYear(m,d,now){
@@ -1924,6 +2021,13 @@ function parsePaste(){
     if(mc>=3){resHeaderIdx=i;headerRow=row;break;}
   }
   if(!headerRow){alert('找不到住院醫師欄位，請確認格式');return;}
+  // A pasted Shiftcard has codes in row 1 and names in row 2 — names are the identity.
+  const nextRow=lines[resHeaderIdx+1]||[];
+  if(nextRow.filter(c=>c&&findResByName(c).length).length>=3){resHeaderIdx++;headerRow=nextRow;}
+  // Optional code→name table of that month: attendings are then matched by NAME.
+  const ntRaw=(document.getElementById('sched-names')?.value||'').trim();
+  const nameTable=ntRaw?ssParseNameTable(ntRaw.split('\n').map(l=>l.split('\t'))):null;
+  const unresolvedNames={};
 
   // ── Determine offset: col0 of date rows is always the date string ──
   // If header[0] is a resident → header has no leading empty cell → offset 1
@@ -1997,7 +2101,9 @@ function parsePaste(){
       // code to silently fail matching.
       const cell=(row[parseInt(col)]||'').replace(/[\s\u3000]+/g,'');
       if(!cell||cell==='-'||cell==='0'||cell==='S')return;
-      const att=getAttByNo(cell);
+      let att=null;
+      if(nameTable){const nm=nameTable[normCode(cell)];if(nm){att=ssMatchName(nm,ATT).hit||null;if(!att)unresolvedNames[cell]=nm;}}
+      else att=getAttByNo(cell);
       if(!att){
         skip++;
         if(!unresolvedCodes[cell])unresolvedCodes[cell]=new Set();
@@ -2026,7 +2132,7 @@ function parsePaste(){
       ⚠ 以下代碼在主治醫師名單中找不到對應，該格已被跳過（可能是代碼打錯、未建立該主治醫師，或含特殊字元）：<br>
       ${unresolvedList.map(code=>{
         const dates=[...unresolvedCodes[code]].sort();
-        return `<b style="color:var(--danger)">「${code}」</b>：${dates.length}天（${dates.slice(0,4).join('、')}${dates.length>4?'...':''}）`;
+        return `<b style="color:var(--danger)">「${escH(code)}」${unresolvedNames[code]?'＝'+escH(unresolvedNames[code])+'（系統內找不到此姓名）':''}</b>：${dates.length}天（${dates.slice(0,4).join('、')}${dates.length>4?'...':''}）`;
       }).join('<br>')}
     </div>`;
   }
@@ -2042,7 +2148,9 @@ function parsePaste(){
   }
   const ymSummary=ymList.map(ym=>{const ds=[...pastedDates].filter(x=>x.startsWith(ym)).sort();const d0=+ds[0].slice(8),d1=+ds[ds.length-1].slice(8),mo=+ym.slice(5);
     return`${fmtYM(ym)}（${mo}/${d0}–${mo}/${d1}，共 ${ds.length} 天）`;}).join('、');
-  el.innerHTML=`${ymSummary?`<div style="font-weight:700;font-size:13.5px;margin-bottom:4px">📅 已匯入 ${ymSummary}</div>`:''}✅ 解析完成！<b>${ok}</b> 個日期，<b>${entries}</b> 筆${skip>0?` <span style="color:var(--a3)">⚠ ${skip}格未識別</span>`:''}
+  const modeNote=nameTable?`<div style="font-size:11.5px;color:var(--t2)">👤 主治醫師依醫師姓名表（${Object.keys(nameTable).length} 位）以姓名對應</div>`
+    :`<div style="font-size:11.5px;color:var(--a3)">⚠ 未提供醫師姓名表，依系統代碼對應（各月代碼不同時可能對錯人）</div>`;
+  el.innerHTML=modeNote+`${ymSummary?`<div style="font-weight:700;font-size:13.5px;margin-bottom:4px">📅 已匯入 ${ymSummary}</div>`:''}✅ 解析完成！<b>${ok}</b> 個日期，<b>${entries}</b> 筆${skip>0?` <span style="color:var(--a3)">⚠ ${skip}格未識別</span>`:''}
     <br><span style="font-size:12px;color:var(--t3)">偏移:${dateColOffset} ｜ ${preview}...</span>${unresolvedMsg}`;
   el.className='al aok';el.classList.remove('hidden');
 }
@@ -3737,7 +3845,94 @@ function restoreDefaultItems(){
   renderAdmToggles();
   alert('✅ 已還原為系統預設的 EPA / Milestone 內容');
 }
-function initAdmin(){const qem=document.getElementById('q-em');const qmm=document.getElementById('q-mm');if(qem)qem.value=CFG.qEpaM||0;if(qmm)qmm.value=CFG.qMsM||0;populateSel('ccc-res',false);populateSel('ward-res',false);renderAdmToggles();renderItemEditor();}
+// ══════════════ SCHEDULE SOURCES (Google Sheets → Apps Script sync) ══════════════
+// CFG.schedSrc = {'YYYY-MM': sheet URL}, CFG.schedHour, CFG.schedHookUrl (Apps Script web app).
+// The pass-code stays on this device only (it is never written to the cloud).
+const SCHED_TOKEN_KEY='em52_sched_token';
+function ymAdd(ym,n){const d=new Date(+ym.slice(0,4),+ym.slice(5,7)-1+n,1);return ymd(d).slice(0,7);}
+function schedSrcWarn(now){
+  const t=ymd(now||new Date()),cur=t.slice(0,7),next=ymAdd(cur,1),src=CFG.schedSrc||{};
+  if(!src[cur])return{level:'err',msg:`⚠ 本月（${cur}）尚未設定班表來源，自動同步不會更新本月班表。`};
+  if(+t.slice(8)>=25&&!src[next])return{level:'warn',msg:`ℹ 下個月（${next}）還沒有班表網址，有了就可以先貼上。`};
+  return null;
+}
+function renderSchedSrc(){
+  const src=CFG.schedSrc||{};
+  const w=schedSrcWarn(),wEl=document.getElementById('ss-warn');
+  if(wEl)wEl.innerHTML=w?`<div class="al ${w.level==='err'?'ae':'ai'} mb4" style="font-size:12.5px">${w.msg}</div>`:'';
+  const cur=tod().slice(0,7);
+  const l=document.getElementById('ss-list');
+  if(l)l.innerHTML=Object.keys(src).sort().reverse().map(m=>`<div class="ifl" style="gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+    <b style="font-family:'DM Mono';min-width:64px;color:${m<cur?'var(--t3)':'var(--acc)'}">${escH(m)}</b>
+    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--t2)">${m<cur?'（已過，不再同步）':''}${escH(src[m])}</span>
+    <button class="btn bs bxs" onclick="syncSchedMonth('${escH(m)}')">同步</button>
+    <button class="btn bxs bd" onclick="delSchedSrc('${escH(m)}')">刪除</button></div>`).join('')||'<div style="color:var(--t3)">尚未設定任何月份</div>';
+  const h=document.getElementById('ss-hour');
+  if(h){h.innerHTML=[...Array(24)].map((_,i)=>`<option value="${i}">${String(i).padStart(2,'0')}:00</option>`).join('');h.value=String(CFG.schedHour==null?5:CFG.schedHour);}
+  const mi=document.getElementById('ss-month');if(mi&&!mi.value)mi.value=ymAdd(cur,1);
+  const hk=document.getElementById('ss-hook');if(hk)hk.value=CFG.schedHookUrl||'';
+  let tk='';try{tk=localStorage.getItem(SCHED_TOKEN_KEY)||'';}catch(e){}
+  const te=document.getElementById('ss-token');if(te)te.value=tk;
+}
+function saveSchedHour(v){CFG.schedHour=parseInt(v);save();}
+function saveSchedHook(v){CFG.schedHookUrl=String(v||'').trim();save();}
+function saveSchedToken(v){try{localStorage.setItem(SCHED_TOKEN_KEY,String(v||'').trim());}catch(e){}}
+async function callSchedHook(body){
+  const url=CFG.schedHookUrl;let token='';try{token=localStorage.getItem(SCHED_TOKEN_KEY)||'';}catch(e){}
+  if(!url||!token)throw new Error('尚未設定同步程式網址或通關碼（見下方「同步程式設定」）');
+  // text/plain body: no CORS preflight, which Apps Script web apps do not answer
+  const res=await fetch(url,{method:'POST',body:JSON.stringify({...body,token})});
+  const j=await res.json();
+  if(!j.ok)throw new Error(j.error||'同步程式回應錯誤');
+  return j;
+}
+function fmtSchedLog(e){
+  if(!e.ok)return`<div style="color:var(--danger)">❌ ${escH(e.error||'失敗')}</div>`;
+  const md=s=>s?(+s.slice(5,7))+'/'+(+s.slice(8,10)):'—';
+  let h=`<div>✅ <b>${escH(e.month)}</b>：《${escH(e.title||'')}》 ${md(e.first)}–${md(e.last)}，${e.days} 天，${e.entries} 筆</div>`;
+  if(e.titleMonth&&e.titleMonth!==e.month)h+=`<div style="color:var(--danger);font-weight:600">⚠ 試算表標題是 ${escH(e.titleMonth)}，與設定的月份 ${escH(e.month)} 不同，請確認網址是否貼錯。</div>`;
+  if((e.skippedCodes||[]).length)h+=`<div style="color:var(--a3)">略過代碼：${e.skippedCodes.map(x=>`${escH(x.code)}${x.name?'='+escH(x.name):''}×${x.n}（${escH(x.why)}）`).join('、')}</div>`;
+  if((e.skippedRes||[]).length)h+=`<div style="color:var(--a3)">略過學員欄：${e.skippedRes.map(x=>`${escH(x.label)}（${escH(x.why)}）`).join('、')}</div>`;
+  return h;
+}
+async function runSchedSync(body,label){
+  const out=document.getElementById('ss-result');
+  if(out)out.innerHTML=`⏳ ${escH(label)}同步中…`;
+  try{
+    const j=await callSchedHook(body);
+    if(out)out.innerHTML=(j.logs||[]).map(fmtSchedLog).join('');
+    await syncDown(true);loadSchedLog();
+    return j;
+  }catch(e){if(out)out.innerHTML=`<div style="color:var(--danger)">❌ ${escH(e.message)}</div>`;return null;}
+}
+function syncSchedMonth(m){return runSchedSync({action:'sync',month:m},m+' ');}
+function syncSchedNow(){return runSchedSync({action:'sync'},'本月＋下月');}
+async function pingSchedHook(){
+  const out=document.getElementById('ss-result');
+  try{const j=await callSchedHook({action:'ping'});if(out)out.innerHTML=`✅ 同步程式連線正常（${escH(j.now||'')}）`;}
+  catch(e){if(out)out.innerHTML=`<div style="color:var(--danger)">❌ ${escH(e.message)}</div>`;}
+}
+function addSchedSrc(){
+  const m=(document.getElementById('ss-month')?.value||'').trim(),url=(document.getElementById('ss-url')?.value||'').trim();
+  if(!/^\d{4}-\d{2}$/.test(m)){alert('請選擇月份');return null;}
+  if(!/^https:\/\/docs\.google\.com\/spreadsheets\/d\//.test(url)){alert('請貼上 Google 試算表網址（https://docs.google.com/spreadsheets/d/...）');return null;}
+  CFG.schedSrc={...(CFG.schedSrc||{}),[m]:url};save();renderSchedSrc();
+  document.getElementById('ss-url').value='';
+  if(!CFG.schedHookUrl){const out=document.getElementById('ss-result');if(out)out.innerHTML=`已儲存 ${escH(m)}。尚未設定同步程式網址，暫時無法立即同步。`;return null;}
+  return syncSchedMonth(m);
+}
+function delSchedSrc(m){
+  if(!confirm(`刪除 ${m} 的班表來源？（已同步的班表不會被刪除）`))return;
+  const src={...(CFG.schedSrc||{})};delete src[m];CFG.schedSrc=src;save();renderSchedSrc();
+}
+async function loadSchedLog(){
+  const el=document.getElementById('ss-log');if(!el)return;
+  try{
+    const d=await fsGetDoc('config','schedLog');const list=(d&&d.entries)||[];
+    el.innerHTML=list.slice(0,20).map(e=>`<div style="padding:6px 0;border-bottom:1px solid var(--border)"><div style="color:var(--t3);font-size:11px">${escH(e.at||'')} · ${e.trigger==='auto'?'自動':'手動'}</div>${fmtSchedLog(e)}</div>`).join('')||'<div style="color:var(--t3)">尚無同步紀錄</div>';
+  }catch(e){el.innerHTML=`<div style="color:var(--t3)">無法讀取同步紀錄：${escH(e.message)}</div>`;}
+}
+function initAdmin(){try{renderSchedSrc();loadSchedLog();}catch(e){showJsError('班表來源載入失敗: '+e.message);}const qem=document.getElementById('q-em');const qmm=document.getElementById('q-mm');if(qem)qem.value=CFG.qEpaM||0;if(qmm)qmm.value=CFG.qMsM||0;populateSel('ccc-res',false);populateSel('ward-res',false);renderAdmToggles();renderItemEditor();}
 function renderCCCPanel(){
   const resId=document.getElementById('ccc-res').value;const panel=document.getElementById('ccc-panel');if(!resId){panel.innerHTML='';return;}
   const r=getRes(resId);

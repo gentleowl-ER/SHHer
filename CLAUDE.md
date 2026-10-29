@@ -2,6 +2,7 @@
 
 ## 專案概況
 - 整個系統只有一個檔案 `index.html`（HTML + CSS + JS 全在裡面），由 GitHub Pages 從 `main` 分支發布。
+- 例外：`automation/` 放 Google Apps Script 的班表同步程式（`schedule_sync.gs`、`appsscript.json`、設定步驟 `README.md`），由管理員手動貼到 Apps Script。
 - 資料存在 Firebase Firestore，透過 REST API 存取（不用 SDK），設定在 `FB_CONFIG`。
 - 使用者：主治醫師（多半用手機填評核）、系統管理員（密碼登入後可見進階功能）。
 - 使用者在手機上審閱你的修改，也不一定會讀程式碼。
@@ -14,7 +15,7 @@
    - 執行 `node smoke_test.js index.html`，必須全部通過。
    新功能或修 bug 時，在 `smoke_test.js` 補上對應的測試情境。
 4. 使用者一次提出多項需求時，一批最多 3–4 項；一批完成並經使用者確認後再做下一批。
-5. 每次改版：側邊欄 `sb-tag` 與 `<title>` 的版本號加 0.01（目前 v5.27）；commit 訊息格式為「vX.XX 改了什麼」。
+5. 每次改版：側邊欄 `sb-tag` 與 `<title>` 的版本號加 0.01（目前 v5.28）；commit 訊息格式為「vX.XX 改了什麼」。
 6. 推送後用繁體中文、白話說明：改了什麼、可能影響誰、使用者該怎麼驗證。
 7. 不要把個資、病歷號、金鑰或密碼寫進 commit 訊息、PR 說明或新檔案（這個 repo 是公開的）。
 
@@ -28,6 +29,7 @@
 - 評核用 `saveCloud()` / `deleteAssessCloud()`；失敗會進 `PENDING_ASSESS` 佇列自動重試，不可改回靜默失敗。
 - **評核增量下載。** `syncDown()` 透過 `pullAssessments()` 只查 `upd` / `id` 大於上次同步點的評核（`:runQuery`），刪除靠 `config/assessDel` 的刪除紀錄；首次、每 7 天、或按「完整重新下載」才讀全部。每次上傳要經 `pushAssess()`（寫 `upd`），刪除要經 `pushAssessDelete()`（先寫刪除紀錄）。不可改回每次開頁下載全部評核。
 - `syncDown()` 用三方合併（`merge3Records` / `merge3Map`）：本機尚未上傳的修改保留，其餘以雲端為準。
+- **班表自動同步。** Apps Script 每天讀「本月＋下個月」的來源（`CFG.schedSrc`），只 PATCH 試算表上出現的日期（`config/schedule` 的 `data.<日期>`），紀錄寫在 `config/schedLog`。主治醫師一律以「該月試算表的代碼→姓名」再以**姓名**對應系統，對不上就略過並記錄，絕不以系統代碼猜。解析核心在 `index.html` 與 `schedule_sync.gs` 各有一份（`==SCHED-CORE-BEGIN/END==` 之間），兩份必須一字不差（smoke_test 會檢查）。不讀試算表的電話欄。
 - Firestore 免費額度每日 2 萬次寫入；任何可能大量寫入的改動都要先說明預估寫入量。
 
 ## 測試
