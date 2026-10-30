@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>急診醫學評核系統 v5.29</title>
+<title>急診醫學評核系統 v5.30</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <!-- Firestore accessed via REST API (no SDK needed - more reliable on mobile/file:// contexts) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -369,7 +369,7 @@ body{font-size:var(--base-font,17px)}
 <div class="sbo" id="sbo" onclick="closeSB()"></div>
 <aside class="sidebar" id="sb">
   <div class="sb-logo">
-    <div class="sb-tag">TSEM · CBME 2025 v5.29</div>
+    <div class="sb-tag">TSEM · CBME 2025 v5.30</div>
     <h1>急診醫學<br>住院醫師評核系統</h1>
   </div>
   <nav class="sb-nav">
@@ -774,6 +774,7 @@ body{font-size:var(--base-font,17px)}
   <div class="card mb4 admin-only" id="sched-src-card">
     <div class="ct"><span class="dot" style="background:var(--acc)"></span>🔗 <span id="ss-title">本月</span> 班表連結（Google 試算表，每天自動同步）</div>
     <div id="ss-warn"></div>
+    <div id="ss-setup"></div>
     <div id="ss-cur" style="font-size:12.5px;margin-bottom:8px"></div>
     <div class="ifl" style="gap:6px;flex-wrap:wrap;align-items:flex-end">
       <div class="fg" style="margin:0;flex:1;min-width:200px"><label style="font-size:11px">貼上這個月的 Google 試算表網址</label><input type="url" id="ss-url" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
@@ -787,7 +788,7 @@ body{font-size:var(--base-font,17px)}
         <select id="ss-hour" style="width:90px" onchange="saveSchedHour(this.value)"></select>
         <button class="btn bs bsm" onclick="syncSchedNow()">🔄 立即同步（本月＋下月）</button>
       </div>
-      <details class="mt3"><summary style="font-size:12px;color:var(--t2);cursor:pointer">⚙ 同步程式設定（Apps Script）</summary>
+      <details class="mt3" id="ss-setup-details"><summary style="font-size:12px;color:var(--t2);cursor:pointer">⚙ 同步程式設定（Apps Script）</summary>
         <div class="fg mt3"><label style="font-size:11px">同步程式網址（網頁應用程式）</label><input type="url" id="ss-hook" placeholder="https://script.google.com/macros/s/.../exec" onchange="saveSchedHook(this.value)"></div>
         <div class="fg"><label style="font-size:11px">通關碼（只存在這台裝置）</label><input type="password" id="ss-token" onchange="saveSchedToken(this.value)"></div>
         <button class="btn bs bsm" onclick="pingSchedHook()">🔌 測試連線</button>
@@ -3944,6 +3945,15 @@ function renderSchedSrc(){
   const hk=document.getElementById('ss-hook');if(hk)hk.value=CFG.schedHookUrl||'';
   let tk='';try{tk=localStorage.getItem(SCHED_TOKEN_KEY)||'';}catch(e){}
   const te=document.getElementById('ss-token');if(te)te.value=tk;
+  // Say plainly when automatic sync can't work yet — a saved link alone does nothing.
+  const st=document.getElementById('ss-setup');
+  if(st){
+    const howto='https://github.com/gentleowl-ER/SHHer/blob/main/automation/README.md';
+    st.innerHTML=!CFG.schedHookUrl
+      ?`<div class="al ae mb4" style="font-size:12.5px">⚠ <b>自動同步尚未啟用。</b>貼上的連結會先存起來，但要先完成一次「同步程式（Apps Script）」設定，系統才會去抓班表。<a href="${howto}" target="_blank" rel="noopener">設定步驟</a>，完成後在下方「⚙ 同步程式設定」貼上網址與通關碼。</div>`
+      :!tk?`<div class="al ai mb4" style="font-size:12.5px">ℹ 每天的自動同步已啟用。這台裝置還沒輸入通關碼，所以不能按「儲存並同步／立即同步」馬上抓；請在下方「⚙ 同步程式設定」輸入一次。</div>`:'';
+    if(!CFG.schedHookUrl||!tk){const d1=document.querySelector('#sched-src-card > details'),d2=document.getElementById('ss-setup-details');if(d1)d1.open=true;if(d2)d2.open=true;}
+  }
 }
 function saveSchedHour(v){CFG.schedHour=parseInt(v);save();}
 function saveSchedHook(v){CFG.schedHookUrl=String(v||'').trim();save();}
@@ -3952,8 +3962,10 @@ async function callSchedHook(body){
   const url=CFG.schedHookUrl;let token='';try{token=localStorage.getItem(SCHED_TOKEN_KEY)||'';}catch(e){}
   if(!url||!token)throw new Error('尚未設定同步程式網址或通關碼（見下方「同步程式設定」）');
   // text/plain body: no CORS preflight, which Apps Script web apps do not answer
-  const res=await fetch(url,{method:'POST',body:JSON.stringify({...body,token})});
-  const j=await res.json();
+  let res;try{res=await fetch(url,{method:'POST',body:JSON.stringify({...body,token})});}
+  catch(e){throw new Error('連不到同步程式（網路問題，或網址不是 Apps Script 的 /exec 網址）');}
+  let j;try{j=await res.json();}
+  catch(e){throw new Error('同步程式沒有回傳資料：請確認部署時「誰可以存取」選「所有人」，而且網址是 …/exec 結尾（不是 /dev）');}
   if(!j.ok)throw new Error(j.error||'同步程式回應錯誤');
   return j;
 }
@@ -3991,7 +4003,7 @@ function addSchedSrc(month,link){
   if(!/^https:\/\/docs\.google\.com\/spreadsheets\/d\//.test(url)){alert('請貼上 Google 試算表網址（https://docs.google.com/spreadsheets/d/...）');return null;}
   CFG.schedSrc={...(CFG.schedSrc||{}),[m]:url};save();renderSchedSrc();
   document.getElementById('ss-url').value='';
-  if(!CFG.schedHookUrl){const out=document.getElementById('ss-result');if(out)out.innerHTML=`已儲存 ${escH(m)}。尚未設定同步程式網址，暫時無法立即同步。`;return null;}
+  if(!CFG.schedHookUrl){const out=document.getElementById('ss-result');if(out)out.innerHTML=`<div style="color:var(--danger);font-weight:600">已儲存 ${escH(m)} 的連結，但還沒抓班表：自動同步尚未啟用（見上方說明）。</div>`;return null;}
   return syncSchedMonth(m);
 }
 function delSchedSrc(m){

@@ -741,6 +741,21 @@ js = js.replace(/\ninit\(\);\s*$/, '\n') + `
   T('replacing a link asks first (取消 keeps the old one)',CFG.schedSrc['2026-10']===LINK);
   CONFIRM=true;isAdmin=false;
 
+  // ── v5.30: say plainly when automatic schedule sync isn't set up ──
+  isAdmin=true;const hook0=CFG.schedHookUrl;let tok0='';try{tok0=localStorage.getItem(SCHED_TOKEN_KEY)||'';}catch(e){}
+  CFG.schedHookUrl='';renderSched();
+  T('no sync program → red "自動同步尚未啟用"',document.getElementById('ss-setup').innerHTML.includes('尚未啟用'));
+  document.getElementById('ss-url').value='https://docs.google.com/spreadsheets/d/nov/edit';schedMo=10;addSchedSrc();
+  T('saving a link without the sync program says nothing was fetched',document.getElementById('ss-result').innerHTML.includes('還沒抓班表'));
+  CFG.schedHookUrl='https://script.google.com/macros/s/x/exec';saveSchedToken('');renderSched();
+  T('sync program set, no pass-code on this device → info note',document.getElementById('ss-setup').innerHTML.includes('通關碼'));
+  saveSchedToken('tok');renderSched();
+  T('fully set up → no setup note',document.getElementById('ss-setup').innerHTML==='');
+  const f0=global.fetch;global.fetch=async()=>({ok:true,status:200,json:async()=>{throw new Error('Unexpected token <');}});
+  let em='';try{await callSchedHook({action:'ping'});}catch(e){em=e.message;}
+  T('web app returns a login page → actionable message',em.includes('所有人'));
+  global.fetch=f0;CFG.schedHookUrl=hook0;saveSchedToken(tok0);delete CFG.schedSrc['2026-11'];isAdmin=false;
+
   console.log((fail?'❌':'✅')+' '+pass+' passed, '+fail+' failed');
   process.exitCode=fail?1:0;
 })().catch(e=>{console.log('❌ CRASH',e&&e.stack||e);process.exitCode=1;});
