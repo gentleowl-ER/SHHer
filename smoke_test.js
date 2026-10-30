@@ -681,7 +681,7 @@ js = js.replace(/\ninit\(\);\s*$/, '\n') + `
   CFG.schedSrc={};CFG.schedHookUrl='https://script.google.com/macros/s/x/exec';saveSchedToken('tok123');
   at(2026,10,26,10);
   T('admin reminder when this month has no source',schedSrcWarn().level==='err');
-  document.getElementById('ss-month').value='2026-10';document.getElementById('ss-url').value=OCT;
+  schedY=2026;schedMo=9;document.getElementById('ss-url').value=OCT;
   await addSchedSrc();writes();
   T('paste URL → synced now, months shown for confirmation',CFG.schedSrc['2026-10']===OCT&&document.getElementById('ss-result').innerHTML.includes('115-10')&&document.getElementById('ss-result').innerHTML.includes('10/1–10/15'));
   T('schedule on the page refreshed from the cloud',(SCHED['2026-10-01']||[]).some(e=>e.attId===A_ZENG.id));
@@ -699,6 +699,47 @@ js = js.replace(/\ninit\(\);\s*$/, '\n') + `
   document.getElementById('sched-names').value='';delete SCHED['2026-10-01'];parsePaste();
   T('manual paste without table: system codes + warning',(SCHED['2026-10-01']||[]).some(e=>e.resId==='RE'&&e.attId===A_WANG.id)&&document.getElementById('paste-result').innerHTML.includes('未提供醫師姓名表'));
   await autoSync();writes();
+
+  // ── v5.29: quick-fill keeps the shift date; date ↔ schedule reminder; monthly sheet link on the schedule page ──
+  isAdmin=false;CONFIRM=true;at(2026,10,29,10,30);
+  SCHED['2026-10-28']=[{attId:'A99',resId:'RE'}];SCHED['2026-10-29']=[];
+  ASSESS=ASSESS.filter(a=>!(a.attId==='A99'&&a.resId==='RE'&&a.date>='2026-10-20'));
+  navToAssess('A99','RE','2026-10-28');
+  T('未填答名單「填寫」keeps the shift date (was reset to today)',document.getElementById('f-date').value==='2026-10-28'&&document.getElementById('f-res').value==='RE');
+  quickAssessOnDate('A99','RE','2026-10-28');
+  T('pending-card button keeps the shift date, no delay',document.getElementById('f-date').value==='2026-10-28');
+  nav('assess');document.getElementById('f-att').value='A99';document.getElementById('f-res').value='RE';onAttChange();
+  T('picking the resident at 10:30 → last night’s unfilled shift',document.getElementById('f-date').value==='2026-10-28'&&document.getElementById('f-date-check').innerHTML.includes('✅'));
+  fDateAuto=false;document.getElementById('f-date').value='2026-10-29';onAttChange();
+  const chk=document.getElementById('f-date-check').innerHTML;
+  T('wrong date → red warning with one-tap fix',chk.includes('⚠')&&chk.includes('改成 10/28'));
+  setShiftDate('2026-10-28');
+  T('one-tap fix sets the shift date',document.getElementById('f-date').value==='2026-10-28'&&document.getElementById('f-date-check').innerHTML.includes('✅'));
+  let asked=0;const conf0=confirm;confirm=()=>{asked++;return CONFIRM;};
+  document.getElementById('f-date').value='2026-10-29';dateAsked='';CONFIRM=false;v0();v0();
+  T('leaving step 1 asks once; 取消 keeps the date',asked===1&&document.getElementById('f-date').value==='2026-10-29');
+  document.getElementById('f-date').value='2026-10-30';CONFIRM=true;v0();
+  T('確定 → changed to the owed shift',asked===2&&document.getElementById('f-date').value==='2026-10-28');
+  confirm=conf0;
+  const saveNow=()=>{const n=ASSESS.length;document.getElementById('f-overall-fb').value='病史詢問完整，鑑別診斷可再加強';document.getElementById('embed-img-enabled').checked=false;selEpa=[];selPcMs=[];selNpcMs=[];saveAssess();return ASSESS.length>n;};
+  T('saved',saveNow());
+  T('thank-you page names the completed shift',document.getElementById('ty-shift').innerHTML.includes('已完成：10/28'));
+  T('shift no longer pending',!getPendingDates('A99').some(p=>p.date==='2026-10-28'&&p.resIds.includes('RE')));
+  nav('assess');document.getElementById('f-att').value='A99';document.getElementById('f-res').value='RE';fDateAuto=false;document.getElementById('f-date').value='2026-10-25';onAttChange();
+  T('no owed shift left → neutral note, not red',document.getElementById('f-date-check').innerHTML.includes('ℹ')&&!document.getElementById('f-date-check').innerHTML.includes('⚠'));
+  saveNow();
+  T('off-schedule save → thank-you page warns',document.getElementById('ty-shift').innerHTML.includes('⚠'));
+  // monthly sheet link lives on the schedule page, for the month on screen
+  isAdmin=true;const LINK='https://docs.google.com/spreadsheets/d/oct/edit';CFG.schedSrc={'2026-10':LINK};
+  schedY=2026;schedMo=10;renderSched();
+  T('schedule page: month without a link says so',document.getElementById('ss-title').textContent==='2026年11月'&&document.getElementById('ss-cur').innerHTML.includes('還沒有'));
+  schedMo=9;renderSched();
+  T('schedule page: this month’s link shown',document.getElementById('ss-cur').innerHTML.includes(LINK));
+  document.getElementById('ss-url').value=LINK;addSchedSrc();
+  T('same link again → no re-save',document.getElementById('ss-result').innerHTML.includes('已經是'));
+  CONFIRM=false;document.getElementById('ss-url').value='https://docs.google.com/spreadsheets/d/other/edit';addSchedSrc();
+  T('replacing a link asks first (取消 keeps the old one)',CFG.schedSrc['2026-10']===LINK);
+  CONFIRM=true;isAdmin=false;
 
   console.log((fail?'❌':'✅')+' '+pass+' passed, '+fail+' failed');
   process.exitCode=fail?1:0;

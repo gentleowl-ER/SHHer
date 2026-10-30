@@ -15,7 +15,7 @@
    - 執行 `node smoke_test.js index.html`，必須全部通過。
    新功能或修 bug 時，在 `smoke_test.js` 補上對應的測試情境。
 4. 使用者一次提出多項需求時，一批最多 3–4 項；一批完成並經使用者確認後再做下一批。
-5. 每次改版：側邊欄 `sb-tag` 與 `<title>` 的版本號加 0.01（目前 v5.28）；commit 訊息格式為「vX.XX 改了什麼」。
+5. 每次改版：側邊欄 `sb-tag` 與 `<title>` 的版本號加 0.01（目前 v5.29）；commit 訊息格式為「vX.XX 改了什麼」。
 6. 推送後用繁體中文、白話說明：改了什麼、可能影響誰、使用者該怎麼驗證。
 7. 不要把個資、病歷號、金鑰或密碼寫進 commit 訊息、PR 說明或新檔案（這個 repo 是公開的）。
 
@@ -30,6 +30,8 @@
 - **評核增量下載。** `syncDown()` 透過 `pullAssessments()` 只查 `upd` / `id` 大於上次同步點的評核（`:runQuery`），刪除靠 `config/assessDel` 的刪除紀錄；首次、每 7 天、或按「完整重新下載」才讀全部。每次上傳要經 `pushAssess()`（寫 `upd`），刪除要經 `pushAssessDelete()`（先寫刪除紀錄）。不可改回每次開頁下載全部評核。
 - `syncDown()` 用三方合併（`merge3Records` / `merge3Map`）：本機尚未上傳的修改保留，其餘以雲端為準。
 - **班表自動同步。** Apps Script 每天讀「本月＋下個月」的來源（`CFG.schedSrc`），只 PATCH 試算表上出現的日期（`config/schedule` 的 `data.<日期>`），紀錄寫在 `config/schedLog`。主治醫師一律以「該月試算表的代碼→姓名」再以**姓名**對應系統，對不上就略過並記錄，絕不以系統代碼猜。解析核心在 `index.html` 與 `schedule_sync.gs` 各有一份（`==SCHED-CORE-BEGIN/END==` 之間），兩份必須一字不差（smoke_test 會檢查）。不讀試算表的電話欄。
+- **評核日期要對上班表。** 「已填」以「日期＋主治＋學員」完全符合班表判斷。所有「填這一班」的按鈕一律走 `openAssessFor()`（同步設定表單並鎖住日期），不可再用 setTimeout 或讓 `onAttChange()` 蓋掉帶入的日期。自動日期用 `autoAssessDate()`（優先這位學員未評的班），日期對不上任何班時要提醒（`renderDateCheck()`、`v0()`、感謝頁）。
+- **每月班表連結**在「班表」頁（`#sched-src-card`，依畫面上的月份），存在 `CFG.schedSrc`；系統管理員頁只留提醒與連結。
 - Firestore 免費額度每日 2 萬次寫入；任何可能大量寫入的改動都要先說明預估寫入量。
 
 ## 測試
