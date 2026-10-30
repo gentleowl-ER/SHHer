@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>急診醫學評核系統 v5.28</title>
+<title>急診醫學評核系統 v5.29</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <!-- Firestore accessed via REST API (no SDK needed - more reliable on mobile/file:// contexts) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -369,7 +369,7 @@ body{font-size:var(--base-font,17px)}
 <div class="sbo" id="sbo" onclick="closeSB()"></div>
 <aside class="sidebar" id="sb">
   <div class="sb-logo">
-    <div class="sb-tag">TSEM · CBME 2025 v5.28</div>
+    <div class="sb-tag">TSEM · CBME 2025 v5.29</div>
     <h1>急診醫學<br>住院醫師評核系統</h1>
   </div>
   <nav class="sb-nav">
@@ -508,9 +508,9 @@ body{font-size:var(--base-font,17px)}
     </div>
     <div class="card">
       <div class="ct"><span class="dot"></span>基本資料</div>
-      <div class="fg"><label>住院醫師<span class="req">*</span></label><select id="f-res"><option value="">— 請選擇 —</option></select></div>
+      <div class="fg"><label>住院醫師<span class="req">*</span></label><select id="f-res" onchange="onAttChange()"><option value="">— 請選擇 —</option></select></div>
       <div class="g2">
-        <div class="fg"><label>評核日期</label><input type="date" id="f-date" onchange="fDateAuto=false;onAttChange()"></div>
+        <div class="fg"><label>評核日期</label><input type="date" id="f-date" onchange="fDateAuto=false;onAttChange()"><div id="f-date-check" style="font-size:12px;margin-top:5px;line-height:1.5"></div></div>
         <div class="fg"><label>臨床情境 / 病例</label><input type="text" id="f-case" placeholder="例：OHCA、休克評估..."></div>
       </div>
     </div>
@@ -605,6 +605,7 @@ body{font-size:var(--base-font,17px)}
     <div class="ty-icon">🙏</div>
     <div class="ty-title">感謝您完成評核！</div>
     <div class="ty-sub">您的評核已成功儲存。感謝您對住院醫師訓練品質的貢獻！</div>
+    <div id="ty-shift" style="margin:-6px auto 16px;max-width:460px;font-size:13.5px;line-height:1.6"></div>
     <div class="ifl" style="flex-wrap:wrap;justify-content:center;gap:10px">
       <button class="btn bp" onclick="nav('assess')">＋ 再新增一筆評核</button>
       <button class="btn bpu" onclick="navToPending()">🔔 回到尚未填寫清單</button>
@@ -770,6 +771,32 @@ body{font-size:var(--base-font,17px)}
       <button class="btn bsm" style="border:1px solid var(--danger);color:var(--danger)" onclick="clearSchedAll()">🗑 清除全部班表</button>
     </div>
   </div>
+  <div class="card mb4 admin-only" id="sched-src-card">
+    <div class="ct"><span class="dot" style="background:var(--acc)"></span>🔗 <span id="ss-title">本月</span> 班表連結（Google 試算表，每天自動同步）</div>
+    <div id="ss-warn"></div>
+    <div id="ss-cur" style="font-size:12.5px;margin-bottom:8px"></div>
+    <div class="ifl" style="gap:6px;flex-wrap:wrap;align-items:flex-end">
+      <div class="fg" style="margin:0;flex:1;min-width:200px"><label style="font-size:11px">貼上這個月的 Google 試算表網址</label><input type="url" id="ss-url" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
+      <button class="btn bp bsm" onclick="addSchedSrc()">💾 儲存並同步</button>
+    </div>
+    <div id="ss-result" class="mt3" style="font-size:12.5px"></div>
+    <details class="mt3" ontoggle="if(this.open)loadSchedLog()"><summary style="font-size:12px;color:var(--t2);cursor:pointer">所有月份的連結、每日同步時間、同步紀錄</summary>
+      <div id="ss-list" class="mt3" style="font-size:12.5px;margin-bottom:8px"></div>
+      <div class="ifl mt3" style="gap:8px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:12px;color:var(--t2)">每天同步時間</span>
+        <select id="ss-hour" style="width:90px" onchange="saveSchedHour(this.value)"></select>
+        <button class="btn bs bsm" onclick="syncSchedNow()">🔄 立即同步（本月＋下月）</button>
+      </div>
+      <details class="mt3"><summary style="font-size:12px;color:var(--t2);cursor:pointer">⚙ 同步程式設定（Apps Script）</summary>
+        <div class="fg mt3"><label style="font-size:11px">同步程式網址（網頁應用程式）</label><input type="url" id="ss-hook" placeholder="https://script.google.com/macros/s/.../exec" onchange="saveSchedHook(this.value)"></div>
+        <div class="fg"><label style="font-size:11px">通關碼（只存在這台裝置）</label><input type="password" id="ss-token" onchange="saveSchedToken(this.value)"></div>
+        <button class="btn bs bsm" onclick="pingSchedHook()">🔌 測試連線</button>
+        <div style="font-size:11px;color:var(--t3);margin-top:6px">設定步驟見 repo 的 automation/README.md。</div>
+      </details>
+      <div class="ah mt4" style="font-size:13px">🧾 同步紀錄 <button class="btn bs bxs" style="margin-left:6px" onclick="loadSchedLog()">重新整理</button></div>
+      <div id="ss-log" style="font-size:12px"></div>
+    </details>
+  </div>
   <div class="card mb4">
     <div class="ct"><span class="dot" style="background:var(--purple)"></span>貼上班表</div>
     <p style="font-size:11px;color:var(--t3);margin-bottom:8px">請將班表資料（Tab分隔格式）貼至下方，格式如：日期欄位在第一欄，住院醫師代號在第一列，數字代表主治醫師編號，- 代表未上班。</p>
@@ -900,29 +927,11 @@ body{font-size:var(--base-font,17px)}
 <!-- ═══ ADMIN ═══ -->
 <div class="page" id="page-admin">
   <div class="sh mb4"><div><div class="st">⚙️ 系統管理員</div></div><span class="badge bdp">管理員</span></div>
-  <div class="card mb4" id="sched-src-card">
-    <div class="ah">📅 班表來源（Google 試算表每天自動同步）</div>
-    <div id="ss-warn"></div>
-    <div id="ss-list" style="font-size:12.5px;margin-bottom:8px"></div>
-    <div class="ifl" style="gap:6px;flex-wrap:wrap;align-items:flex-end">
-      <div class="fg" style="margin:0"><label style="font-size:11px">月份</label><input type="month" id="ss-month" style="width:150px"></div>
-      <div class="fg" style="margin:0;flex:1;min-width:200px"><label style="font-size:11px">Google 試算表網址</label><input type="url" id="ss-url" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
-      <button class="btn bp bsm" onclick="addSchedSrc()">💾 儲存並同步</button>
-    </div>
-    <div id="ss-result" class="mt3" style="font-size:12.5px"></div>
-    <div class="ifl mt3" style="gap:8px;flex-wrap:wrap;align-items:center">
-      <span style="font-size:12px;color:var(--t2)">每天同步時間</span>
-      <select id="ss-hour" style="width:90px" onchange="saveSchedHour(this.value)"></select>
-      <button class="btn bs bsm" onclick="syncSchedNow()">🔄 立即同步（本月＋下月）</button>
-    </div>
-    <details class="mt3"><summary style="font-size:12px;color:var(--t2);cursor:pointer">⚙ 同步程式設定（Apps Script）</summary>
-      <div class="fg mt3"><label style="font-size:11px">同步程式網址（網頁應用程式）</label><input type="url" id="ss-hook" placeholder="https://script.google.com/macros/s/.../exec" onchange="saveSchedHook(this.value)"></div>
-      <div class="fg"><label style="font-size:11px">通關碼（只存在這台裝置）</label><input type="password" id="ss-token" onchange="saveSchedToken(this.value)"></div>
-      <button class="btn bs bsm" onclick="pingSchedHook()">🔌 測試連線</button>
-      <div style="font-size:11px;color:var(--t3);margin-top:6px">設定步驟見 repo 的 automation/README.md。</div>
-    </details>
-    <div class="ah mt4" style="font-size:13px">🧾 同步紀錄 <button class="btn bs bxs" style="margin-left:6px" onclick="loadSchedLog()">重新整理</button></div>
-    <div id="ss-log" style="font-size:12px"></div>
+  <div class="card mb4" id="sched-src-pointer">
+    <div class="ah">📅 班表連結</div>
+    <div id="ss-admin-warn" style="font-size:12.5px"></div>
+    <div style="font-size:12.5px;color:var(--t2)">每個月的班表連結已移到「人員與排班 → 班表」，切到那個月份就能貼上。</div>
+    <button class="btn bs bsm mt3" onclick="nav('schedule')">前往班表 →</button>
   </div>
   <div class="g2 mb4">
     <div class="card">
@@ -2229,9 +2238,21 @@ function getPendingDates(attId){
   });
   return result.sort((a,b)=>b.date.localeCompare(a.date));
 }
-function quickAssess(attId,resId){nav('assess');setTimeout(()=>{document.getElementById('f-att').value=attId;document.getElementById('f-res').value=resId;onAttChange();},100);}
-function quickAssessDate(attId,date){nav('assess');setTimeout(()=>{fDateAuto=false;document.getElementById('f-att').value=attId;document.getElementById('f-date').value=date;onAttChange();},100);}
-function quickAssessOnDate(attId,resId,date){nav('assess');setTimeout(()=>{fDateAuto=false;document.getElementById('f-att').value=attId;document.getElementById('f-res').value=resId;document.getElementById('f-date').value=date;onAttChange();},100);}
+// Every "fill this one" button goes through openAssessFor(). It resets the
+// form (nav → initAssess) and then fills it in the same tick. The old versions
+// set the fields 100 ms later, and the 未填答名單 button never switched off the
+// automatic date, so onAttChange() put today's date back over the shift date.
+function openAssessFor(attId,resId,date){
+  nav('assess');
+  const fa=document.getElementById('f-att'),fr=document.getElementById('f-res'),fd=document.getElementById('f-date');
+  if(attId&&fa)fa.value=attId;
+  if(resId&&fr)fr.value=resId;
+  if(date&&fd){fd.value=date;fDateAuto=false;}
+  onAttChange();
+}
+function quickAssess(attId,resId){openAssessFor(attId,resId,tod());}
+function quickAssessDate(attId,date){openAssessFor(attId,'',date);}
+function quickAssessOnDate(attId,resId,date){openAssessFor(attId,resId,date);}
 function renderDashCharts(){
   dC('ch-epa-c');dC('ch-ms-c');
   const msA=ASSESS.filter(a=>a.type==='ms');
@@ -2260,7 +2281,7 @@ function renderAssessPendingCard(){
     card.classList.add('hidden');
   }
 }
-function initAssess(){selEpa=[];selPcMs=[];selNpcMs=[];epaScores={};epaFb={};msScores={};embedImgType='';document.getElementById('f-date').value=tod();document.getElementById('f-case').value='';const ofb=document.getElementById('f-overall-fb');if(ofb){ofb.value='';ofb.classList.remove('fil');ofb.classList.add('mf');}const ofbCnt=document.getElementById('f-overall-fb-cnt');if(ofbCnt){ofbCnt.textContent='0 字';ofbCnt.style.color='var(--t3)';}const eib=document.getElementById('embed-img-enabled');if(eib){eib.checked=true;const inner=document.getElementById('embed-img-inner');if(inner)inner.style.display='block';}['eipid','eimg-comment'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.querySelectorAll('#embed-img-inner .itbtn').forEach(b=>b.classList.remove('sel'));clearEmbedImgFlag();fDateAuto=true;['ass-ok','ass-err'].forEach(id=>document.getElementById(id).classList.add('hidden'));populateSel('f-res',false);populateSel('f-att',true);if(currentAttId)document.getElementById('f-att').value=currentAttId;onAttChange();renderAssessPendingCard();[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===0);document.getElementById('ws'+i).className='ws'+(i===0?' active':'');const t=document.getElementById('ws'+i+'-skip');if(t)t.textContent='';});curStep=0;placeEmbedImg(false);syncMobBar(0);}
+function initAssess(){selEpa=[];selPcMs=[];selNpcMs=[];epaScores={};epaFb={};msScores={};embedImgType='';document.getElementById('f-date').value=tod();document.getElementById('f-case').value='';const ofb=document.getElementById('f-overall-fb');if(ofb){ofb.value='';ofb.classList.remove('fil');ofb.classList.add('mf');}const ofbCnt=document.getElementById('f-overall-fb-cnt');if(ofbCnt){ofbCnt.textContent='0 字';ofbCnt.style.color='var(--t3)';}const eib=document.getElementById('embed-img-enabled');if(eib){eib.checked=true;const inner=document.getElementById('embed-img-inner');if(inner)inner.style.display='block';}['eipid','eimg-comment'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.querySelectorAll('#embed-img-inner .itbtn').forEach(b=>b.classList.remove('sel'));clearEmbedImgFlag();fDateAuto=true;dateAsked='';['ass-ok','ass-err'].forEach(id=>document.getElementById(id).classList.add('hidden'));populateSel('f-res',false);populateSel('f-att',true);if(currentAttId)document.getElementById('f-att').value=currentAttId;onAttChange();renderAssessPendingCard();[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===0);document.getElementById('ws'+i).className='ws'+(i===0?' active':'');const t=document.getElementById('ws'+i+'-skip');if(t)t.textContent='';});curStep=0;placeEmbedImg(false);syncMobBar(0);}
 // Assessment date: today, except before 09:00 when this attending worked
 // yesterday and still owes an evaluation for it (night shift) → yesterday.
 // Only while the date hasn't been set by hand or passed in by a quick link.
@@ -2272,9 +2293,44 @@ function defaultAssessDate(attId,now){
   const owed=(SCHED[y]||[]).some(e=>e.attId===attId&&getRes(e.resId)&&!getRes(e.resId).grad&&!ASSESS.some(a=>a.date===y&&a.attId===attId&&a.resId===e.resId));
   return owed?y:t;
 }
+// Which shift is this evaluation for? A record only clears the pending list
+// when date + attending + resident match a schedule entry exactly.
+function mdOf(d){return d?(+d.slice(5,7))+'/'+(+d.slice(8,10)):'';}
+function shiftCheck(attId,resId,date){
+  if(!attId||!resId||!date)return null;
+  const has=d=>(SCHED[d]||[]).some(e=>e.attId===attId&&e.resId===resId);
+  const done=d=>ASSESS.some(a=>a.date===d&&a.attId===attId&&a.resId===resId);
+  const t=tod(),owed=[];
+  for(let i=0;i<=7;i++){const d=addDays(t,-i);if(d!==date&&has(d)&&!done(d))owed.push(d);}
+  return{match:has(date),filled:has(date)&&done(date),owed};
+}
+// Automatic date: the shift with this resident that still needs an evaluation
+// (today first, then the most recent of the past week); without a resident,
+// the old rule (night shift before 09:00 → yesterday).
+function autoAssessDate(attId,resId){
+  if(attId&&resId){
+    const t=tod(),c=shiftCheck(attId,resId,t);
+    if(c&&c.match&&!c.filled)return t;
+    if(c&&c.owed.length)return c.owed[0];
+  }
+  return defaultAssessDate(attId);
+}
+let dateAsked='';
+function setShiftDate(d){const fd=document.getElementById('f-date');if(!fd)return;fd.value=d;fDateAuto=false;dateAsked='';onAttChange();}
+function renderDateCheck(){
+  const el=document.getElementById('f-date-check');if(!el)return;
+  const attId=document.getElementById('f-att')?.value,resId=document.getElementById('f-res')?.value,date=document.getElementById('f-date')?.value;
+  const c=shiftCheck(attId,resId,date);if(!c){el.innerHTML='';return;}
+  const rn=escH(getRes(resId)?.n||'');
+  const btns=c.owed.slice(0,4).map(d=>`<button class="btn bp bxs" style="margin:3px 4px 0 0" onclick="setShiftDate('${d}')">改成 ${mdOf(d)}</button>`).join('');
+  if(c.match&&!c.filled)el.innerHTML=`<span style="color:var(--acc)">✅ 對應班表：${mdOf(date)} 與 ${rn} 的班</span>`;
+  else if(c.match)el.innerHTML=`<span style="color:var(--t2)">ℹ ${mdOf(date)} 與 ${rn} 的班已經評過，這筆會是同一班的第二筆。</span>${c.owed.length?`<div style="color:var(--a3)">還沒評的班：</div>${btns}`:''}`;
+  else if(c.owed.length)el.innerHTML=`<span style="color:var(--danger);font-weight:600">⚠ 班表上 ${mdOf(date)} 沒有你和 ${rn} 的班，存檔後待填名單不會減少。</span><div style="color:var(--t2)">你和 ${rn} 還沒評的班：</div>${btns}`;
+  else el.innerHTML=`<span style="color:var(--a3)">ℹ 班表上 ${mdOf(date)} 沒有你和 ${rn} 的班（例如臨時代班），可以照常填，但不會對應到任何一班。</span>`;
+}
 function onAttChange(){
   const id=document.getElementById('f-att').value;const fd=document.getElementById('f-date');
-  if(fd&&fDateAuto)fd.value=defaultAssessDate(id);
+  if(fd&&fDateAuto)fd.value=autoAssessDate(id,document.getElementById('f-res')?.value);
   const ds=fd?.value||tod();const today=tod();
   const entries=(SCHED[ds]||[]).filter(e=>e.attId===id);const si=document.getElementById('tshift');
   const names=entries.map(e=>getRes(e.resId)?.n||'').filter(Boolean).join('、');
@@ -2283,6 +2339,7 @@ function onAttChange(){
   else if(ds===today)si.textContent=names?`今日需評：${names}`:'今日值班';
   else if(fDateAuto&&ds===addDays(today,-1))si.textContent=`🌙 夜班：已帶入昨天（${md}）日期${names?'，需評：'+names:''}`;
   else si.textContent=names?`${md} 需評：${names}`:`${md} 值班`;
+  renderDateCheck();
 }
 function showStepOnly(s){curStep=s;[0,1,2,3,4].forEach(i=>{document.getElementById('wp'+i).classList.toggle('active',i===s);document.getElementById('ws'+i).className='ws'+(i===s?' active':i<s?' done':'');});syncMobBar(s);}
 let curStep=0;
@@ -2314,7 +2371,16 @@ function syncMobBar(s){
   if(s<4){next.textContent='下一步 →';next.className='btn bp';next.onclick=()=>goStep(s+1);}
   else{next.textContent='💾 儲存評核';next.className='btn bp';next.onclick=()=>saveAssess();}
 }
-function v0(){if(!document.getElementById('f-res').value){alert('請選擇住院醫師');return false;}return true;}
+function v0(){
+  const resId=document.getElementById('f-res').value;if(!resId){alert('請選擇住院醫師');return false;}
+  const attId=document.getElementById('f-att').value,date=document.getElementById('f-date').value;
+  const c=shiftCheck(attId,resId,date);
+  if(c&&!c.match&&c.owed.length&&dateAsked!==date){
+    dateAsked=date;const rn=getRes(resId)?.n||'';
+    if(confirm(`評核日期是 ${mdOf(date)}，但班表上這天沒有你和 ${rn} 的班。\n你和 ${rn} 還沒評的班：${c.owed.map(mdOf).join('、')}\n\n按「確定」改成 ${mdOf(c.owed[0])}；按「取消」維持 ${mdOf(date)}。`))setShiftDate(c.owed[0]);
+  }
+  return true;
+}
 // How many items the teacher must pick = the usual rule (EPA 1, PC 2, non-PC 2)
 // capped by what this resident can still be assessed on: enabled, not locked
 // by CCC, and under this month's limit. Replaces the per-resident relax switch.
@@ -2588,6 +2654,13 @@ function saveAssess(){
   const rec={id:Date.now(),type:'ms',date:document.getElementById('f-date').value,resId,resName:res?.n||'',resYear:res?.y||'',attId:attId||null,attName:att?.n||'',caseDesc:document.getElementById('f-case').value,selEpa,selPcMs,selNpcMs,selMs,epaScores:{...epaScores},epaFb:{...epaFb},msItems:{...msScores},msFb:msFbData,overallFb,imgData:embedImgResult||null,epaAvg:ev.length?(ev.reduce((a,b)=>a+b,0)/ev.length).toFixed(2):null,msPresRate:pct};
   ASSESS.unshift(rec);save();saveCloud(rec);autoSyncDebounced();updateRmBadge();
   lastSavedAttId=attId;nav('thankyou');
+  const ty=document.getElementById('ty-shift');
+  if(ty){
+    const hit=(SCHED[rec.date]||[]).some(e=>e.attId===attId&&e.resId===resId);
+    const left=attId?getPendingDates(attId).reduce((t,p)=>t+p.resIds.length,0):0;
+    ty.innerHTML=hit?`<div style="color:var(--acc);font-weight:600">✅ 已完成：${mdOf(rec.date)} ${escH(res?.n||'')} 的班</div><div style="color:var(--t2)">${left?`你還有 ${left} 筆未評`:'🎉 你的班都評完了'}</div>`
+      :`<div style="color:var(--danger);font-weight:600">⚠ 這筆評核的日期 ${mdOf(rec.date)} 沒有對上班表上你和 ${escH(res?.n||'')} 的班，待填名單不會因此減少。</div><div style="color:var(--t2)">若日期填錯，請通知管理員修正。${left?`你還有 ${left} 筆未評。`:''}</div>`;
+  }
 }
 
 function showErr(id,msg){const el=document.getElementById(id);el.textContent=msg;el.classList.remove('hidden');}
@@ -3507,6 +3580,7 @@ function delSchedDay(dateStr){
 }
 function schedMon(d){schedMo+=d;if(schedMo>11){schedMo=0;schedY++;}else if(schedMo<0){schedMo=11;schedY--;}renderSched();}
 function renderSched(){
+  if(isAdmin){try{renderSchedSrc();}catch(e){showJsError('班表連結載入失敗: '+e.message);}}
   document.getElementById('sched-t').textContent=`${schedY}年${schedMo+1}月`;
   const t=tod(),fd=new Date(schedY,schedMo,1).getDay(),days=new Date(schedY,schedMo+1,0).getDate();
   const grid=document.getElementById('sc-grid');grid.innerHTML='';
@@ -3618,14 +3692,7 @@ function renderMissing(){
         </div>`).join('')}
     </div>`).join('');
 }
-function navToAssess(attId,resId,date){
-  nav('assess');
-  setTimeout(()=>{
-    const fa=document.getElementById('f-att');const fr=document.getElementById('f-res');const fd=document.getElementById('f-date');
-    if(fa)fa.value=attId;if(fr)fr.value=resId;if(fd)fd.value=date;
-    onAttChange();
-  },120);
-}
+function navToAssess(attId,resId,date){openAssessFor(attId,resId,date);}
 // The public URL of this system, used in short reminder messages so the
 // recipient can tap straight through to fill in their evaluation.
 const SYSTEM_URL='https://gentleowl-er.github.io/SHHer/';
@@ -3856,10 +3923,15 @@ function schedSrcWarn(now){
   if(+t.slice(8)>=25&&!src[next])return{level:'warn',msg:`ℹ 下個月（${next}）還沒有班表網址，有了就可以先貼上。`};
   return null;
 }
+function schedMonthKey(){return `${schedY}-${String(schedMo+1).padStart(2,'0')}`;}
 function renderSchedSrc(){
   const src=CFG.schedSrc||{};
-  const w=schedSrcWarn(),wEl=document.getElementById('ss-warn');
-  if(wEl)wEl.innerHTML=w?`<div class="al ${w.level==='err'?'ae':'ai'} mb4" style="font-size:12.5px">${w.msg}</div>`:'';
+  const w=schedSrcWarn(),wHtml=w?`<div class="al ${w.level==='err'?'ae':'ai'} mb4" style="font-size:12.5px">${w.msg}</div>`:'';
+  ['ss-warn','ss-admin-warn'].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML=wHtml;});
+  const sm=schedMonthKey(),tEl=document.getElementById('ss-title');if(tEl)tEl.textContent=`${schedY}年${schedMo+1}月`;
+  const cEl=document.getElementById('ss-cur');
+  if(cEl)cEl.innerHTML=src[sm]?`<div class="ifl" style="gap:8px;align-items:center;flex-wrap:wrap"><span style="color:var(--acc)">✅ 已設定</span><a href="${escH(src[sm])}" target="_blank" rel="noopener" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(src[sm])}</a><button class="btn bs bxs" onclick="syncSchedMonth('${sm}')">🔄 同步這個月</button><button class="btn bxs bd" onclick="delSchedSrc('${sm}')">刪除</button></div><div style="font-size:11px;color:var(--t3);margin-top:3px">換新連結：直接在下方貼上新網址即可。</div>`
+    :`<span style="color:var(--a3)">這個月還沒有班表連結。</span>`;
   const cur=tod().slice(0,7);
   const l=document.getElementById('ss-list');
   if(l)l.innerHTML=Object.keys(src).sort().reverse().map(m=>`<div class="ifl" style="gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
@@ -3869,7 +3941,6 @@ function renderSchedSrc(){
     <button class="btn bxs bd" onclick="delSchedSrc('${escH(m)}')">刪除</button></div>`).join('')||'<div style="color:var(--t3)">尚未設定任何月份</div>';
   const h=document.getElementById('ss-hour');
   if(h){h.innerHTML=[...Array(24)].map((_,i)=>`<option value="${i}">${String(i).padStart(2,'0')}:00</option>`).join('');h.value=String(CFG.schedHour==null?5:CFG.schedHour);}
-  const mi=document.getElementById('ss-month');if(mi&&!mi.value)mi.value=ymAdd(cur,1);
   const hk=document.getElementById('ss-hook');if(hk)hk.value=CFG.schedHookUrl||'';
   let tk='';try{tk=localStorage.getItem(SCHED_TOKEN_KEY)||'';}catch(e){}
   const te=document.getElementById('ss-token');if(te)te.value=tk;
@@ -3912,9 +3983,11 @@ async function pingSchedHook(){
   try{const j=await callSchedHook({action:'ping'});if(out)out.innerHTML=`✅ 同步程式連線正常（${escH(j.now||'')}）`;}
   catch(e){if(out)out.innerHTML=`<div style="color:var(--danger)">❌ ${escH(e.message)}</div>`;}
 }
-function addSchedSrc(){
-  const m=(document.getElementById('ss-month')?.value||'').trim(),url=(document.getElementById('ss-url')?.value||'').trim();
+function addSchedSrc(month,link){
+  const m=month||schedMonthKey(),url=(link||document.getElementById('ss-url')?.value||'').trim();
   if(!/^\d{4}-\d{2}$/.test(m)){alert('請選擇月份');return null;}
+  if(CFG.schedSrc?.[m]===url){const out=document.getElementById('ss-result');if(out)out.innerHTML='這個網址已經是本月的班表連結。';return null;}
+  if(CFG.schedSrc?.[m]&&!confirm(`${m} 已經有班表連結，要換成新網址嗎？`))return null;
   if(!/^https:\/\/docs\.google\.com\/spreadsheets\/d\//.test(url)){alert('請貼上 Google 試算表網址（https://docs.google.com/spreadsheets/d/...）');return null;}
   CFG.schedSrc={...(CFG.schedSrc||{}),[m]:url};save();renderSchedSrc();
   document.getElementById('ss-url').value='';
@@ -3932,7 +4005,7 @@ async function loadSchedLog(){
     el.innerHTML=list.slice(0,20).map(e=>`<div style="padding:6px 0;border-bottom:1px solid var(--border)"><div style="color:var(--t3);font-size:11px">${escH(e.at||'')} · ${e.trigger==='auto'?'自動':'手動'}</div>${fmtSchedLog(e)}</div>`).join('')||'<div style="color:var(--t3)">尚無同步紀錄</div>';
   }catch(e){el.innerHTML=`<div style="color:var(--t3)">無法讀取同步紀錄：${escH(e.message)}</div>`;}
 }
-function initAdmin(){try{renderSchedSrc();loadSchedLog();}catch(e){showJsError('班表來源載入失敗: '+e.message);}const qem=document.getElementById('q-em');const qmm=document.getElementById('q-mm');if(qem)qem.value=CFG.qEpaM||0;if(qmm)qmm.value=CFG.qMsM||0;populateSel('ccc-res',false);populateSel('ward-res',false);renderAdmToggles();renderItemEditor();}
+function initAdmin(){try{renderSchedSrc();}catch(e){showJsError('班表連結提醒載入失敗: '+e.message);}const qem=document.getElementById('q-em');const qmm=document.getElementById('q-mm');if(qem)qem.value=CFG.qEpaM||0;if(qmm)qmm.value=CFG.qMsM||0;populateSel('ccc-res',false);populateSel('ward-res',false);renderAdmToggles();renderItemEditor();}
 function renderCCCPanel(){
   const resId=document.getElementById('ccc-res').value;const panel=document.getElementById('ccc-panel');if(!resId){panel.innerHTML='';return;}
   const r=getRes(resId);
