@@ -8,7 +8,8 @@
  * （預設「雙和{民國年}-{月}急診值班表」，可用指令碼屬性 SCHED_TITLE 改），找到的網址記在 schedAuto。
  * 只更新試算表上出現的日期（config/schedule 的 data.<日期>），並在 config/schedLog 留紀錄。
  * 該月的「代碼→姓名」存在 config/cfg 的 schedNames.<月份>，供網頁手動貼上時用姓名對應主治醫師。
- * 管理員頁的「立即同步」經由 doPost() 呼叫，需要通關碼（指令碼屬性 SYNC_TOKEN）。
+ * 管理員頁的「立即同步」經由 doPost() 呼叫，需要通關碼（指令碼屬性 SYNC_TOKEN，setup() 沒有時會自動產生）。
+ * Firebase 設定沒填指令碼屬性時，會從公開的 SHHer 網頁讀一次並記住。
  *
  * 只讀 Shiftcard 分頁的住院醫師欄與「班表」分頁的「醫師姓名」表（代碼、姓名兩欄），
  * 不讀電話欄，也不用 Shiftcard 右側的舊代碼表。主治醫師一律以姓名對應系統，絕不以代碼猜。
@@ -88,7 +89,19 @@ function ssTitleMonth(title){const m=String(title||'').match(/(1\d\d)\s*[-年\/.
 
 // ── settings (Project Settings → Script properties) ──
 function cfgProp(k){return PropertiesService.getScriptProperties().getProperty(k)||'';}
-function fsBase(){return 'https://firestore.googleapis.com/v1/projects/'+cfgProp('FB_PROJECT')+'/databases/(default)/documents';}
+// Firebase project + web API key: script properties if set, otherwise read once from the published
+// SHHer page (the same public web config the page itself uses) and remembered — no typing keys.
+const SHHER_PAGE='https://gentleowl-er.github.io/SHHer/';
+function fbConf(k){
+  const v=cfgProp(k);if(v)return v;
+  const html=UrlFetchApp.fetch(cfgProp('SHHER_URL')||SHHER_PAGE,{muteHttpExceptions:true}).getContentText();
+  const blk=(html.match(/FB_CONFIG\s*=\s*\{[^}]*\}/)||[''])[0];
+  const key=(blk.match(/apiKey\s*:\s*["']([^"']+)/)||[])[1],proj=(blk.match(/projectId\s*:\s*["']([^"']+)/)||[])[1];
+  if(!key||!proj)throw new Error('讀不到 SHHer 網頁的 Firebase 設定，請在指令碼屬性填 FB_PROJECT 與 FB_API_KEY');
+  const props=PropertiesService.getScriptProperties();props.setProperty('FB_PROJECT',proj);props.setProperty('FB_API_KEY',key);
+  return k==='FB_PROJECT'?proj:key;
+}
+function fsBase(){return 'https://firestore.googleapis.com/v1/projects/'+fbConf('FB_PROJECT')+'/databases/(default)/documents';}
 
 // ── Firestore REST (same value encoding as the web page) ──
 function fsEnc(v){
@@ -111,7 +124,7 @@ function fsDec(val){
 }
 function fsDecFields(f){const o={};Object.keys(f||{}).forEach(k=>{o[k]=fsDec(f[k]);});return o;}
 function fsCall(path,method,body){
-  const url=fsBase()+path+(path.indexOf('?')<0?'?':'&')+'key='+cfgProp('FB_API_KEY');
+  const url=fsBase()+path+(path.indexOf('?')<0?'?':'&')+'key='+fbConf('FB_API_KEY');
   const opt={method:method||'get',muteHttpExceptions:true,contentType:'application/json'};
   if(body)opt.payload=JSON.stringify(body);
   const res=UrlFetchApp.fetch(url,opt);const code=res.getResponseCode();
@@ -243,9 +256,14 @@ function doPost(e){
   return out({ok:true,logs:syncMonths([cur,monthAdd(cur,1)],'manual',[monthAdd(cur,1)])});
 }
 
-// ── run once from the editor: installs the hourly trigger ──
+// ── run once from the editor: installs the hourly trigger, makes the pass-code if there is none ──
 function setup(){
+  const props=PropertiesService.getScriptProperties();
+  let tok=props.getProperty('SYNC_TOKEN');
+  if(!tok){tok=Utilities.getUuid().replace(/-/g,'').slice(0,20);props.setProperty('SYNC_TOKEN',tok);}
+  fbConf('FB_API_KEY');                 // fail here (visible) rather than at 5 a.m.
   ScriptApp.getProjectTriggers().forEach(tr=>{if(tr.getHandlerFunction()==='hourly')ScriptApp.deleteTrigger(tr);});
   ScriptApp.newTrigger('hourly').timeBased().everyHours(1).create();
   Logger.log('✅ 已建立觸發器：每小時檢查一次，到了管理員頁設定的時間就同步');
+  Logger.log('🔑 通關碼：'+tok+'（貼到 SHHer「班表」頁 → ⚙ 同步程式設定 → 通關碼；只存在你的裝置）');
 }
