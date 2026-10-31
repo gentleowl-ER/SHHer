@@ -155,7 +155,13 @@ function monthAdd(ym,n){const y=+ym.slice(0,4),m=+ym.slice(5,7)-1+n;const yy=y+M
 function readSource(url){
   let ss;
   try{ss=SpreadsheetApp.openByUrl(url);}
-  catch(e){throw new Error('試算表無法開啟：沒有共用給執行同步的 Google 帳號，或網址錯誤');}
+  catch(e){
+    const msg=String(e&&e.message||e);
+    // SpreadsheetApp needs the full spreadsheets scope even to read; say so instead of blaming sharing
+    if(/權限|permission|authorization|auth\/spreadsheets/i.test(msg)&&/auth\/spreadsheets|SpreadsheetApp/.test(msg))
+      throw new Error('同步程式的授權不足：請在 Apps Script 編輯器執行一次 setup 並按「允許」（需要「試算表」權限）');
+    throw new Error('試算表無法開啟：沒有共用給執行同步的 Google 帳號，或網址錯誤（'+msg.slice(0,80)+'）');
+  }
   const sc=ss.getSheetByName('Shiftcard');if(!sc)throw new Error('找不到「Shiftcard」分頁');
   const bt=ss.getSheetByName('班表');if(!bt)throw new Error('找不到「班表」分頁');
   const grid=sc.getDataRange().getDisplayValues();

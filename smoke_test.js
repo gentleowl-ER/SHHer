@@ -95,7 +95,7 @@ function makeGAS(env) {
     getDataRange: () => { env.reads.push({ tab, r: 1, c: 1, nr: grid.length, nc: Math.max(...grid.map(r => r.length)) }); return { getDisplayValues: () => grid.map(r => r.map(v => String(v ?? ''))) }; },
     getLastRow: () => grid.length, getLastColumn: () => Math.max(...grid.map(r => r.length)),
     getRange: (r, c, nr, nc) => { env.reads.push({ tab, r, c, nr, nc }); return { getDisplayValues: () => [...Array(nr)].map((_, i) => [...Array(nc)].map((_, j) => String((grid[r - 1 + i] || [])[c - 1 + j] ?? ''))) }; } });
-  const SpreadsheetApp = { openByUrl: url => { if (env.deny.has(url) || !env.sheets[url]) throw new Error('You do not have permission'); const sh = env.sheets[url];
+  const SpreadsheetApp = { openByUrl: url => { if (env.noScope) throw new Error('指定的權限不足，無法呼叫 SpreadsheetApp.openByUrl。必要權限：https://www.googleapis.com/auth/spreadsheets'); if (env.deny.has(url) || !env.sheets[url]) throw new Error('You do not have permission'); const sh = env.sheets[url];
     return { getName: () => sh.title, getSheetByName: n => sh.tabs[n] ? sheetMock(n, sh.tabs[n]) : null }; } };
   const UrlFetchApp = { fetch: (url, o) => { if (url.startsWith('https://gentleowl-er.github.io/')) { env.pageReads = (env.pageReads || 0) + 1; return { getResponseCode: () => 200, getContentText: () => env.page || '' }; } const r = fsHandle(url, { method: (o.method || 'get').toUpperCase(), body: o.payload }); return { getResponseCode: () => r.status, getContentText: () => JSON.stringify(r.body) }; } };
   const PropertiesService = { getScriptProperties: () => ({ getProperty: k => props[k] ?? null, setProperty: (k, v) => { props[k] = String(v); } }) };
@@ -666,6 +666,8 @@ js = js.replace(/\ninit\(\);\s*$/, '\n') + `
   T('unshared sheet: log names the month',!logs[1].ok&&logs[1].error.includes('2026-11')&&logs[1].error.includes('沒有共用'));
   T('phone column never read',!env.reads.some(r=>r.tab==='班表'&&r.c<=50&&r.c+r.nc-1>=50&&r.r+r.nr-1>=4));
   T('log stored in config/schedLog',(get('config','schedLog').entries||[]).length===2);
+  env.noScope=true;const lsc=G.syncMonths(['2026-10'],'manual');env.noScope=false;
+  T('missing spreadsheets permission → says re-authorize, not "not shared"',!lsc[0].ok&&lsc[0].error.includes('授權不足')&&!lsc[0].error.includes('沒有共用'));
   // daily schedule: only at the configured hour, once a day, this month (+ next if set)
   env.deny.delete(NOV);env.sheets[NOV]={title:'雙和115-11急診值班表',tabs:{Shiftcard:[[],[],[],['11/1','20']],'班表':BT}};
   at(2026,10,20,4,30);T('before the hour → nothing',G.hourly()===null);
