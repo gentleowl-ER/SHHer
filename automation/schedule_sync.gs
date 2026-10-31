@@ -3,7 +3,9 @@
  * 設定步驟見 automation/README.md。
  *
  * 每小時觸發一次 hourly()：到了管理員設定的時間（config/cfg 的 schedHour，台北時間）
- * 且今天還沒同步，就讀「本月」與「下個月」的試算表（config/cfg 的 schedSrc），
+ * 且今天還沒同步，就讀「本月」與「下個月」的試算表，
+ * 來源：班表頁手動貼的網址（config/cfg 的 schedSrc）優先；沒有就在雲端硬碟用檔名自動找
+ * （預設「雙和{民國年}-{月}急診值班表」，可用指令碼屬性 SCHED_TITLE 改），找到的網址記在 schedAuto。
  * 只更新試算表上出現的日期（config/schedule 的 data.<日期>），並在 config/schedLog 留紀錄。
  * 該月的「代碼→姓名」存在 config/cfg 的 schedNames.<月份>，供網頁手動貼上時用姓名對應主治醫師。
  * 管理員頁的「立即同步」經由 doPost() 呼叫，需要通關碼（指令碼屬性 SYNC_TOKEN）。
@@ -155,17 +157,51 @@ function readSource(url){
   return{title:ss.getName(),grid,nameTable:ssParseNameTable(pairs)};
 }
 
+// ── finding a month's spreadsheet by its title (no link needed each month) ──
+// Pattern from script property SCHED_TITLE, default 雙和{ROC}-{MM}急診值班表. Exact title only;
+// several files with that exact title → refuse (never guess), the admin pastes the link instead.
+function schedTitleFor(month){
+  const y=+month.slice(0,4),m=month.slice(5,7);
+  return (cfgProp('SCHED_TITLE')||'雙和{ROC}-{MM}急診值班表').replace('{ROC}',String(y-1911)).replace('{MM}',m).replace('{M}',String(+m)).replace('{YYYY}',String(y));
+}
+function findMonthSource(month){
+  const title=schedTitleFor(month);
+  const q="title contains '"+title.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+"' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false";
+  let it;
+  try{it=DriveApp.searchFiles(q);}
+  catch(e){throw new Error('無法搜尋雲端硬碟（同步程式需要重新授權「查看雲端硬碟檔案」）');}
+  const hits=[];
+  while(it.hasNext()){const f=it.next();if(ssNorm(f.getName())===ssNorm(title))hits.push(f);}
+  if(!hits.length)return null;
+  if(hits.length>1)throw new Error('雲端硬碟有 '+hits.length+' 份標題都是「'+title+'」的試算表，無法判斷用哪一份，請在班表頁貼上這個月的網址');
+  return{url:hits[0].getUrl(),title};
+}
+// manual link wins; otherwise search Drive. Returns {url, how:'manual'|'auto'} or null.
+function resolveSource(month,cfg){
+  const src=cfg.schedSrc||{};
+  if(src[month])return{url:src[month],how:'manual'};
+  const f=findMonthSource(month);
+  return f?{url:f.url,how:'auto',title:f.title}:null;
+}
+
 // ── one sync run ──
 // months: ['2026-10','2026-11']; trigger: 'auto' | 'manual'. Returns the log entries.
-function syncMonths(months,trigger){
-  const cfg=fsGet('config','cfg')||{};const src=cfg.schedSrc||{};const t=nowTpe();
+// optional: months whose sheet may simply not exist yet (next month) — skipped quietly, no log entry.
+function syncMonths(months,trigger,optional){
+  const cfg=fsGet('config','cfg')||{};const auto=cfg.schedAuto||{};const t=nowTpe();
   let residents=null,attendings=null;const logs=[];
   months.forEach(month=>{
     const entry={at:t.stamp,trigger,month,ok:false};
     try{
-      const url=src[month];
-      if(!url)throw new Error(month+' 尚未設定班表來源網址');
-      const s=readSource(url);
+      const so=resolveSource(month,cfg);
+      if(!so){
+        if(optional&&optional.indexOf(month)>=0)return;
+        throw new Error(month+' 尚未設定班表來源網址，雲端硬碟也找不到「'+schedTitleFor(month)+'」（還沒共用給同步帳號，或檔名不同；可在班表頁手動貼上網址）');
+      }
+      entry.src=so.how;
+      // remember an auto-found link so the page can show it (one write, only when it changes)
+      if(so.how==='auto'&&auto[month]!==so.url){fsPatch('config','cfg',{schedAuto:{[month]:so.url}},['schedAuto.'+fsSeg(month)]);auto[month]=so.url;}
+      const s=readSource(so.url);
       if(!residents){residents=fsList('residents');attendings=fsList('attendings');}
       const r=buildMonthSchedule({month,grid:s.grid,nameTable:s.nameTable,residents,attendings});
       const paths=Object.keys(r.dates).map(ds=>'data.'+fsSeg(ds));
@@ -193,8 +229,7 @@ function hourly(){
   if(t.hour!==hour||props.getProperty('LAST_RUN')===t.ymd)return null;
   props.setProperty('LAST_RUN',t.ymd);
   const cur=t.ymd.slice(0,7),next=monthAdd(cur,1);
-  const months=[cur];if((cfg.schedSrc||{})[next])months.push(next); // next month only once its URL is in
-  return syncMonths(months,'auto');
+  return syncMonths([cur,next],'auto',[next]); // next month only once its sheet exists
 }
 
 // ── web app for the admin page (立即同步 / 貼上網址後同步 / 測試連線) ──
@@ -204,8 +239,8 @@ function doPost(e){
   if(!cfgProp('SYNC_TOKEN')||req.token!==cfgProp('SYNC_TOKEN'))return out({ok:false,error:'通關碼錯誤'});
   if(req.action==='ping')return out({ok:true,now:nowTpe().stamp});
   const cur=nowTpe().ymd.slice(0,7);
-  const months=req.month?[String(req.month)]:[cur,monthAdd(cur,1)];
-  return out({ok:true,logs:syncMonths(months,'manual')});
+  if(req.month)return out({ok:true,logs:syncMonths([String(req.month)],'manual')});
+  return out({ok:true,logs:syncMonths([cur,monthAdd(cur,1)],'manual',[monthAdd(cur,1)])});
 }
 
 // ── run once from the editor: installs the hourly trigger ──

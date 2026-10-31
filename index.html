@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>急診醫學評核系統 v5.31</title>
+<title>急診醫學評核系統 v5.32</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <!-- Firestore accessed via REST API (no SDK needed - more reliable on mobile/file:// contexts) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -369,7 +369,7 @@ body{font-size:var(--base-font,17px)}
 <div class="sbo" id="sbo" onclick="closeSB()"></div>
 <aside class="sidebar" id="sb">
   <div class="sb-logo">
-    <div class="sb-tag">TSEM · CBME 2025 v5.31</div>
+    <div class="sb-tag">TSEM · CBME 2025 v5.32</div>
     <h1>急診醫學<br>住院醫師評核系統</h1>
   </div>
   <nav class="sb-nav">
@@ -772,12 +772,12 @@ body{font-size:var(--base-font,17px)}
     </div>
   </div>
   <div class="card mb4 admin-only" id="sched-src-card">
-    <div class="ct"><span class="dot" style="background:var(--acc)"></span>🔗 <span id="ss-title">本月</span> 班表連結（Google 試算表，每天自動同步）</div>
+    <div class="ct"><span class="dot" style="background:var(--acc)"></span>🔗 <span id="ss-title">本月</span> 班表來源（Google 試算表，每天自動找、自動同步）</div>
     <div id="ss-warn"></div>
     <div id="ss-setup"></div>
     <div id="ss-cur" style="font-size:12.5px;margin-bottom:8px"></div>
     <div class="ifl" style="gap:6px;flex-wrap:wrap;align-items:flex-end">
-      <div class="fg" style="margin:0;flex:1;min-width:200px"><label style="font-size:11px">貼上這個月的 Google 試算表網址</label><input type="url" id="ss-url" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
+      <div class="fg" style="margin:0;flex:1;min-width:200px"><label style="font-size:11px">手動指定網址（只有檔名不同或找錯檔案時才需要）</label><input type="url" id="ss-url" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
       <button class="btn bp bsm" onclick="addSchedSrc()">💾 儲存並同步</button>
     </div>
     <div id="ss-result" class="mt3" style="font-size:12.5px"></div>
@@ -3940,10 +3940,16 @@ function restoreDefaultItems(){
 // The pass-code stays on this device only (it is never written to the cloud).
 const SCHED_TOKEN_KEY='em52_sched_token';
 function ymAdd(ym,n){const d=new Date(+ym.slice(0,4),+ym.slice(5,7)-1+n,1);return ymd(d).slice(0,7);}
+// The sync program finds each month's sheet in Drive by its title (CFG.schedAuto = what it found);
+// a pasted link (CFG.schedSrc) is only needed when the title differs.
+function schedSrcOf(m){const src=CFG.schedSrc||{},au=CFG.schedAuto||{};return src[m]?{url:src[m],how:'manual'}:au[m]?{url:au[m],how:'auto'}:null;}
+function schedTitleGuess(m){return `雙和${+m.slice(0,4)-1911}-${m.slice(5,7)}急診值班表`;}
 function schedSrcWarn(now){
-  const t=ymd(now||new Date()),cur=t.slice(0,7),next=ymAdd(cur,1),src=CFG.schedSrc||{};
-  if(!src[cur])return{level:'err',msg:`⚠ 本月（${cur}）尚未設定班表來源，自動同步不會更新本月班表。`};
-  if(+t.slice(8)>=25&&!src[next])return{level:'warn',msg:`ℹ 下個月（${next}）還沒有班表網址，有了就可以先貼上。`};
+  const t=ymd(now||new Date()),cur=t.slice(0,7),next=ymAdd(cur,1);
+  if(!schedSrcOf(cur))return{level:'err',msg:CFG.schedHookUrl
+    ?`⚠ 還沒找到本月（${cur}）的班表：雲端硬碟裡要有「${schedTitleGuess(cur)}」並共用給同步帳號；檔名不同就在班表頁貼上網址。`
+    :`⚠ 本月（${cur}）尚未設定班表來源，自動同步不會更新本月班表。`};
+  if(!CFG.schedHookUrl&&+t.slice(8)>=25&&!schedSrcOf(next))return{level:'warn',msg:`ℹ 下個月（${next}）還沒有班表網址，有了就可以先貼上。`};
   return null;
 }
 function schedMonthKey(){return `${schedY}-${String(schedMo+1).padStart(2,'0')}`;}
@@ -3952,16 +3958,22 @@ function renderSchedSrc(){
   const w=schedSrcWarn(),wHtml=w?`<div class="al ${w.level==='err'?'ae':'ai'} mb4" style="font-size:12.5px">${w.msg}</div>`:'';
   ['ss-warn','ss-admin-warn'].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML=wHtml;});
   const sm=schedMonthKey(),tEl=document.getElementById('ss-title');if(tEl)tEl.textContent=`${schedY}年${schedMo+1}月`;
-  const cEl=document.getElementById('ss-cur');
-  if(cEl)cEl.innerHTML=src[sm]?`<div class="ifl" style="gap:8px;align-items:center;flex-wrap:wrap"><span style="color:var(--acc)">✅ 已設定</span><a href="${escH(src[sm])}" target="_blank" rel="noopener" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(src[sm])}</a><button class="btn bs bxs" onclick="syncSchedMonth('${sm}')">🔄 同步這個月</button><button class="btn bxs bd" onclick="delSchedSrc('${sm}')">刪除</button></div><div style="font-size:11px;color:var(--t3);margin-top:3px">換新連結：直接在下方貼上新網址即可。</div>`
+  const cEl=document.getElementById('ss-cur'),so=schedSrcOf(sm);
+  if(cEl)cEl.innerHTML=so&&so.how==='auto'?`<div class="ifl" style="gap:8px;align-items:center;flex-wrap:wrap"><span style="color:var(--acc)">🔎 已自動找到</span><a href="${escH(so.url)}" target="_blank" rel="noopener" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(schedTitleGuess(sm))}</a><button class="btn bs bxs" onclick="syncSchedMonth('${sm}')">🔄 同步這個月</button></div><div style="font-size:11px;color:var(--t3);margin-top:3px">不用貼連結：同步程式每天依檔名在雲端硬碟找這個月的班表。找錯檔案時才在下方貼上正確網址。</div>`
+    :src[sm]?`<div class="ifl" style="gap:8px;align-items:center;flex-wrap:wrap"><span style="color:var(--acc)">✅ 已設定</span><a href="${escH(src[sm])}" target="_blank" rel="noopener" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(src[sm])}</a><button class="btn bs bxs" onclick="syncSchedMonth('${sm}')">🔄 同步這個月</button><button class="btn bxs bd" onclick="delSchedSrc('${sm}')">刪除</button></div><div style="font-size:11px;color:var(--t3);margin-top:3px">換新連結：直接在下方貼上新網址即可。</div>`
+    :CFG.schedHookUrl?`<span style="color:var(--a3)">還沒找到這個月的班表。</span><div style="font-size:11px;color:var(--t3);margin-top:3px">同步程式會依檔名「${escH(schedTitleGuess(sm))}」自動找（每天一次，或按「同步這個月」）；檔名不同時才需要在下方貼上網址。</div><button class="btn bs bxs mt3" onclick="syncSchedMonth('${sm}')">🔄 同步這個月</button>`
     :`<span style="color:var(--a3)">這個月還沒有班表連結。</span>`;
   const cur=tod().slice(0,7);
   const l=document.getElementById('ss-list');
-  if(l)l.innerHTML=Object.keys(src).sort().reverse().map(m=>`<div class="ifl" style="gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+  const auOnly=Object.keys(CFG.schedAuto||{}).filter(m=>!src[m]).sort().reverse().slice(0,3);
+  if(l)l.innerHTML=auOnly.map(m=>`<div class="ifl" style="gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+    <b style="font-family:'DM Mono';min-width:64px;color:${m<cur?'var(--t3)':'var(--acc)'}">${escH(m)}</b>
+    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--t2)">🔎 自動找到 ${escH(schedTitleGuess(m))}</span>
+    <button class="btn bs bxs" onclick="syncSchedMonth('${escH(m)}')">同步</button></div>`).join('')+(Object.keys(src).sort().reverse().map(m=>`<div class="ifl" style="gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
     <b style="font-family:'DM Mono';min-width:64px;color:${m<cur?'var(--t3)':'var(--acc)'}">${escH(m)}</b>
     <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--t2)">${m<cur?'（已過，不再同步）':''}${escH(src[m])}</span>
     <button class="btn bs bxs" onclick="syncSchedMonth('${escH(m)}')">同步</button>
-    <button class="btn bxs bd" onclick="delSchedSrc('${escH(m)}')">刪除</button></div>`).join('')||'<div style="color:var(--t3)">尚未設定任何月份</div>';
+    <button class="btn bxs bd" onclick="delSchedSrc('${escH(m)}')">刪除</button></div>`).join('')||(auOnly.length?'':'<div style="color:var(--t3)">尚未設定任何月份</div>'));
   const h=document.getElementById('ss-hour');
   if(h){h.innerHTML=[...Array(24)].map((_,i)=>`<option value="${i}">${String(i).padStart(2,'0')}:00</option>`).join('');h.value=String(CFG.schedHour==null?5:CFG.schedHour);}
   const hk=document.getElementById('ss-hook');if(hk)hk.value=CFG.schedHookUrl||'';
@@ -3994,7 +4006,7 @@ async function callSchedHook(body){
 function fmtSchedLog(e){
   if(!e.ok)return`<div style="color:var(--danger)">❌ ${escH(e.error||'失敗')}</div>`;
   const md=s=>s?(+s.slice(5,7))+'/'+(+s.slice(8,10)):'—';
-  let h=`<div>✅ <b>${escH(e.month)}</b>：《${escH(e.title||'')}》 ${md(e.first)}–${md(e.last)}，${e.days} 天，${e.entries} 筆</div>`;
+  let h=`<div>✅ <b>${escH(e.month)}</b>${e.src==='auto'?'（依檔名自動找到）':''}：《${escH(e.title||'')}》 ${md(e.first)}–${md(e.last)}，${e.days} 天，${e.entries} 筆</div>`;
   if(e.titleMonth&&e.titleMonth!==e.month)h+=`<div style="color:var(--danger);font-weight:600">⚠ 試算表標題是 ${escH(e.titleMonth)}，與設定的月份 ${escH(e.month)} 不同，請確認網址是否貼錯。</div>`;
   if((e.skippedCodes||[]).length)h+=`<div style="color:var(--a3)">略過代碼：${e.skippedCodes.map(x=>`${escH(x.code)}${x.name?'='+escH(x.name):''}×${x.n}（${escH(x.why)}）`).join('、')}</div>`;
   if((e.skippedRes||[]).length)h+=`<div style="color:var(--a3)">略過學員欄：${e.skippedRes.map(x=>`${escH(x.label)}（${escH(x.why)}）`).join('、')}</div>`;
