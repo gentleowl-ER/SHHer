@@ -97,17 +97,21 @@ function makeGAS(env) {
     getRange: (r, c, nr, nc) => { env.reads.push({ tab, r, c, nr, nc }); return { getDisplayValues: () => [...Array(nr)].map((_, i) => [...Array(nc)].map((_, j) => String((grid[r - 1 + i] || [])[c - 1 + j] ?? ''))) }; } });
   const SpreadsheetApp = { openByUrl: url => { if (env.deny.has(url) || !env.sheets[url]) throw new Error('You do not have permission'); const sh = env.sheets[url];
     return { getName: () => sh.title, getSheetByName: n => sh.tabs[n] ? sheetMock(n, sh.tabs[n]) : null }; } };
-  const UrlFetchApp = { fetch: (url, o) => { const r = fsHandle(url, { method: (o.method || 'get').toUpperCase(), body: o.payload }); return { getResponseCode: () => r.status, getContentText: () => JSON.stringify(r.body) }; } };
+  const UrlFetchApp = { fetch: (url, o) => { if (url.startsWith('https://gentleowl-er.github.io/')) { env.pageReads = (env.pageReads || 0) + 1; return { getResponseCode: () => 200, getContentText: () => env.page || '' }; } const r = fsHandle(url, { method: (o.method || 'get').toUpperCase(), body: o.payload }); return { getResponseCode: () => r.status, getContentText: () => JSON.stringify(r.body) }; } };
   const PropertiesService = { getScriptProperties: () => ({ getProperty: k => props[k] ?? null, setProperty: (k, v) => { props[k] = String(v); } }) };
   const ScriptApp = { getProjectTriggers: () => triggers, deleteTrigger: t => triggers.splice(triggers.indexOf(t), 1),
     newTrigger: fn => ({ timeBased: () => ({ everyHours: n => ({ create: () => triggers.push({ fn, n, getHandlerFunction: () => fn }) }) }) }) };
   const ContentService = { MimeType: { JSON: 'json' }, createTextOutput: t => ({ setMimeType: () => JSON.parse(t) }) };
   const pad = n => String(n).padStart(2, '0');
-  const Utilities = { formatDate: (d, tz, f) => f.replace('yyyy', d.getFullYear()).replace('MM', pad(d.getMonth() + 1)).replace('dd', pad(d.getDate())).replace('HH', pad(d.getHours())).replace('mm', pad(d.getMinutes())).replace(/^H$/, String(d.getHours())) };
+  const Utilities = { getUuid: () => 'abcd1234-ef56-7890-abcd-ef1234567890', formatDate: (d, tz, f) => f.replace('yyyy', d.getFullYear()).replace('MM', pad(d.getMonth() + 1)).replace('dd', pad(d.getDate())).replace('HH', pad(d.getHours())).replace('mm', pad(d.getMinutes())).replace(/^H$/, String(d.getHours())) };
   const Logger = { log: m => { env.logged = m; } };
-  return new Function('SpreadsheetApp', 'UrlFetchApp', 'PropertiesService', 'ScriptApp', 'ContentService', 'Utilities', 'Logger',
+  // fake Drive search: env.drive = [{name, url}]; honours the "title contains '…'" part of the query
+  const DriveApp = { searchFiles: q => { env.driveQ = (env.driveQ || 0) + 1; const t = (q.match(/title contains '([^']*)'/) || [])[1] || '';
+    const list = (env.drive || []).filter(f => f.name.includes(t)).map(f => ({ getName: () => f.name, getUrl: () => f.url })); let i = 0;
+    return { hasNext: () => i < list.length, next: () => list[i++] }; } };
+  return new Function('DriveApp', 'SpreadsheetApp', 'UrlFetchApp', 'PropertiesService', 'ScriptApp', 'ContentService', 'Utilities', 'Logger',
     gasSrc + '\nreturn {buildMonthSchedule, ssParseNameTable, ssMatchName, ssTitleMonth, syncMonths, hourly, doPost, setup, monthAdd};')(
-    SpreadsheetApp, UrlFetchApp, PropertiesService, ScriptApp, ContentService, Utilities, Logger);
+    DriveApp, SpreadsheetApp, UrlFetchApp, PropertiesService, ScriptApp, ContentService, Utilities, Logger);
 }
 global.__GASX = { makeGAS, gasSrc, setHook: h => { HOOK = h; } };
 global.__H = { STORE, LOG, LS, setFail: n => { FAIL_NEXT = n; }, setNow: ms => { NOW = ms; TICK = 0; }, reads: () => { const r = READS; READS = 0; return r; } };
@@ -675,6 +679,40 @@ js = js.replace(/\ninit\(\);\s*$/, '\n') + `
   // web app: pass-code required
   const bad=G.doPost({postData:{contents:JSON.stringify({token:'nope',action:'sync'})}});
   T('wrong pass-code refused, nothing written',bad.ok===false&&writes().length===0);
+  // ── v5.32: each month's sheet found in Drive by its title — no link to paste ──
+  const DEC='https://docs.google.com/spreadsheets/d/dec',DEC2='https://docs.google.com/spreadsheets/d/dec2',TEACH='https://docs.google.com/spreadsheets/d/teach';
+  env.sheets[DEC]={title:'雙和115-12急診值班表',tabs:{Shiftcard:[[],[],[],['12/1','20']],'班表':BT}};
+  env.drive=[{name:'雙和115-12教學活動表',url:TEACH},{name:'Copy of 雙和115-12急診值班表',url:DEC2},{name:'雙和115-12急診值班表',url:DEC}];
+  writes();let la=G.syncMonths(['2026-12'],'manual');
+  T('auto-find: exact title only (not copies / other sheets), log says auto',la[0].ok&&la[0].src==='auto'&&la[0].title==='雙和115-12急診值班表');
+  T('auto-find: link remembered in cfg.schedAuto (one write)',(get('config','cfg').schedAuto||{})['2026-12']===DEC&&writes().filter(x=>x.startsWith('PATCH config/cfg')).length===2);
+  G.syncMonths(['2026-12'],'manual');
+  T('auto-find: same link next time → no extra schedAuto write',writes().filter(x=>x.startsWith('PATCH config/cfg')).length===1);
+  const cfgM=get('config','cfg');cfgM.schedSrc['2026-12']=OCT;put('config','cfg',cfgM);
+  la=G.syncMonths(['2026-12'],'manual');
+  T('a pasted link wins over the Drive search',la[0].src==='manual'&&la[0].title==='雙和115-10急診值班表');
+  delete cfgM.schedSrc['2026-12'];put('config','cfg',cfgM);
+  env.drive.push({name:'雙和115-12急診值班表',url:DEC2});writes();
+  la=G.syncMonths(['2026-12'],'manual');
+  T('two files with the same title → refused, never guessed',!la[0].ok&&la[0].error.includes('2 份')&&!writes().some(x=>x.startsWith('PATCH config/schedule')));
+  env.drive.pop();
+  at(2026,11,28,5,5);hr=G.hourly();
+  T('hourly: next month found in Drive → synced with this month',hr.map(x=>x.month).join()==='2026-11,2026-12'&&hr[1].ok&&hr[1].src==='auto');
+  env.drive=[];at(2026,11,29,5,5);hr=G.hourly();
+  T('hourly: next month not out yet → quietly skipped (no error entry)',hr.length===1&&hr[0].month==='2026-11');
+  env.drive=[{name:'雙和115-11急診值班表',url:NOV}];env.sheets[NOV]=env.sheets[NOV]||{title:'雙和115-11急診值班表',tabs:{Shiftcard:[[],[],[],['11/1','20']],'班表':BT}};
+  at(2026,11,30,5,5);hr=G.hourly();
+  T('hourly: this month with no pasted link → found by title',hr[0].month==='2026-11'&&hr[0].ok&&hr[0].src==='auto');
+  env.drive=[];writes();
+  // v5.32: no script properties to type — Firebase config read once from the public page; setup makes the pass-code
+  const env2={sheets:{},deny:new Set(),props:{},reads:[],page:'<script>const FB_CONFIG={apiKey:"KEYX",authDomain:"x",projectId:"p"};</script>'};
+  const G2=makeGAS(env2);G2.setup();
+  T('setup: pass-code generated and shown once, Firebase config read from the page and remembered',env2.props.SYNC_TOKEN==='abcd1234ef567890abcd'&&env2.props.FB_PROJECT==='p'&&env2.props.FB_API_KEY==='KEYX'&&env2.pageReads===1&&String(env2.logged).includes('abcd1234ef567890abcd'));
+  G2.setup();G2.doPost({postData:{contents:JSON.stringify({token:'abcd1234ef567890abcd',action:'ping'})}});
+  T('setup again keeps the same pass-code; page not re-read',env2.props.SYNC_TOKEN==='abcd1234ef567890abcd'&&env2.pageReads===1);
+  const env3={sheets:{},deny:new Set(),props:{},reads:[],page:'<html>nothing</html>'};let eSet='';
+  try{makeGAS(env3).setup();}catch(e){eSet=e.message;}
+  T('setup: no Firebase config on the page → clear error, no trigger',eSet.includes('FB_API_KEY')&&env3.triggers.length===0);
   T('setup installs one hourly trigger',(G.setup(),G.setup(),env.triggers.length===1&&env.triggers[0].fn==='hourly'));
   // admin page: paste a URL → immediate sync through the web app → schedule refreshed
   setHook(body=>G.doPost({postData:{contents:body}}));
@@ -685,8 +723,17 @@ js = js.replace(/\ninit\(\);\s*$/, '\n') + `
   await addSchedSrc();writes();
   T('paste URL → synced now, months shown for confirmation',CFG.schedSrc['2026-10']===OCT&&document.getElementById('ss-result').innerHTML.includes('115-10')&&document.getElementById('ss-result').innerHTML.includes('10/1–10/15'));
   T('schedule on the page refreshed from the cloud',(SCHED['2026-10-01']||[]).some(e=>e.attId===A_ZENG.id));
-  T('after the 25th, missing next month → gentle reminder',schedSrcWarn().level==='warn');
+  const hk1=CFG.schedHookUrl,au1=CFG.schedAuto;CFG.schedHookUrl='';CFG.schedAuto={};
+  T('after the 25th, missing next month → gentle reminder (no sync program)',schedSrcWarn().level==='warn');
+  CFG.schedHookUrl=hk1;CFG.schedAuto=au1;
+  T('sync program set → no reminder to paste next month (it is found by title)',schedSrcWarn()===null);
   CFG.schedSrc['2026-11']=NOV;T('both months set → no reminder',schedSrcWarn()===null);
+  // page: an auto-found month shows as found, no red warning, no paste needed
+  const src0=CFG.schedSrc,au0=CFG.schedAuto;CFG.schedSrc={};CFG.schedAuto={'2026-10':OCT};schedY=2026;schedMo=9;renderSchedSrc();
+  T('page: auto-found month shown, no warning',schedSrcWarn()===null&&document.getElementById('ss-cur').innerHTML.includes('自動找到')&&document.getElementById('ss-cur').innerHTML.includes('雙和115-10急診值班表'));
+  CFG.schedAuto={};renderSchedSrc();
+  T('page: not found yet → red warning names the expected file title',schedSrcWarn().level==='err'&&schedSrcWarn().msg.includes('雙和115-10急診值班表'));
+  CFG.schedSrc=src0;CFG.schedAuto=au0;renderSchedSrc();
   env.sheets[OCT].title='雙和115-09急診值班表';await syncSchedMonth('2026-10');writes();
   T('title month ≠ configured month → red warning',document.getElementById('ss-result').innerHTML.includes('不同'));
   env.sheets[OCT].title='雙和115-10急診值班表';
@@ -733,9 +780,9 @@ js = js.replace(/\ninit\(\);\s*$/, '\n') + `
   saveNow();
   T('off-schedule save → thank-you page warns',document.getElementById('ty-shift').innerHTML.includes('⚠'));
   // monthly sheet link lives on the schedule page, for the month on screen
-  isAdmin=true;const LINK='https://docs.google.com/spreadsheets/d/oct/edit';CFG.schedSrc={'2026-10':LINK};
+  isAdmin=true;const LINK='https://docs.google.com/spreadsheets/d/oct/edit';CFG.schedSrc={'2026-10':LINK};CFG.schedAuto={};
   schedY=2026;schedMo=10;renderSched();
-  T('schedule page: month without a link says so',document.getElementById('ss-title').textContent==='2026年11月'&&document.getElementById('ss-cur').innerHTML.includes('還沒有'));
+  T('schedule page: month without a link says so',document.getElementById('ss-title').textContent==='2026年11月'&&document.getElementById('ss-cur').innerHTML.includes('還沒'));
   schedMo=9;renderSched();
   T('schedule page: this month’s link shown',document.getElementById('ss-cur').innerHTML.includes(LINK));
   document.getElementById('ss-url').value=LINK;addSchedSrc();

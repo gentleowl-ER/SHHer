@@ -3,10 +3,13 @@
  * 設定步驟見 automation/README.md。
  *
  * 每小時觸發一次 hourly()：到了管理員設定的時間（config/cfg 的 schedHour，台北時間）
- * 且今天還沒同步，就讀「本月」與「下個月」的試算表（config/cfg 的 schedSrc），
+ * 且今天還沒同步，就讀「本月」與「下個月」的試算表，
+ * 來源：班表頁手動貼的網址（config/cfg 的 schedSrc）優先；沒有就在雲端硬碟用檔名自動找
+ * （預設「雙和{民國年}-{月}急診值班表」，可用指令碼屬性 SCHED_TITLE 改），找到的網址記在 schedAuto。
  * 只更新試算表上出現的日期（config/schedule 的 data.<日期>），並在 config/schedLog 留紀錄。
  * 該月的「代碼→姓名」存在 config/cfg 的 schedNames.<月份>，供網頁手動貼上時用姓名對應主治醫師。
- * 管理員頁的「立即同步」經由 doPost() 呼叫，需要通關碼（指令碼屬性 SYNC_TOKEN）。
+ * 管理員頁的「立即同步」經由 doPost() 呼叫，需要通關碼（指令碼屬性 SYNC_TOKEN，setup() 沒有時會自動產生）。
+ * Firebase 設定沒填指令碼屬性時，會從公開的 SHHer 網頁讀一次並記住。
  *
  * 只讀 Shiftcard 分頁的住院醫師欄與「班表」分頁的「醫師姓名」表（代碼、姓名兩欄），
  * 不讀電話欄，也不用 Shiftcard 右側的舊代碼表。主治醫師一律以姓名對應系統，絕不以代碼猜。
@@ -86,7 +89,19 @@ function ssTitleMonth(title){const m=String(title||'').match(/(1\d\d)\s*[-年\/.
 
 // ── settings (Project Settings → Script properties) ──
 function cfgProp(k){return PropertiesService.getScriptProperties().getProperty(k)||'';}
-function fsBase(){return 'https://firestore.googleapis.com/v1/projects/'+cfgProp('FB_PROJECT')+'/databases/(default)/documents';}
+// Firebase project + web API key: script properties if set, otherwise read once from the published
+// SHHer page (the same public web config the page itself uses) and remembered — no typing keys.
+const SHHER_PAGE='https://gentleowl-er.github.io/SHHer/';
+function fbConf(k){
+  const v=cfgProp(k);if(v)return v;
+  const html=UrlFetchApp.fetch(cfgProp('SHHER_URL')||SHHER_PAGE,{muteHttpExceptions:true}).getContentText();
+  const blk=(html.match(/FB_CONFIG\s*=\s*\{[^}]*\}/)||[''])[0];
+  const key=(blk.match(/apiKey\s*:\s*["']([^"']+)/)||[])[1],proj=(blk.match(/projectId\s*:\s*["']([^"']+)/)||[])[1];
+  if(!key||!proj)throw new Error('讀不到 SHHer 網頁的 Firebase 設定，請在指令碼屬性填 FB_PROJECT 與 FB_API_KEY');
+  const props=PropertiesService.getScriptProperties();props.setProperty('FB_PROJECT',proj);props.setProperty('FB_API_KEY',key);
+  return k==='FB_PROJECT'?proj:key;
+}
+function fsBase(){return 'https://firestore.googleapis.com/v1/projects/'+fbConf('FB_PROJECT')+'/databases/(default)/documents';}
 
 // ── Firestore REST (same value encoding as the web page) ──
 function fsEnc(v){
@@ -109,7 +124,7 @@ function fsDec(val){
 }
 function fsDecFields(f){const o={};Object.keys(f||{}).forEach(k=>{o[k]=fsDec(f[k]);});return o;}
 function fsCall(path,method,body){
-  const url=fsBase()+path+(path.indexOf('?')<0?'?':'&')+'key='+cfgProp('FB_API_KEY');
+  const url=fsBase()+path+(path.indexOf('?')<0?'?':'&')+'key='+fbConf('FB_API_KEY');
   const opt={method:method||'get',muteHttpExceptions:true,contentType:'application/json'};
   if(body)opt.payload=JSON.stringify(body);
   const res=UrlFetchApp.fetch(url,opt);const code=res.getResponseCode();
@@ -155,17 +170,51 @@ function readSource(url){
   return{title:ss.getName(),grid,nameTable:ssParseNameTable(pairs)};
 }
 
+// ── finding a month's spreadsheet by its title (no link needed each month) ──
+// Pattern from script property SCHED_TITLE, default 雙和{ROC}-{MM}急診值班表. Exact title only;
+// several files with that exact title → refuse (never guess), the admin pastes the link instead.
+function schedTitleFor(month){
+  const y=+month.slice(0,4),m=month.slice(5,7);
+  return (cfgProp('SCHED_TITLE')||'雙和{ROC}-{MM}急診值班表').replace('{ROC}',String(y-1911)).replace('{MM}',m).replace('{M}',String(+m)).replace('{YYYY}',String(y));
+}
+function findMonthSource(month){
+  const title=schedTitleFor(month);
+  const q="title contains '"+title.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+"' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false";
+  let it;
+  try{it=DriveApp.searchFiles(q);}
+  catch(e){throw new Error('無法搜尋雲端硬碟（同步程式需要重新授權「查看雲端硬碟檔案」）');}
+  const hits=[];
+  while(it.hasNext()){const f=it.next();if(ssNorm(f.getName())===ssNorm(title))hits.push(f);}
+  if(!hits.length)return null;
+  if(hits.length>1)throw new Error('雲端硬碟有 '+hits.length+' 份標題都是「'+title+'」的試算表，無法判斷用哪一份，請在班表頁貼上這個月的網址');
+  return{url:hits[0].getUrl(),title};
+}
+// manual link wins; otherwise search Drive. Returns {url, how:'manual'|'auto'} or null.
+function resolveSource(month,cfg){
+  const src=cfg.schedSrc||{};
+  if(src[month])return{url:src[month],how:'manual'};
+  const f=findMonthSource(month);
+  return f?{url:f.url,how:'auto',title:f.title}:null;
+}
+
 // ── one sync run ──
 // months: ['2026-10','2026-11']; trigger: 'auto' | 'manual'. Returns the log entries.
-function syncMonths(months,trigger){
-  const cfg=fsGet('config','cfg')||{};const src=cfg.schedSrc||{};const t=nowTpe();
+// optional: months whose sheet may simply not exist yet (next month) — skipped quietly, no log entry.
+function syncMonths(months,trigger,optional){
+  const cfg=fsGet('config','cfg')||{};const auto=cfg.schedAuto||{};const t=nowTpe();
   let residents=null,attendings=null;const logs=[];
   months.forEach(month=>{
     const entry={at:t.stamp,trigger,month,ok:false};
     try{
-      const url=src[month];
-      if(!url)throw new Error(month+' 尚未設定班表來源網址');
-      const s=readSource(url);
+      const so=resolveSource(month,cfg);
+      if(!so){
+        if(optional&&optional.indexOf(month)>=0)return;
+        throw new Error(month+' 尚未設定班表來源網址，雲端硬碟也找不到「'+schedTitleFor(month)+'」（還沒共用給同步帳號，或檔名不同；可在班表頁手動貼上網址）');
+      }
+      entry.src=so.how;
+      // remember an auto-found link so the page can show it (one write, only when it changes)
+      if(so.how==='auto'&&auto[month]!==so.url){fsPatch('config','cfg',{schedAuto:{[month]:so.url}},['schedAuto.'+fsSeg(month)]);auto[month]=so.url;}
+      const s=readSource(so.url);
       if(!residents){residents=fsList('residents');attendings=fsList('attendings');}
       const r=buildMonthSchedule({month,grid:s.grid,nameTable:s.nameTable,residents,attendings});
       const paths=Object.keys(r.dates).map(ds=>'data.'+fsSeg(ds));
@@ -193,8 +242,7 @@ function hourly(){
   if(t.hour!==hour||props.getProperty('LAST_RUN')===t.ymd)return null;
   props.setProperty('LAST_RUN',t.ymd);
   const cur=t.ymd.slice(0,7),next=monthAdd(cur,1);
-  const months=[cur];if((cfg.schedSrc||{})[next])months.push(next); // next month only once its URL is in
-  return syncMonths(months,'auto');
+  return syncMonths([cur,next],'auto',[next]); // next month only once its sheet exists
 }
 
 // ── web app for the admin page (立即同步 / 貼上網址後同步 / 測試連線) ──
@@ -204,13 +252,18 @@ function doPost(e){
   if(!cfgProp('SYNC_TOKEN')||req.token!==cfgProp('SYNC_TOKEN'))return out({ok:false,error:'通關碼錯誤'});
   if(req.action==='ping')return out({ok:true,now:nowTpe().stamp});
   const cur=nowTpe().ymd.slice(0,7);
-  const months=req.month?[String(req.month)]:[cur,monthAdd(cur,1)];
-  return out({ok:true,logs:syncMonths(months,'manual')});
+  if(req.month)return out({ok:true,logs:syncMonths([String(req.month)],'manual')});
+  return out({ok:true,logs:syncMonths([cur,monthAdd(cur,1)],'manual',[monthAdd(cur,1)])});
 }
 
-// ── run once from the editor: installs the hourly trigger ──
+// ── run once from the editor: installs the hourly trigger, makes the pass-code if there is none ──
 function setup(){
+  const props=PropertiesService.getScriptProperties();
+  let tok=props.getProperty('SYNC_TOKEN');
+  if(!tok){tok=Utilities.getUuid().replace(/-/g,'').slice(0,20);props.setProperty('SYNC_TOKEN',tok);}
+  fbConf('FB_API_KEY');                 // fail here (visible) rather than at 5 a.m.
   ScriptApp.getProjectTriggers().forEach(tr=>{if(tr.getHandlerFunction()==='hourly')ScriptApp.deleteTrigger(tr);});
   ScriptApp.newTrigger('hourly').timeBased().everyHours(1).create();
   Logger.log('✅ 已建立觸發器：每小時檢查一次，到了管理員頁設定的時間就同步');
+  Logger.log('🔑 通關碼：'+tok+'（貼到 SHHer「班表」頁 → ⚙ 同步程式設定 → 通關碼；只存在你的裝置）');
 }
