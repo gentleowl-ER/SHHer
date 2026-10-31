@@ -690,14 +690,17 @@ js = js.replace(/\ninit\(\);\s*$/, '\n') + `
   env.sheets[OCT].title='雙和115-09急診值班表';await syncSchedMonth('2026-10');writes();
   T('title month ≠ configured month → red warning',document.getElementById('ss-result').innerHTML.includes('不同'));
   env.sheets[OCT].title='雙和115-10急診值班表';
-  // manual paste: optional name table → attendings by name; Shiftcard block → names row
+  // the sync saved October's code→name table in config/cfg, and the page picked it up
+  T('sync stores the month’s name table (cfg.schedNames)',(get('config','cfg').schedNames||{})['2026-10']?.['20']==='曾孟元'&&(CFG.schedNames||{})['2026-10']?.['20']==='曾孟元');
+  // manual paste: no name-table box; the synced table matches attendings by name; Shiftcard block → names row
   // codes row has an unknown code (X) → only the names row can identify all three residents
   const block=[['','E',rfNo,'X'],['',nm('RE'),nm('RF'),nm('RG')],['10/1','20','-','26']].map(r=>r.join('\\t')).join('\\n');
-  document.getElementById('sched-paste').value=block;document.getElementById('sched-names').value='20\\t曾孟元\\n26\\t王鎮珄(西園)';
+  document.getElementById('sched-paste').value=block;CFG.schedNames={...(CFG.schedNames||{}),'2026-10':{'20':'曾孟元','26':'王鎮珄(西園)'}};
   delete SCHED['2026-10-01'];parsePaste();
   T('manual paste uses the names row + name table: 20 → 曾孟元, 26 → 王鎮珄',(SCHED['2026-10-01']||[]).some(e=>e.resId==='RE'&&e.attId===A_ZENG.id)&&(SCHED['2026-10-01']||[]).some(e=>e.resId==='RG'&&e.attId===A_WANG.id)&&document.getElementById('paste-result').innerHTML.includes('以姓名對應'));
-  document.getElementById('sched-names').value='';delete SCHED['2026-10-01'];parsePaste();
-  T('manual paste without table: system codes + warning',(SCHED['2026-10-01']||[]).some(e=>e.resId==='RE'&&e.attId===A_WANG.id)&&document.getElementById('paste-result').innerHTML.includes('未提供醫師姓名表'));
+  const savedNames=CFG.schedNames;CFG.schedNames={};delete SCHED['2026-10-01'];parsePaste();
+  T('month never synced: system codes + red warning',(SCHED['2026-10-01']||[]).some(e=>e.resId==='RE'&&e.attId===A_WANG.id)&&document.getElementById('paste-result').innerHTML.includes('還沒有醫師姓名表'));
+  CFG.schedNames=savedNames;
   await autoSync();writes();
 
   // ── v5.29: quick-fill keeps the shift date; date ↔ schedule reminder; monthly sheet link on the schedule page ──
@@ -740,6 +743,47 @@ js = js.replace(/\ninit\(\);\s*$/, '\n') + `
   CONFIRM=false;document.getElementById('ss-url').value='https://docs.google.com/spreadsheets/d/other/edit';addSchedSrc();
   T('replacing a link asks first (取消 keeps the old one)',CFG.schedSrc['2026-10']===LINK);
   CONFIRM=true;isAdmin=false;
+
+  // ── v5.30: say plainly when automatic schedule sync isn't set up ──
+  isAdmin=true;const hook0=CFG.schedHookUrl;let tok0='';try{tok0=localStorage.getItem(SCHED_TOKEN_KEY)||'';}catch(e){}
+  CFG.schedHookUrl='';renderSched();
+  T('no sync program → red "自動同步尚未啟用"',document.getElementById('ss-setup').innerHTML.includes('尚未啟用'));
+  document.getElementById('ss-url').value='https://docs.google.com/spreadsheets/d/nov/edit';schedMo=10;addSchedSrc();
+  T('saving a link without the sync program says nothing was fetched',document.getElementById('ss-result').innerHTML.includes('還沒抓班表'));
+  CFG.schedHookUrl='https://script.google.com/macros/s/x/exec';saveSchedToken('');renderSched();
+  T('sync program set, no pass-code on this device → info note',document.getElementById('ss-setup').innerHTML.includes('通關碼'));
+  saveSchedToken('tok');renderSched();
+  T('fully set up → no setup note',document.getElementById('ss-setup').innerHTML==='');
+  const f0=global.fetch;global.fetch=async()=>({ok:true,status:200,json:async()=>{throw new Error('Unexpected token <');}});
+  let em='';try{await callSchedHook({action:'ping'});}catch(e){em=e.message;}
+  T('web app returns a login page → actionable message',em.includes('所有人'));
+  global.fetch=f0;CFG.schedHookUrl=hook0;saveSchedToken(tok0);delete CFG.schedSrc['2026-11'];isAdmin=false;
+
+  // ── v5.31: teacher departure keeps evaluations, leaves pickers and reminders ──
+  isAdmin=true;CONFIRM=true;at(2026,11,2,10);
+  const dep=ATT.find(a=>a.id==='A99');
+  SCHED['2026-11-01']=[{attId:'A99',resId:'RE'},{attId:'A88',resId:'RF'}];
+  ASSESS.unshift({id:9901,type:'ms',date:'2026-10-20',resId:'RE',resName:nm('RE'),attId:'A99',attName:dep.n,selEpa:[],epaScores:{},msItems:{}});
+  const nAss=ASSESS.filter(a=>a.attId==='A99').length;
+  T('before: departed-to-be shows in reminders',getPendingInRange('2026-11-01','2026-11-01').some(e=>e.attId==='A99'));
+  setAttLeft('A99',true);
+  T('marked left with date',dep.left===true&&dep.leftAt==='2026-11-02');
+  T('evaluations kept',ASSESS.filter(a=>a.attId==='A99').length===nAss);
+  T('not in 未填答名單 / 提醒',!getPendingInRange('2026-11-01','2026-11-01').some(e=>e.attId==='A99')&&getPendingInRange('2026-11-01','2026-11-01').some(e=>e.attId==='A88'));
+  T('no pending list for a departed attending',getPendingDates('A99').length===0);
+  const optVals=id=>{const sel=document.getElementById(id);return (sel._opts||[]).map(o=>o.value);};
+  T('identity picker hides departed',!document.getElementById('att-sel-grid').innerHTML.includes("selAtt('A99')")||(showAttSel(),!document.getElementById('att-sel-grid').innerHTML.includes("selAtt('A99')")));
+  currentAttId=null;selAtt('A99');
+  T('cannot pick a departed identity',currentAttId===null);
+  renderAtt();
+  T('management page lists departed separately with restore',document.getElementById('att-tbody').innerHTML.includes('已離職（')&&document.getElementById('att-tbody').innerHTML.includes("setAttLeft('A99',false)"));
+  await autoSync();
+  T('departure synced to the cloud',get('attendings','A99').left===true);
+  CONFIRM=false;const nAtt=ATT.length;delAtt('A88');
+  T('delete with evaluations offers departure instead (取消 = no change)',ATT.length===nAtt||!ASSESS.some(a=>a.attId==='A88'));
+  CONFIRM=true;setAttLeft('A99',false);
+  T('restore',!dep.left&&!dep.leftAt&&getPendingInRange('2026-11-01','2026-11-01').some(e=>e.attId==='A99'));
+  ASSESS=ASSESS.filter(a=>a.id!==9901);isAdmin=false;
 
   console.log((fail?'❌':'✅')+' '+pass+' passed, '+fail+' failed');
   process.exitCode=fail?1:0;

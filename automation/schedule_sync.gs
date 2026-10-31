@@ -5,6 +5,7 @@
  * 每小時觸發一次 hourly()：到了管理員設定的時間（config/cfg 的 schedHour，台北時間）
  * 且今天還沒同步，就讀「本月」與「下個月」的試算表（config/cfg 的 schedSrc），
  * 只更新試算表上出現的日期（config/schedule 的 data.<日期>），並在 config/schedLog 留紀錄。
+ * 該月的「代碼→姓名」存在 config/cfg 的 schedNames.<月份>，供網頁手動貼上時用姓名對應主治醫師。
  * 管理員頁的「立即同步」經由 doPost() 呼叫，需要通關碼（指令碼屬性 SYNC_TOKEN）。
  *
  * 只讀 Shiftcard 分頁的住院醫師欄與「班表」分頁的「醫師姓名」表（代碼、姓名兩欄），
@@ -169,6 +170,8 @@ function syncMonths(months,trigger){
       const r=buildMonthSchedule({month,grid:s.grid,nameTable:s.nameTable,residents,attendings});
       const paths=Object.keys(r.dates).map(ds=>'data.'+fsSeg(ds));
       fsPatch('config','schedule',{data:r.dates},paths);
+      // keep this month's code→name table so a manual paste on the page can match attendings by name
+      fsPatch('config','cfg',{schedNames:{[month]:s.nameTable}},['schedNames.'+fsSeg(month)]);
       Object.assign(entry,{ok:true,title:s.title,titleMonth:ssTitleMonth(s.title),first:r.first,last:r.last,days:r.days,entries:r.entries,
         skippedCodes:r.skippedCodes,skippedRes:r.skippedRes.map(x=>({label:x.label,why:x.why}))});
     }catch(e){entry.error=month+'：'+(e&&e.message||e);}

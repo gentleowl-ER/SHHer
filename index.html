@@ -10,7 +10,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>急診醫學評核系統 v5.29</title>
+<title>急診醫學評核系統 v5.31</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <!-- Firestore accessed via REST API (no SDK needed - more reliable on mobile/file:// contexts) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -369,7 +369,7 @@ body{font-size:var(--base-font,17px)}
 <div class="sbo" id="sbo" onclick="closeSB()"></div>
 <aside class="sidebar" id="sb">
   <div class="sb-logo">
-    <div class="sb-tag">TSEM · CBME 2025 v5.29</div>
+    <div class="sb-tag">TSEM · CBME 2025 v5.31</div>
     <h1>急診醫學<br>住院醫師評核系統</h1>
   </div>
   <nav class="sb-nav">
@@ -774,6 +774,7 @@ body{font-size:var(--base-font,17px)}
   <div class="card mb4 admin-only" id="sched-src-card">
     <div class="ct"><span class="dot" style="background:var(--acc)"></span>🔗 <span id="ss-title">本月</span> 班表連結（Google 試算表，每天自動同步）</div>
     <div id="ss-warn"></div>
+    <div id="ss-setup"></div>
     <div id="ss-cur" style="font-size:12.5px;margin-bottom:8px"></div>
     <div class="ifl" style="gap:6px;flex-wrap:wrap;align-items:flex-end">
       <div class="fg" style="margin:0;flex:1;min-width:200px"><label style="font-size:11px">貼上這個月的 Google 試算表網址</label><input type="url" id="ss-url" placeholder="https://docs.google.com/spreadsheets/d/..."></div>
@@ -787,7 +788,7 @@ body{font-size:var(--base-font,17px)}
         <select id="ss-hour" style="width:90px" onchange="saveSchedHour(this.value)"></select>
         <button class="btn bs bsm" onclick="syncSchedNow()">🔄 立即同步（本月＋下月）</button>
       </div>
-      <details class="mt3"><summary style="font-size:12px;color:var(--t2);cursor:pointer">⚙ 同步程式設定（Apps Script）</summary>
+      <details class="mt3" id="ss-setup-details"><summary style="font-size:12px;color:var(--t2);cursor:pointer">⚙ 同步程式設定（Apps Script）</summary>
         <div class="fg mt3"><label style="font-size:11px">同步程式網址（網頁應用程式）</label><input type="url" id="ss-hook" placeholder="https://script.google.com/macros/s/.../exec" onchange="saveSchedHook(this.value)"></div>
         <div class="fg"><label style="font-size:11px">通關碼（只存在這台裝置）</label><input type="password" id="ss-token" onchange="saveSchedToken(this.value)"></div>
         <button class="btn bs bsm" onclick="pingSchedHook()">🔌 測試連線</button>
@@ -801,8 +802,7 @@ body{font-size:var(--base-font,17px)}
     <div class="ct"><span class="dot" style="background:var(--purple)"></span>貼上班表</div>
     <p style="font-size:11px;color:var(--t3);margin-bottom:8px">請將班表資料（Tab分隔格式）貼至下方，格式如：日期欄位在第一欄，住院醫師代號在第一列，數字代表主治醫師編號，- 代表未上班。</p>
     <textarea class="paste-area" id="sched-paste" placeholder="貼上班表資料...&#10;&#9;A&#9;B&#9;C&#9;...&#10;4/1&#9;4&#9;-&#9;-&#9;..."></textarea>
-    <div style="font-size:11.5px;color:var(--t2);margin:8px 0 4px">醫師姓名表（選填，建議）：貼上該月「班表」分頁「醫師姓名」的代碼與姓名兩欄，主治醫師就會用姓名對應，不受各月代碼不同影響。</div>
-    <textarea class="paste-area" id="sched-names" style="min-height:70px" placeholder="20&#9;曾孟元&#10;21&#9;陳天恩&#10;..."></textarea>
+    <div style="font-size:11.5px;color:var(--t2);margin:8px 0 4px">主治醫師會自動用該月班表的「醫師姓名表」換成姓名再對應（每天自動同步時存下）；還沒同步過的月份才會暫用系統代碼。</div>
     <div class="ifl mt3" style="flex-wrap:wrap;gap:6px">
       <button class="btn bp bsm" onclick="parsePaste()">📊 解析班表</button>
       <button class="btn bs bsm" onclick="document.getElementById('sched-paste').value=''">清除</button>
@@ -1032,6 +1032,7 @@ body{font-size:var(--base-font,17px)}
   <div class="g2"><div class="fg"><label>編號</label><input type="text" id="a-no"></div><div class="fg"><label>姓名<span class="req">*</span></label><input type="text" id="a-n"></div></div>
   <div class="fg"><label>Email</label><input type="email" id="a-e"></div>
   <div class="fg"><label>LINE ID</label><input type="text" id="a-l"></div>
+  <label class="ifl" style="gap:8px;align-items:center;font-size:13px;margin:4px 0 6px;cursor:pointer"><input type="checkbox" id="a-left" style="width:auto"> 已離職（保留所有評核紀錄，不再出現在選單和提醒）</label>
   <div class="ah mt3">💬 個人質性回饋套餐</div>
   <div id="att-pre-wrap"></div>
   <div class="g2 mt3"><div class="fg"><label>套餐名稱</label><input type="text" id="atp-n"></div><div class="fg"><label>內容</label><input type="text" id="atp-c"></div></div>
@@ -1851,6 +1852,8 @@ function applyMode(){
   else{btn.textContent='🔒 切換管理員模式';btn.classList.remove('adm');bdg.textContent='指導醫師模式';bdg.className='badge bdg';if(!currentAttId)showAttSel();}
   updateRmBadge();
 }
+// Departed attendings keep their evaluations but leave every picker and reminder.
+function attActive(id){const a=getAtt(id);return !!a&&!a.left;}
 function showAttSel(){
   const w=document.getElementById('att-selector-wrap');if(!w)return;
   w.classList.remove('hidden');
@@ -1858,11 +1861,12 @@ function showAttSel(){
   // Belt-and-suspenders: if ATT is somehow empty/corrupted, fall back straight to defaults
   let src=(Array.isArray(ATT)&&ATT.length)?ATT:DEF_ATT;
   if(src===DEF_ATT)showJsError('ATT 名單為空，已自動改用內建預設名單顯示');
-  grid.innerHTML=[...src].sort((a,b)=>(parseInt(a.no)||999)-(parseInt(b.no)||999)).map(a=>`<button class="att-sel-btn ${currentAttId===a.id?'active':''}" onclick="selAtt('${a.id}')">${a.no?`<span style="font-size:9.5px;color:var(--t3)">${a.no}</span><br>`:''}${a.n}</button>`).join('');
+  grid.innerHTML=[...src].filter(a=>!a.left).sort((a,b)=>(parseInt(a.no)||999)-(parseInt(b.no)||999)).map(a=>`<button class="att-sel-btn ${currentAttId===a.id?'active':''}" onclick="selAtt('${a.id}')">${a.no?`<span style="font-size:9.5px;color:var(--t3)">${a.no}</span><br>`:''}${a.n}</button>`).join('');
 }
 function selAtt(id){
-  currentAttId=id;
   const att=ATT.find(a=>a.id===id);
+  if(att&&att.left){currentAttId=null;showAttSel();return;}
+  currentAttId=id;
   if(att){
     document.getElementById('att-badge').textContent=att.n;
     document.getElementById('att-selector-wrap').classList.add('hidden');
@@ -2033,10 +2037,10 @@ function parsePaste(){
   // A pasted Shiftcard has codes in row 1 and names in row 2 — names are the identity.
   const nextRow=lines[resHeaderIdx+1]||[];
   if(nextRow.filter(c=>c&&findResByName(c).length).length>=3){resHeaderIdx++;headerRow=nextRow;}
-  // Optional code→name table of that month: attendings are then matched by NAME.
-  const ntRaw=(document.getElementById('sched-names')?.value||'').trim();
-  const nameTable=ntRaw?ssParseNameTable(ntRaw.split('\n').map(l=>l.split('\t'))):null;
-  const unresolvedNames={};
+  // Code→name table of each month, saved by the daily sync (config/cfg → schedNames.<YYYY-MM>).
+  // Attendings are matched by NAME; only months never synced fall back to system codes.
+  const tableFor=ds=>{const t=(CFG.schedNames||{})[ds.slice(0,7)];return t&&Object.keys(t).length?t:null;};
+  const unresolvedNames={};const usedTables=new Set(),codeMonths=new Set();
 
   // ── Determine offset: col0 of date rows is always the date string ──
   // If header[0] is a resident → header has no leading empty cell → offset 1
@@ -2110,9 +2114,9 @@ function parsePaste(){
       // code to silently fail matching.
       const cell=(row[parseInt(col)]||'').replace(/[\s\u3000]+/g,'');
       if(!cell||cell==='-'||cell==='0'||cell==='S')return;
-      let att=null;
-      if(nameTable){const nm=nameTable[normCode(cell)];if(nm){att=ssMatchName(nm,ATT).hit||null;if(!att)unresolvedNames[cell]=nm;}}
-      else att=getAttByNo(cell);
+      let att=null;const nameTable=tableFor(dateStr);
+      if(nameTable){usedTables.add(dateStr.slice(0,7));const nm=nameTable[normCode(cell)];if(nm){att=ssMatchName(nm,ATT).hit||null;if(!att)unresolvedNames[cell]=nm;}}
+      else{codeMonths.add(dateStr.slice(0,7));att=getAttByNo(cell);}
       if(!att){
         skip++;
         if(!unresolvedCodes[cell])unresolvedCodes[cell]=new Set();
@@ -2157,8 +2161,8 @@ function parsePaste(){
   }
   const ymSummary=ymList.map(ym=>{const ds=[...pastedDates].filter(x=>x.startsWith(ym)).sort();const d0=+ds[0].slice(8),d1=+ds[ds.length-1].slice(8),mo=+ym.slice(5);
     return`${fmtYM(ym)}（${mo}/${d0}–${mo}/${d1}，共 ${ds.length} 天）`;}).join('、');
-  const modeNote=nameTable?`<div style="font-size:11.5px;color:var(--t2)">👤 主治醫師依醫師姓名表（${Object.keys(nameTable).length} 位）以姓名對應</div>`
-    :`<div style="font-size:11.5px;color:var(--a3)">⚠ 未提供醫師姓名表，依系統代碼對應（各月代碼不同時可能對錯人）</div>`;
+  const modeNote=(usedTables.size?`<div style="font-size:11.5px;color:var(--t2)">👤 主治醫師依 ${[...usedTables].sort().map(fmtYM).join('、')} 班表的醫師姓名表以姓名對應</div>`:'')
+    +(codeMonths.size?`<div style="font-size:11.5px;color:var(--danger);font-weight:600">⚠ ${[...codeMonths].sort().map(fmtYM).join('、')} 還沒有醫師姓名表（自動同步尚未成功過），暫用系統代碼對應，各月代碼不同時會對錯人。請先完成該月的自動同步。</div>`:'');
   el.innerHTML=modeNote+`${ymSummary?`<div style="font-weight:700;font-size:13.5px;margin-bottom:4px">📅 已匯入 ${ymSummary}</div>`:''}✅ 解析完成！<b>${ok}</b> 個日期，<b>${entries}</b> 筆${skip>0?` <span style="color:var(--a3)">⚠ ${skip}格未識別</span>`:''}
     <br><span style="font-size:12px;color:var(--t3)">偏移:${dateColOffset} ｜ ${preview}...</span>${unresolvedMsg}`;
   el.className='al aok';el.classList.remove('hidden');
@@ -2225,6 +2229,7 @@ function renderDash(){
 function getTodayDocs(ds){return SCHED[ds]||[];}
 function getPendingDates(attId){
   const result=[];
+  if(!attActive(attId))return result;
   const today=tod();
   Object.entries(SCHED).forEach(([date,entries])=>{
     if(date>today)return;
@@ -3544,17 +3549,34 @@ function mergeDupResidents(nameKey){
 }
 
 // ══════════════ ATTENDINGS ══════════════
-function renderAtt(){const sortedATT=[...ATT].sort((a,b)=>{const na=parseInt(a.no)||999,nb=parseInt(b.no)||999;return na-nb;});const tb=document.getElementById('att-tbody');if(!ATT.length){tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--t3);padding:16px">尚無資料</td></tr>';return;}const m=mkStr();tb.innerHTML=sortedATT.map(a=>{const c=ASSESS.filter(x=>x.attId===a.id&&x.date.startsWith(m)).length;return`<tr><td style="font-family:'DM Mono';font-size:10.5px;color:var(--t3)">${a.no||'—'}</td><td><div style="display:flex;align-items:center;gap:7px"><div class="dav">${a.n[0]}</div>${a.n}</div></td><td>${c} 份</td><td style="font-size:11px;color:var(--t3)">${a.note||'—'}</td><td class="ifl" style="gap:4px"><button class="btn bs bxs" onclick="editAtt('${a.id}')">編輯</button><button class="btn bxs" style="background:rgba(59,130,246,.12);color:var(--a2);border:1px solid rgba(59,130,246,.25)" onclick="showAccCal('${a.id}')">📅</button><button class="btn bxs bd" onclick="delAtt('${a.id}')">刪除</button></td></tr>`;}).join('');}
+function renderAtt(){
+  const tb=document.getElementById('att-tbody');
+  if(!ATT.length){tb.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--t3);padding:16px">尚無資料</td></tr>';return;}
+  const byNo=(a,b)=>(parseInt(a.no)||999)-(parseInt(b.no)||999);
+  const m=mkStr();
+  const row=a=>{const c=ASSESS.filter(x=>x.attId===a.id&&x.date.startsWith(m)).length,tot=ASSESS.filter(x=>x.attId===a.id).length;
+    return`<tr style="${a.left?'opacity:.6':''}"><td style="font-family:'DM Mono';font-size:10.5px;color:var(--t3)">${escH(a.no||'—')}</td><td><div style="display:flex;align-items:center;gap:7px"><div class="dav">${escH(a.n[0])}</div>${escH(a.n)}${a.left?`<span class="pill p1" style="font-size:10px">已離職${a.leftAt?' '+escH(a.leftAt):''}</span>`:''}</div></td><td>${a.left?`共 ${tot} 份`:`${c} 份`}</td><td style="font-size:11px;color:var(--t3)">${escH(a.note||'—')}</td><td class="ifl" style="gap:4px"><button class="btn bs bxs" onclick="editAtt('${a.id}')">編輯</button>${a.left?`<button class="btn bs bxs" onclick="setAttLeft('${a.id}',false)">↩ 恢復在職</button>`:`<button class="btn bxs" style="background:rgba(59,130,246,.12);color:var(--a2);border:1px solid rgba(59,130,246,.25)" onclick="showAccCal('${a.id}')">📅</button><button class="btn bs bxs" onclick="setAttLeft('${a.id}',true)">離職</button>`}<button class="btn bxs bd" onclick="delAtt('${a.id}')">刪除</button></td></tr>`;};
+  const act=ATT.filter(a=>!a.left).sort(byNo),gone=ATT.filter(a=>a.left).sort(byNo);
+  tb.innerHTML=act.map(row).join('')+(gone.length?`<tr><td colspan="5" style="padding:10px 6px 4px;font-size:12px;font-weight:600;color:var(--t3)">已離職（${gone.length} 位，評核紀錄都保留）</td></tr>`+gone.map(row).join(''):'');
+}
+function setAttLeft(id,left){
+  const a=getAtt(id);if(!a)return;
+  const n=ASSESS.filter(x=>x.attId===id).length;
+  if(left&&!confirm(`將「${a.n}」設為離職？\n他的 ${n} 份評核紀錄都會保留，統計與學員報告照常顯示；之後不會出現在選擇身份、填答選單、未填答名單和提醒裡。\n可隨時恢復在職。`))return;
+  a.left=!!left;if(left)a.leftAt=tod();else delete a.leftAt;
+  save();renderAtt();updateRmBadge();
+  setCst('ok',left?`✅ 已將「${a.n}」設為離職`:`✅「${a.n}」已恢復在職`);
+}
 function showAccCal(id){accId=id;accY=new Date().getFullYear();accMo=new Date().getMonth();renderAccCal();}
 function accM(d){accMo+=d;if(accMo>11){accMo=0;accY++;}else if(accMo<0){accMo=11;accY--;}renderAccCal();}
 function renderAccCal(){const att=getAtt(accId);if(!att)return;const cal=document.getElementById('att-cal');cal.style.display='block';document.getElementById('acc-title').textContent=`${att.n} 評核日曆`;document.getElementById('acc-mon').textContent=`${accY}年${accMo+1}月`;const t=tod(),fd=new Date(accY,accMo,1).getDay(),days=new Date(accY,accMo+1,0).getDate();const grid=document.getElementById('acc-grid');grid.innerHTML='';for(let i=0;i<fd;i++)grid.innerHTML+=`<div class="acd empty"></div>`;for(let d=1;d<=days;d++){const ds=`${accY}-${String(accMo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;const hasSched=(SCHED[ds]||[]).some(e=>e.attId===accId);const cnt=ASSESS.filter(a=>a.date===ds&&a.attId===accId).length;let cls='acd';if(!hasSched)cls+=' nosc';else if(cnt>0)cls+=' hass';else cls+=' noss';if(ds===t)cls+=' tod';grid.innerHTML+=`<div class="${cls}"><div style="font-size:9.5px">${d}</div>${hasSched&&cnt>0?`<div style="font-size:7.5px">${cnt}份</div>`:''}</div>`;}cal.scrollIntoView({behavior:'smooth',block:'nearest'});}
-function openAttM(){editAttId=null;['a-id','a-n','a-e','a-l','a-no'].forEach(id=>document.getElementById(id).value='');document.getElementById('att-pre-wrap').innerHTML='';document.getElementById('m-att-t').textContent='新增主治醫師';openM('m-att');}
-function editAtt(id){editAttId=id;const a=getAtt(id);if(!a)return;document.getElementById('a-id').value=id;document.getElementById('a-n').value=a.n;document.getElementById('a-e').value=a.email||'';document.getElementById('a-l').value=a.line||'';document.getElementById('a-no').value=a.no||'';renderAttPreWrap(a);document.getElementById('m-att-t').textContent=`編輯 — ${a.n}`;openM('m-att');}
+function openAttM(){editAttId=null;['a-id','a-n','a-e','a-l','a-no'].forEach(id=>document.getElementById(id).value='');{const al=document.getElementById('a-left');if(al)al.checked=false;}document.getElementById('att-pre-wrap').innerHTML='';document.getElementById('m-att-t').textContent='新增主治醫師';openM('m-att');}
+function editAtt(id){editAttId=id;const a=getAtt(id);if(!a)return;document.getElementById('a-id').value=id;document.getElementById('a-n').value=a.n;document.getElementById('a-e').value=a.email||'';document.getElementById('a-l').value=a.line||'';document.getElementById('a-no').value=a.no||'';const al=document.getElementById('a-left');if(al)al.checked=!!a.left;renderAttPreWrap(a);document.getElementById('m-att-t').textContent=`編輯 — ${a.n}`;openM('m-att');}
 function renderAttPreWrap(att){document.getElementById('att-pre-wrap').innerHTML=(att?.presets||[]).map((p,i)=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid rgba(30,45,69,.4)"><span style="font-size:11px;color:var(--acc)">${p.n}</span><span style="font-size:10px;color:var(--t3);flex:1">${p.c.slice(0,30)}…</span><button class="btn bxs bd" onclick="delAttPre(${i})">✕</button></div>`).join('')||'<div style="font-size:10.5px;color:var(--t3);padding:3px 0">尚無個人套餐</div>';}
 function addAttPre(){const n=document.getElementById('atp-n').value.trim(),c=document.getElementById('atp-c').value.trim();if(!n||!c)return alert('請填寫套餐名稱和內容');const id=editAttId||document.getElementById('a-id').value;const att=getAtt(id);if(!att)return;if(!att.presets)att.presets=[];att.presets.push({n,c});save();renderAttPreWrap(att);document.getElementById('atp-n').value='';document.getElementById('atp-c').value='';}
 function delAttPre(idx){const id=editAttId||document.getElementById('a-id').value;const att=getAtt(id);if(!att)return;att.presets.splice(idx,1);save();renderAttPreWrap(att);}
-function saveAtt(){const n=document.getElementById('a-n').value.trim();if(!n)return alert('請輸入姓名');const eid=document.getElementById('a-id').value;const d={n,email:document.getElementById('a-e').value,line:document.getElementById('a-l').value,no:document.getElementById('a-no').value};if(eid){const a=getAtt(eid);if(a)Object.assign(a,d);}else ATT.push({id:Date.now().toString(),...d,presets:[]});save();autoSyncDebounced();closeM('m-att');renderAtt();}
-function delAtt(id){if(!confirm('確定刪除？'))return;ATT=ATT.filter(a=>a.id!==id);save();renderAtt();}
+function saveAtt(){const n=document.getElementById('a-n').value.trim();if(!n)return alert('請輸入姓名');const eid=document.getElementById('a-id').value;const d={n,email:document.getElementById('a-e').value,line:document.getElementById('a-l').value,no:document.getElementById('a-no').value};const lf=!!document.getElementById('a-left')?.checked;if(eid){const a=getAtt(eid);if(a){Object.assign(a,d);if(lf&&!a.left){a.left=true;a.leftAt=tod();}else if(!lf&&a.left){a.left=false;delete a.leftAt;}}}else ATT.push({id:Date.now().toString(),...d,presets:[]});save();autoSyncDebounced();closeM('m-att');renderAtt();}
+function delAtt(id){const a=getAtt(id);const n=ASSESS.filter(x=>x.attId===id).length;if(n&&!a?.left){if(confirm(`「${a?.n||''}」有 ${n} 份評核紀錄。\n若是離職，建議改用「離職」保留紀錄。\n\n按「確定」改設為離職；按「取消」不做任何變更。`))setAttLeft(id,true);return;}if(!confirm(n?`刪除「${a?.n||''}」？他的 ${n} 份評核仍會保留，但會失去對應的主治醫師資料。`:'確定刪除？'))return;ATT=ATT.filter(a=>a.id!==id);save();renderAtt();}
 
 // ══════════════ SCHEDULE ══════════════
 function clearSchedMonth(){
@@ -3623,7 +3645,7 @@ function restoreRes(id){
 }
 
 // ══════════════ REMIND ══════════════
-function updateRmBadge(){const t=tod();const sched=getTodayDocs(t);const miss=sched.filter(e=>{const res=getRes(e.resId);if(!res||res.grad)return false;const cnt=ASSESS.filter(a=>a.date===t&&a.attId===e.attId&&a.resId===e.resId).length;return cnt===0;});const b=document.getElementById('rbadge');if(isAdmin&&miss.length>0){b.textContent=miss.length;b.classList.remove('hidden');}else b.classList.add('hidden');}
+function updateRmBadge(){const t=tod();const sched=getTodayDocs(t);const miss=sched.filter(e=>{const res=getRes(e.resId);if(!res||res.grad||!attActive(e.attId))return false;const cnt=ASSESS.filter(a=>a.date===t&&a.attId===e.attId&&a.resId===e.resId).length;return cnt===0;});const b=document.getElementById('rbadge');if(isAdmin&&miss.length>0){b.textContent=miss.length;b.classList.remove('hidden');}else b.classList.add('hidden');}
 function monthStart(dateStr){return String(dateStr).slice(0,7)+'-01';}
 function initRemindRange(){
   const to=tod();const from=monthStart(to);
@@ -3655,6 +3677,7 @@ function getPendingInRange(from,to){
     if(date<from||date>to)return;
     entries.forEach(e=>{
       const res=getRes(e.resId);if(!res||res.grad)return;
+      if(!attActive(e.attId))return; // departed: no reminders, evaluations kept
       const att=getAtt(e.attId);
       const filled=ASSESS.some(a=>a.date===date&&a.attId===e.attId&&a.resId===e.resId);
       result.push({date,attId:e.attId,attName:att?.n||'—',resId:e.resId,resName:res.n,resYear:res.y,filled});
@@ -3776,7 +3799,7 @@ function quickMessenger(attId,from,to){
   if(!txt){alert('此主治醫師在此區間已無未填答項目');return;}
   openMessengerShare(txt);
 }
-function buildBatch(ds){const entries=SCHED[ds]||[];const attGroups={};entries.forEach(e=>{const res=getRes(e.resId);if(!res||res.grad)return;if(!attGroups[e.attId])attGroups[e.attId]=[];attGroups[e.attId].push(e.resId);});const miss=[];Object.entries(attGroups).forEach(([attId,resIds])=>{const att=getAtt(attId);if(!att)return;const missing=resIds.filter(rid=>{const cnt=ASSESS.filter(a=>a.date===ds&&a.attId===attId&&a.resId===rid).length;return cnt===0;});if(missing.length){const resNames=missing.map(rid=>getRes(rid)?.n||'?').join('、');miss.push(`• ${att.n}（尚未評核：${resNames}）`);}});return miss.length?`【急診住院醫師評核提醒】\n\n以下主治醫師於 ${ds} 尚未完成評核：\n\n${miss.join('\n')}\n\n請於輪班結束前完成評核，謝謝！`:'無需提醒';}
+function buildBatch(ds){const entries=SCHED[ds]||[];const attGroups={};entries.forEach(e=>{const res=getRes(e.resId);if(!res||res.grad||!attActive(e.attId))return;if(!attGroups[e.attId])attGroups[e.attId]=[];attGroups[e.attId].push(e.resId);});const miss=[];Object.entries(attGroups).forEach(([attId,resIds])=>{const att=getAtt(attId);if(!att)return;const missing=resIds.filter(rid=>{const cnt=ASSESS.filter(a=>a.date===ds&&a.attId===attId&&a.resId===rid).length;return cnt===0;});if(missing.length){const resNames=missing.map(rid=>getRes(rid)?.n||'?').join('、');miss.push(`• ${att.n}（尚未評核：${resNames}）`);}});return miss.length?`【急診住院醫師評核提醒】\n\n以下主治醫師於 ${ds} 尚未完成評核：\n\n${miss.join('\n')}\n\n請於輪班結束前完成評核，謝謝！`:'無需提醒';}
 function batchEmail(){const {from,to}=getDateRange('rmd-from','rmd-to');const txt=buildBatchRange(from,to);const entries=getPendingInRange(from,to).filter(e=>!e.filled);const emails=[...new Set(entries.map(e=>getAtt(e.attId)?.email).filter(Boolean))].join(',');if(!emails)return alert('無 Email 可發送');window.open(`mailto:${emails}?subject=${encodeURIComponent('評核提醒 '+from+' ~ '+to)}&body=${encodeURIComponent(txt)}`);}
 function batchLine(){const {from,to}=getDateRange('rmd-from','rmd-to');document.getElementById('line-txt').textContent=buildBatchRange(from,to);openM('m-line');}
 function batchMessenger(){const {from,to}=getDateRange('rmd-from','rmd-to');document.getElementById('line-txt').textContent=buildBatchRange(from,to);openM('m-line');}
@@ -3944,6 +3967,15 @@ function renderSchedSrc(){
   const hk=document.getElementById('ss-hook');if(hk)hk.value=CFG.schedHookUrl||'';
   let tk='';try{tk=localStorage.getItem(SCHED_TOKEN_KEY)||'';}catch(e){}
   const te=document.getElementById('ss-token');if(te)te.value=tk;
+  // Say plainly when automatic sync can't work yet — a saved link alone does nothing.
+  const st=document.getElementById('ss-setup');
+  if(st){
+    const howto='https://github.com/gentleowl-ER/SHHer/blob/main/automation/README.md';
+    st.innerHTML=!CFG.schedHookUrl
+      ?`<div class="al ae mb4" style="font-size:12.5px">⚠ <b>自動同步尚未啟用。</b>貼上的連結會先存起來，但要先完成一次「同步程式（Apps Script）」設定，系統才會去抓班表。<a href="${howto}" target="_blank" rel="noopener">設定步驟</a>，完成後在下方「⚙ 同步程式設定」貼上網址與通關碼。</div>`
+      :!tk?`<div class="al ai mb4" style="font-size:12.5px">ℹ 每天的自動同步已啟用。這台裝置還沒輸入通關碼，所以不能按「儲存並同步／立即同步」馬上抓；請在下方「⚙ 同步程式設定」輸入一次。</div>`:'';
+    if(!CFG.schedHookUrl||!tk){const d1=document.querySelector('#sched-src-card > details'),d2=document.getElementById('ss-setup-details');if(d1)d1.open=true;if(d2)d2.open=true;}
+  }
 }
 function saveSchedHour(v){CFG.schedHour=parseInt(v);save();}
 function saveSchedHook(v){CFG.schedHookUrl=String(v||'').trim();save();}
@@ -3952,8 +3984,10 @@ async function callSchedHook(body){
   const url=CFG.schedHookUrl;let token='';try{token=localStorage.getItem(SCHED_TOKEN_KEY)||'';}catch(e){}
   if(!url||!token)throw new Error('尚未設定同步程式網址或通關碼（見下方「同步程式設定」）');
   // text/plain body: no CORS preflight, which Apps Script web apps do not answer
-  const res=await fetch(url,{method:'POST',body:JSON.stringify({...body,token})});
-  const j=await res.json();
+  let res;try{res=await fetch(url,{method:'POST',body:JSON.stringify({...body,token})});}
+  catch(e){throw new Error('連不到同步程式（網路問題，或網址不是 Apps Script 的 /exec 網址）');}
+  let j;try{j=await res.json();}
+  catch(e){throw new Error('同步程式沒有回傳資料：請確認部署時「誰可以存取」選「所有人」，而且網址是 …/exec 結尾（不是 /dev）');}
   if(!j.ok)throw new Error(j.error||'同步程式回應錯誤');
   return j;
 }
@@ -3991,7 +4025,7 @@ function addSchedSrc(month,link){
   if(!/^https:\/\/docs\.google\.com\/spreadsheets\/d\//.test(url)){alert('請貼上 Google 試算表網址（https://docs.google.com/spreadsheets/d/...）');return null;}
   CFG.schedSrc={...(CFG.schedSrc||{}),[m]:url};save();renderSchedSrc();
   document.getElementById('ss-url').value='';
-  if(!CFG.schedHookUrl){const out=document.getElementById('ss-result');if(out)out.innerHTML=`已儲存 ${escH(m)}。尚未設定同步程式網址，暫時無法立即同步。`;return null;}
+  if(!CFG.schedHookUrl){const out=document.getElementById('ss-result');if(out)out.innerHTML=`<div style="color:var(--danger);font-weight:600">已儲存 ${escH(m)} 的連結，但還沒抓班表：自動同步尚未啟用（見上方說明）。</div>`;return null;}
   return syncSchedMonth(m);
 }
 function delSchedSrc(m){
@@ -4209,8 +4243,9 @@ function populateSel(id,isAtt=false){
   // Belt-and-suspenders: fall back to built-in defaults if live data is empty/corrupted
   const attSrc=(Array.isArray(ATT)&&ATT.length)?ATT:DEF_ATT;
   const resSrc=(Array.isArray(RES)&&RES.length)?RES:DEF_RES;
-  (isAtt?[...attSrc].sort((a,b)=>(parseInt(a.no)||999)-(parseInt(b.no)||999)):resSrc.filter(r=>!r.grad)).forEach(r=>{
-    const o=document.createElement('option');o.value=r.id;o.textContent=isAtt?`${r.no?r.no+' ':''}${r.n}`:`${r.n} (${r.y})`;sel.appendChild(o);
+  const keepLeft=id==='hf-a';
+  (isAtt?[...attSrc].filter(a=>keepLeft||!a.left).sort((a,b)=>(parseInt(a.no)||999)-(parseInt(b.no)||999)):resSrc.filter(r=>!r.grad)).forEach(r=>{
+    const o=document.createElement('option');o.value=r.id;o.textContent=isAtt?`${r.no?r.no+' ':''}${r.n}${r.left?'（已離職）':''}`:`${r.n} (${r.y})`;sel.appendChild(o);
   });
   sel.value=cur;
 }
